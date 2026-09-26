@@ -2,12 +2,15 @@
 --  tools/proof_closure_lint.py fails on any unit gnatprove did not
 --  analyze.  A generic (Fabula.Tags.Eval) is analyzed only through a
 --  concrete instance, so one is instantiated here.
+with Fabula.Args;
 with Fabula.Ast;
 with Fabula.Check;
+with Fabula.Expand;
 with Fabula.Expressions;
 with Fabula.Frames;
 with Fabula.Limits;
 with Fabula.Parse;
+with Fabula.Registry;
 with Fabula.Results;
 with Fabula.Scan;
 with Fabula.Tags;
@@ -72,5 +75,54 @@ is
 
    --  A Frame's bounded fields, filled and read back.
    procedure Closure_Frame (F : in out Fabula.Frames.Frame);
+
+   --  A Registry instance over sample enums, with a step table and a
+   --  hook table declared at library level, as a user declares them.
+   type Closure_Step is (Count_Step, Word_Step);
+   type Closure_Hook is (Fresh_Hook, Audit_Hook);
+
+   type Closure_Context is record
+      Count : Natural := 0;
+   end record;
+
+   package Closure_Registry is new
+     Fabula.Registry
+       (Step_Kind => Closure_Step,
+        Hook_Kind => Closure_Hook,
+        Context   => Closure_Context);
+   use type Closure_Registry.Step_Row;
+   use type Closure_Registry.Hook_Row;
+   use type Closure_Registry.Hook_Phase;
+
+   Closure_Steps : constant Closure_Registry.Step_Table :=
+     [Closure_Registry.Step ("the count is {int}") >= Count_Step,
+      Closure_Registry.Step ("a {word}") >= Word_Step];
+
+   Closure_Hooks : constant Closure_Registry.Hook_Table :=
+     [Closure_Registry.Before ("@fresh") >= Fresh_Hook,
+      Closure_Registry.After >= Audit_Hook,
+      Closure_Registry.Before_All >= Audit_Hook,
+      Closure_Registry.After_All >= Audit_Hook,
+      Closure_Registry.Before_Step >= Audit_Hook,
+      Closure_Registry.After_Step >= Audit_Hook];
+
+   --  Startup validation, then one lookup, as the runner will do them.
+   procedure Closure_Lookup (Kind : out Closure_Step; Captures : out Natural);
+
+   --  Every hook accessor the runner reads, over the whole table.
+   procedure Closure_Hook_Walk (Tagged_Rows : out Natural);
+
+   --  The first outline's concrete scenarios, as the runner will walk
+   --  them: rows, name, line, tags and one step's expansion.
+   procedure Closure_Expand (Doc : Fabula.Ast.Document; Total : out Natural);
+
+   --  A List as the runner assembles one: a lookup's text and captures,
+   --  a doc string and a table, one Examples row.  The shell makes Ref.
+   procedure Closure_Assemble
+     (Ref : Fabula.Args.Document_Access; A : out Fabula.Args.List);
+
+   --  Every Args reader, each behind the guard its precondition names,
+   --  as a step body calls them.
+   procedure Closure_Read (A : Fabula.Args.List; Longest : out Natural);
 
 end Fabula_Closure_Proof;
