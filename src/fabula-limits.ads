@@ -43,4 +43,13 @@ is
    --  One tag expression's source length, and its compiled postfix
    --  token table (also the bound of the shunting-yard operator stack).
 
+   Max_Message_Length   : constant := 512;
+   --  One check's failure text.
+   Max_Name_Length      : constant := 256;
+   --  A feature or scenario name.
+   Max_Path_Length      : constant := 512;
+   --  A feature-file path.
+   Max_Step_Text_Length : constant := Max_Line_Length;
+   --  A step's own text, the same bound as a scanned line.
+
 end Fabula.Limits;
