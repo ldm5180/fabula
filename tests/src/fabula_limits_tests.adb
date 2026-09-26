@@ -52,6 +52,23 @@ package body Fabula_Limits_Tests is
          "the arena must hold at least one full line");
    end Test_Limits_Are_Positive;
 
+   --  The pattern matcher's two capacities, and the relation between
+   --  them: the matcher keeps at most one choice per pattern token.
+   procedure Test_Matcher_Limits (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert
+        (Fabula.Limits.Max_Pattern_Tokens > 0,
+         "Max_Pattern_Tokens must be positive");
+      Assert
+        (Fabula.Limits.Max_Match_Choices > 0,
+         "Max_Match_Choices must be positive");
+      Assert
+        (Fabula.Limits.Max_Match_Choices > Fabula.Limits.Max_Pattern_Tokens,
+         "the choice stack must hold one choice per pattern token");
+   end Test_Matcher_Limits;
+
    overriding
    procedure Register_Tests (T : in out Test) is
    begin
@@ -59,6 +76,10 @@ package body Fabula_Limits_Tests is
         (T,
          Test_Limits_Are_Positive'Access,
          "every shipped capacity is positive");
+      Register_Routine
+        (T,
+         Test_Matcher_Limits'Access,
+         "the matcher's capacities are consistent");
    end Register_Tests;
 
    overriding

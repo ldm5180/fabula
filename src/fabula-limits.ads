@@ -29,4 +29,9 @@ is
    Max_Pattern_Length   : constant := 256;
    Max_Args_Per_Step    : constant := 16;
 
+   Max_Pattern_Tokens : constant := 64;
+   Max_Match_Choices  : constant := 128;
+   --  One compiled step pattern's token table, and the depth of the
+   --  choice stack its matcher backtracks through.
+
 end Fabula.Limits;
