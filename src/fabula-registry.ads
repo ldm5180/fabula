@@ -4,6 +4,8 @@
 --  its row, never raised; the table-level checks report it by row.
 --  Context is the user's per-scenario record: the runner and the
 --  binary instantiate over this one package, so it travels here.
+--  Every component of Context must carry a default, because the shell
+--  starts each scenario from a default-initialized one.
 with Fabula.Expressions;
 with Fabula.Limits;
 with Fabula.Tags;
@@ -12,8 +14,11 @@ generic
    type Step_Kind is (<>);
    type Hook_Kind is (<>);
    type Context is private;
-   pragma Unreferenced (Context);
 package Fabula.Registry with SPARK_Mode is
+
+   --  The context under a name of its own, which the shell's drive loop
+   --  reads through the instance; nothing in this package reads it.
+   subtype Scenario_Context is Context;
 
    ---------------------------------------------------------------------
    --  Steps.  Table : constant Step_Table :=

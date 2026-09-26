@@ -122,11 +122,22 @@ package body Fabula_Limits_Tests is
          "Max_Line_Selections must be positive");
    end Test_Selection_Limits;
 
+   --  The shell's search bound added in P8.
+   procedure Test_Search_Limit (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+   begin
+      Assert
+        (Fabula.Limits.Max_Search_Depth > 0,
+         "Max_Search_Depth must be positive");
+   end Test_Search_Limit;
+
    overriding
    procedure Register_Tests (T : in out Test) is
    begin
       Register_Routine
         (T, Test_Selection_Limits'Access, "the runner's selection capacities");
+      Register_Routine
+        (T, Test_Search_Limit'Access, "the shell's search depth");
       Register_Routine
         (T,
          Test_Limits_Are_Positive'Access,
