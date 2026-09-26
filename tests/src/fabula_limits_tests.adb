@@ -85,6 +85,29 @@ package body Fabula_Limits_Tests is
          "the choice stack must hold one choice per pattern token");
    end Test_Matcher_Limits;
 
+   --  The check, results and frame capacities added in P5.
+   procedure Test_Check_Frame_Limits
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert
+        (Fabula.Limits.Max_Message_Length > 0,
+         "Max_Message_Length must be positive");
+      Assert
+        (Fabula.Limits.Max_Name_Length > 0,
+         "Max_Name_Length must be positive");
+      Assert
+        (Fabula.Limits.Max_Path_Length > 0,
+         "Max_Path_Length must be positive");
+      Assert
+        (Fabula.Limits.Max_Step_Text_Length > 0,
+         "Max_Step_Text_Length must be positive");
+      Assert
+        (Fabula.Limits.Max_Step_Text_Length = Fabula.Limits.Max_Line_Length,
+         "a step's text is bounded the same as a scanned line");
+   end Test_Check_Frame_Limits;
+
    overriding
    procedure Register_Tests (T : in out Test) is
    begin
@@ -98,6 +121,8 @@ package body Fabula_Limits_Tests is
          "the matcher's capacities are consistent");
       Register_Routine
         (T, Test_Tag_Expr_Limits'Access, "the tag-expression capacities");
+      Register_Routine
+        (T, Test_Check_Frame_Limits'Access, "the check/frame capacities");
    end Register_Tests;
 
    overriding

@@ -3,9 +3,12 @@
 --  analyze.  A generic (Fabula.Tags.Eval) is analyzed only through a
 --  concrete instance, so one is instantiated here.
 with Fabula.Ast;
+with Fabula.Check;
 with Fabula.Expressions;
+with Fabula.Frames;
 with Fabula.Limits;
 with Fabula.Parse;
+with Fabula.Results;
 with Fabula.Scan;
 with Fabula.Tags;
 
@@ -49,4 +52,25 @@ is
    --  Fabula.Grammar) at the shipped capacities.
    procedure Closure_Parse
      (P : out Fabula.Parse.Parser; Doc : in out Fabula.Ast.Document);
+
+   --  A second Integer instance of Compare, alongside the shipped
+   --  Fabula.Check.Ints: belt and suspenders for the generic's proof
+   --  coverage, since a bare child-unit instantiation needs its own
+   --  `pragma SPARK_Mode;` (an aspect there is rejected) before
+   --  gnatprove analyzes it rather than skipping it as Off.
+   package Closure_Compare is new
+     Fabula.Check.Compare
+       (Item  => Integer,
+        Image => Fabula.Check.Integer_Image);
+
+   --  Reaches Closure_Compare's six comparisons and the plain checks
+   --  and scenario controls declared directly on Fabula.Check.
+   procedure Closure_Check (R : in out Fabula.Check.Outcome);
+
+   --  One scenario's worth of counters, reaching the exit rule.
+   procedure Closure_Results (C : in out Fabula.Results.Counts);
+
+   --  A Frame's bounded fields, filled and read back.
+   procedure Closure_Frame (F : in out Fabula.Frames.Frame);
+
 end Fabula_Closure_Proof;
