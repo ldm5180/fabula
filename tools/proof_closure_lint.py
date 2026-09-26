@@ -59,8 +59,10 @@ import pathlib
 import re
 import sys
 
-#  Directories that hold core (proof-covered) units.  Later phases add
-#  more (e.g. a scanner or parser package tree) by appending here.
+#  Directories that hold core (proof-covered) units, each read without
+#  recursion.  src/shell -- the shell, outside the proof by design --
+#  sits under src and is therefore NOT core; the selftest pins that.
+#  A later core tree is added by appending its directory here.
 CORE_DIRS: list[str] = ["src"]
 
 #  A generic block's own formal-subprogram parameters ("with function"
@@ -300,6 +302,9 @@ def selftest() -> int:
         for stem in ("a", "b", "c", "d", "gen", "e"):
             (src / f"{stem}.ads").write_text(f"package {stem} is end;\n")
         (src / "gsub.ads").write_text(_GSUB_SOURCE)
+        #  A shell unit: under src/shell, so never core.
+        (src / "shell").mkdir()
+        (src / "shell" / "shelly.ads").write_text("package shelly is end;\n")
 
         #  a: fully analyzed.
         (gnatprove_obj / "a.spark").write_text(_spark_json([("a.ads", "A", "all")]))
@@ -367,6 +372,8 @@ def selftest() -> int:
         problems = check(core, analyzed, waived, generics, evidence)
         kinds = {p.split()[0] for p in problems}
 
+        if "shelly" in core:
+            failures.append("a unit under src/shell must not count as core")
         if "gen" not in analyzed:
             failures.append("gen must count as analyzed through its instance")
         if not any(p.startswith("UNWAIVED  b:") for p in problems):

@@ -3,14 +3,18 @@ with AUnit.Test_Cases;
 with Fabula_Args_Tests;
 with Fabula_Ast_Tests;
 with Fabula_Check_Tests;
+with Fabula_Console_Tests;
 with Fabula_Corpus_Tests;
+with Fabula_Dispatch_Tests;
 with Fabula_Expand_Tests;
 with Fabula_Expressions_Tests;
+with Fabula_Files_Tests;
 with Fabula_Frames_Tests;
 with Fabula_Limits_Tests;
 with Fabula_Names_Tests;
 with Fabula_Parse_Tests;
 with Fabula_Registry_Tests;
+with Fabula_Reports_Tests;
 with Fabula_Results_Tests;
 with Fabula_Run_Select_Tests;
 with Fabula_Run_Tests;
@@ -19,14 +23,13 @@ with Fabula_Tags_Tests;
 
 package body Fabula_Suite is
 
-   function Suite return AUnit.Test_Suites.Access_Test_Suite is
-      Result : constant AUnit.Test_Suites.Access_Test_Suite :=
-        AUnit.Test_Suites.New_Suite;
+   --  Add_Test's second parameter is an anonymous access type, so each
+   --  test case is allocated into a named Test_Case_Access constant
+   --  first: allocating directly into an anonymous-access actual
+   --  parameter is a distinct GNAT warning under -gnatwa.
 
-      --  Add_Test's second parameter is an anonymous access type, so each
-      --  test case is allocated into a named Test_Case_Access constant
-      --  first: allocating directly into an anonymous-access actual
-      --  parameter is a distinct GNAT warning under -gnatwa.
+   --  The proved core's tests.
+   procedure Add_Core (Result : AUnit.Test_Suites.Access_Test_Suite) is
       Limits_Test      : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Limits_Tests.Test;
       Scan_Test        : constant AUnit.Test_Cases.Test_Case_Access :=
@@ -76,6 +79,31 @@ package body Fabula_Suite is
       AUnit.Test_Suites.Add_Test (Result, Names_Test);
       AUnit.Test_Suites.Add_Test (Result, Run_Test);
       AUnit.Test_Suites.Add_Test (Result, Run_Select_Test);
+   end Add_Core;
+
+   --  The shell's tests.
+   procedure Add_Shell (Result : AUnit.Test_Suites.Access_Test_Suite) is
+      Console_Test  : constant AUnit.Test_Cases.Test_Case_Access :=
+        new Fabula_Console_Tests.Test;
+      Reports_Test  : constant AUnit.Test_Cases.Test_Case_Access :=
+        new Fabula_Reports_Tests.Test;
+      Files_Test    : constant AUnit.Test_Cases.Test_Case_Access :=
+        new Fabula_Files_Tests.Test;
+      Dispatch_Test : constant AUnit.Test_Cases.Test_Case_Access :=
+        new Fabula_Dispatch_Tests.Test;
+   begin
+      AUnit.Test_Suites.Add_Test (Result, Console_Test);
+      AUnit.Test_Suites.Add_Test (Result, Reports_Test);
+      AUnit.Test_Suites.Add_Test (Result, Files_Test);
+      AUnit.Test_Suites.Add_Test (Result, Dispatch_Test);
+   end Add_Shell;
+
+   function Suite return AUnit.Test_Suites.Access_Test_Suite is
+      Result : constant AUnit.Test_Suites.Access_Test_Suite :=
+        AUnit.Test_Suites.New_Suite;
+   begin
+      Add_Core (Result);
+      Add_Shell (Result);
       return Result;
    end Suite;
 

@@ -57,4 +57,8 @@ is
    Max_Line_Selections    : constant := 64;
    --  The line numbers one file:line:line argument selects.
 
+   Max_Search_Depth : constant := 32;
+   --  Directory levels a search for feature files descends, so a
+   --  symbolic-link loop ends in a refusal.
+
 end Fabula.Limits;
