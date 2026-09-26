@@ -315,6 +315,25 @@ package body Fabula_Files_Tests is
       Assert (Fabula.Ast.Step_Count (Document.all) = 1, "the last line");
    end Test_Load_Line_Ends;
 
+   --  At_End tells the two refusal origins apart: a mid-file prose error
+   --  comes from Feed, a dangling Rule at end of input from Finish.
+   procedure Test_Load_At_End (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Path : constant String := Fresh_Dir ("load") & "/dangling_rule.feature";
+      R    : Load_Result;
+   begin
+      Load (Corpus & "/edge_examples_before_any_scenario.feature", R);
+      Expect (R.Status, Refused, "Examples before a scenario");
+      Assert (not R.At_End, "a mid-file prose error comes from Feed");
+      Write_File (Path, "Feature: f" & LF & "  Rule: r" & LF);
+      Load (Path, R);
+      Expect (R.Status, Refused, "a Rule with no scenario after it");
+      Assert
+        (R.Refusal.Kind = Fabula.Parse.Expected_Scenario,
+         "refused as " & R.Refusal.Kind'Image);
+      Assert (R.At_End, "a dangling Rule at end of input comes from Finish");
+   end Test_Load_At_End;
+
    procedure Test_Load_Unreadable (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
@@ -504,6 +523,8 @@ package body Fabula_Files_Tests is
       Register_Routine
         (T, Test_Load_Too_Long'Access, "an overlong line is refused");
       Register_Routine (T, Test_Load_Line_Ends'Access, "CRLF and a last line");
+      Register_Routine
+        (T, Test_Load_At_End'Access, "At_End tells Feed and Finish apart");
       Register_Routine
         (T, Test_Load_Unreadable'Access, "empty, missing, a directory");
       Register_Routine

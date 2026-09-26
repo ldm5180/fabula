@@ -5,7 +5,7 @@
 
 export PATH := $(PATH):$(HOME)/.alire/bin
 
-.PHONY: all build test prove format validation shape ci help
+.PHONY: all build test prove format validation shape example gate run ci help
 
 all: build
 
@@ -36,8 +36,21 @@ shape:
 	python3 tools/proof_closure_lint.py --selftest
 	python3 tools/shape_check.py
 
+## example     Build the box example binary, both modes
+example: build
+	alr exec -- gprbuild -p -P example/example.gpr -XMODE=debug
+	alr exec -- gprbuild -p -P example/example.gpr -XMODE=release
+
+## gate        Byte-gate the RELEASE example against the pinned oracle
+gate: example
+	python3 tools/byte_gate.py
+
+## run         Build (debug) and run the example against the byte-gate feature
+run: example
+	./example/bin/debug/box_main tests/data/cwt/parser/1_first_scenario.feature
+
 ## ci          Run every gate, cheapest first
-ci: shape format validation test prove
+ci: shape format validation test prove example gate
 
 ## help        List targets
 help:

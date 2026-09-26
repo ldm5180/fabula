@@ -1,0 +1,63 @@
+Feature: This is a doc string example  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:2
+
+Scenario: Doc string with quotes  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:4
+[   PASSED    ] Given An empty box with a label  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:5
+"""
+This is a docstring with quotes
+after a step
+"""
+[   PASSED    ] Then The box is labeled  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:10
+
+Scenario: Doc string with backticks  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:12
+[   PASSED    ] Given An empty box with a label  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:13
+"""
+This is a docstring with backticks
+after a step
+"""
+[   PASSED    ] Then The box is labeled  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:18
+
+Scenario: Doc string as vector  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:20
+[   PASSED    ] Given An empty box with a label  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:21
+"""
+This is a docstring
+which we access
+as std::vector<std::string>
+"""
+[   PASSED    ] Then The box is labeled  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:27
+
+Scenario: Doc string with a content type tag for a customs declaration  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:29
+[   PASSED    ] Given An empty box with a label  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:30
+"""
+Fragile electronics
+"""
+[   PASSED    ] When The box gets a customs declaration  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:34
+"""
+{ "value_usd": 250, "contents": "electronics" }
+"""
+[   PASSED    ] Then The customs declaration content type should be "json"  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:38
+
+Scenario Outline: Doc string with a shipping label template in a scenario outline  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:53
+[   PASSED    ] Given An empty box with a label  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:41
+"""
+Fragile electronics
+"""
+[   PASSED    ] When The box gets a shipping label  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:45
+"""
+Ship to: Berlin, Germany. Barcode template: <barcode>
+"""
+[   PASSED    ] Then The shipping label should equal "Ship to: Berlin, Germany. Barcode template: <barcode>"  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:49
+
+Scenario Outline: Doc string with a shipping label template in a scenario outline  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:54
+[   PASSED    ] Given An empty box with a label  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:41
+"""
+Fragile electronics
+"""
+[   PASSED    ] When The box gets a shipping label  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:45
+"""
+Ship to: Tokyo, Japan. Barcode template: <barcode>
+"""
+[   PASSED    ] Then The shipping label should equal "Ship to: Tokyo, Japan. Barcode template: <barcode>"  /Users/jason/pipeline/fabula-repo/tests/data/golden/7_doc_strings_lf.feature:49
+
+
+6 Scenarios (6 passed)
+15 Steps (15 passed)

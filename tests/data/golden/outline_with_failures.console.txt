@@ -1,0 +1,23 @@
+Feature: A scenario outline where one row fails  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:1
+
+Scenario Outline: Placing 1 items  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:10
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:4
+[   PASSED    ] When I place 1 x "widget" in it  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:5
+[   PASSED    ] Then The box contains 1 items  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:6
+
+Scenario Outline: Placing 2 items  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:11
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:4
+[   PASSED    ] When I place 2 x "widget" in it  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:5
+Value 2 is not equal to 99
+[   FAILED    ] Then The box contains 99 items  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:6
+
+Scenario Outline: Placing 3 items  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:12
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:4
+[   PASSED    ] When I place 3 x "widget" in it  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:5
+[   PASSED    ] Then The box contains 3 items  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:6
+
+Failed Scenarios:
+Placing 2 items  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/outline_with_failures.feature:11
+
+3 Scenarios (1 failed, 2 passed)
+9 Steps (1 failed, 8 passed)

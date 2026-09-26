@@ -1,0 +1,15 @@
+Feature: The Rules keyword  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/9_rules.feature:3
+
+Scenario: A scenario as we used before  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/9_rules.feature:5
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/9_rules.feature:6
+[   PASSED    ] When I place 1 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/9_rules.feature:7
+[   PASSED    ] Then The box contains 1 item  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/9_rules.feature:8
+
+Example: An example is the same as a scenario  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/9_rules.feature:13
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/9_rules.feature:14
+[   PASSED    ] When I place 1 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/9_rules.feature:15
+[   PASSED    ] Then The box contains 1 item  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/9_rules.feature:16
+
+
+2 Scenarios (2 passed)
+6 Steps (6 passed)

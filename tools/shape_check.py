@@ -645,7 +645,7 @@ def canonical(findings: list[Finding]) -> list[Finding]:
 
 #  The directories this lint measures.  Adding a source tree (an example
 #  binary, a shell layer) means adding its glob here.
-SOURCE_DIRS: tuple[str, ...] = ("src", "tests/src", "proof/src")
+SOURCE_DIRS: tuple[str, ...] = ("src", "tests/src", "proof/src", "example/src")
 
 
 def sources(root: pathlib.Path) -> list[pathlib.Path]:

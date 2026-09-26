@@ -336,6 +336,67 @@ is
       Counts := Closure_Run.Counts_Of (R);
    end Closure_Drive;
 
+   --  A well-formed argv: every flag, a merged --report-json=FILE, an
+   --  --exclude-file value, one positional.  0 if Cli itself refused it.
+   function Closure_Cli_Good return Natural is
+      Args : Fabula.Cli.Arg_List (1 .. 6);
+      R    : Fabula.Cli.Options_Result;
+      Best : Natural;
+   begin
+      Fabula.Cli.Set (Args (1), "-t");
+      Fabula.Cli.Set (Args (2), "@a");
+      Fabula.Cli.Set (Args (3), "--report-json=out.json");
+      Fabula.Cli.Set (Args (4), "--exclude-file");
+      Fabula.Cli.Set (Args (5), "skip.feature");
+      Fabula.Cli.Set (Args (6), "real.feature");
+      Fabula.Cli.Parse (Args, R);
+      if Fabula.Cli.Refused (R) then
+         return 0;
+      end if;
+      Best :=
+        Natural'Max
+          (Fabula.Cli.Tag_Expr_Text (R)'Length,
+           Fabula.Cli.Names_Text (R)'Length);
+      if Fabula.Cli.Help (R)
+        and then Fabula.Cli.Quiet (R)
+        and then Fabula.Cli.Verbose (R)
+        and then Fabula.Cli.Dry_Run (R)
+        and then Fabula.Cli.Continue_On_Failure (R)
+      then
+         Best := Natural'Max (Best, 1);   --  every flag reachable
+
+      end if;
+      if Fabula.Cli.Report_Json (R)
+        and then Fabula.Cli.Report_Json_Has_File (R)
+      then
+         Best :=
+           Natural'Max (Best, Fabula.Cli.Report_Json_File_Text (R)'Length);
+      end if;
+      if Fabula.Cli.Excludes_Count (R) > 0 then
+         Best := Natural'Max (Best, Fabula.Cli.Exclude_Text (R, 1)'Length);
+      end if;
+      if Fabula.Cli.Positionals_Count (R) > 0 then
+         Best := Natural'Max (Best, Fabula.Cli.Positional_Text (R, 1)'Length);
+      end if;
+      return Best;
+   end Closure_Cli_Good;
+
+   procedure Closure_Cli (Total : out Natural) is
+      Bad_Args : Fabula.Cli.Arg_List (1 .. 1);
+      Bad      : Fabula.Cli.Options_Result;
+   begin
+      Total := Closure_Cli_Good;
+      Fabula.Cli.Set (Bad_Args (1), "--bogus");
+      Fabula.Cli.Parse (Bad_Args, Bad);
+      if Fabula.Cli.Refused (Bad) then
+         Total :=
+           Natural'Max
+             (Total,
+              Fabula.Cli.Refusal_Text (Fabula.Cli.Refusal_Of (Bad))'Length);
+      end if;
+      Total := Natural'Max (Total, Fabula.Cli.Help_Text'Length);
+   end Closure_Cli;
+
    procedure Closure_Frame (F : in out Fabula.Frames.Frame) is
    begin
       Fabula.Frames.Set (F.Feature, "a feature");

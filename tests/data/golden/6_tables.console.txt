@@ -1,0 +1,72 @@
+Feature: This represents tables  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:2
+
+Scenario: Adding items with raw  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:8
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:9
+[   PASSED    ] When I add all items with the raw function:  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:10
+  | apple      | 2 |
+  | strawberry | 3 |
+  | banana     | 5 |
+[   PASSED    ] Then The box contains 10 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:14
+
+Scenario Outline: Adding items with raw  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:30
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:23
+[   PASSED    ] When I add all items with the raw function:  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:24
+  | a very fresh orange | 2 |
+[   PASSED    ] Then The box contains 2 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:26
+
+Scenario Outline: Adding items with raw  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:31
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:23
+[   PASSED    ] When I add all items with the raw function:  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:24
+  | a very fresh apple | 3 |
+[   PASSED    ] Then The box contains 3 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:26
+
+Scenario Outline: Adding items with raw  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:41
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:34
+[   PASSED    ] When I add all items with the raw function:  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:35
+  | cars and bikes | 2 |
+[   PASSED    ] Then The box contains 2 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:37
+
+Scenario Outline: This works in scenario outlines too  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:51
+[   PASSED    ] When I add all items with the raw function:  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:44
+  | pen  | 5 |
+  | book | 3 |
+[   PASSED    ] Then The box contains 8 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:47
+
+Scenario Outline: This works in scenario outlines too  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:52
+[   PASSED    ] When I add all items with the raw function:  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:44
+  | chair | 4 |
+  | table | 1 |
+[   PASSED    ] Then The box contains 5 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:47
+
+Scenario: Adding items with hashes  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:54
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:55
+[   PASSED    ] When I add all items with the hashes function:  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:56
+  | ITEM   | QUANTITY |
+  | apple  | 3        |
+  | banana | 6        |
+[   PASSED    ] Then The box contains 9 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:60
+
+Scenario Outline: Adding items with hashes in a scenario outline  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:71
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:63
+[   PASSED    ] When I add all items with the hashes function:  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:64
+  | ITEM    | QUANTITY |
+  | "shirt" | 3        |
+[   PASSED    ] Then The box contains 3 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:67
+
+Scenario Outline: Adding items with hashes in a scenario outline  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:72
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:63
+[   PASSED    ] When I add all items with the hashes function:  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:64
+  | ITEM    | QUANTITY |
+  | "phone" | 100      |
+[   PASSED    ] Then The box contains 100 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:67
+
+Scenario: Adding items with rows_hash  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:74
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:75
+[   PASSED    ] When I add the following item with the rows_hash function:  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:76
+  | ITEM     | really good apples |
+  | QUANTITY | 3                  |
+[   PASSED    ] Then The box contains 3 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/6_tables.feature:79
+
+
+10 Scenarios (10 passed)
+28 Steps (28 passed)

@@ -106,3 +106,18 @@ jobs:
 
       - name: Proof-closure lint selftest
         run: python3 tools/proof_closure_lint.py --selftest
+
+  gate:
+    name: Byte gate (example vs. the pinned oracle)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Alire + GNAT toolchain
+        uses: alire-project/setup-alire@v6
+
+      - name: Build the example (both modes; the gate runs RELEASE)
+        run: make example
+
+      - name: Run the byte gate
+        run: make gate

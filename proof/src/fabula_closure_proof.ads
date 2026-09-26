@@ -6,6 +6,7 @@
 with Fabula.Args;
 with Fabula.Ast;
 with Fabula.Check;
+with Fabula.Cli;
 with Fabula.Expand;
 with Fabula.Expressions;
 with Fabula.Frames;
@@ -78,6 +79,11 @@ is
 
    --  A Frame's bounded fields, filled and read back.
    procedure Closure_Frame (F : in out Fabula.Frames.Frame);
+
+   --  argv as the shell hands it over: a flag needing a value, a
+   --  pre-merged --report-json=FILE, an unknown flag.  Reaches every
+   --  Options_Result accessor and both refusal shapes.
+   procedure Closure_Cli (Total : out Natural);
 
    --  A Registry instance over sample enums, with a step table and a
    --  hook table declared at library level, as a user declares them.
