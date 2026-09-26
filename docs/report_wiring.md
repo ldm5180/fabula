@@ -81,18 +81,32 @@ time).
      scenario-close blank from item 6 — the two blanks back to back
      that the byte samples show for an all-green run.
 
-8. **`-q` (quiet) keeps only error-level and report-level lines.**
-   The oracle's logger has five levels (verbose, info, quiet, error,
-   report) and `-q` sets its threshold to quiet, so info-level calls
-   (every header, every step line, the item-6 scenario-close blank)
-   are dropped, while error-level messages (item 5's failure text) and
-   report-level lines (the trailer and its header, its own blank, both
-   summaries) still print. Probe-confirmed on
-   `11_manual_fails.feature -q`: the blank between the last error
-   message and "Failed Scenarios:" disappears (it was the info-level
-   one), but the blank between the trailer and the summary stays (it
-   is report-level). P10 must reproduce this asymmetry, not skip a
-   fixed set of calls.
+8. **`-q` (quiet) keeps only error-level and report-level lines; `-v`
+   always wins over it.** The oracle's logger has five levels (verbose,
+   info, quiet, error, report). `-q` raises the threshold to quiet;
+   `-v`, checked second and unconditionally (`options.cpp`'s own two
+   sequential `set_level` calls, the second never guarded on the
+   first), lowers it back to verbose regardless — so `-q -v` together
+   restores everything, verbose lines included.
+   - **Info-level, dropped under a plain `-q`:** the feature and
+     scenario headers, every step line, the item-6 scenario-close
+     blank, and item 5's **step-body** half (a step-body assertion or a
+     before-step `Fail_Step`, printed inline before that step's own
+     line — `asserts.hpp` logs it at info level, not error).
+   - **Error-level, always printed:** item 5's **whole-scenario**
+     half (`Fail`, from a hook or a step) — a materially different
+     message from the step-body one above, not the same text at a
+     different level.
+   - **Report-level, always printed:** the trailer and its header, its
+     own blank, both summaries.
+
+   Probe-confirmed against the pinned oracle on a step-assertion
+   fixture: under `-q` alone, only "Failed Scenarios:" and the two
+   summary lines print; under `-q -v` together, the feature header,
+   the scenario's own header, every step line, and the assertion
+   message all come back, byte-identical to a plain run. P10 must
+   reproduce this asymmetry — including which half of item 5 sits at
+   which level — not skip a fixed set of calls.
 
 9. **`--report-json` silences the console path entirely.** The oracle
    never calls any of items 1-8 when a JSON report is requested — it

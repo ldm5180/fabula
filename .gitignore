@@ -3,6 +3,8 @@
 /bin/
 /tests/obj/
 /tests/bin/
+/example/obj/
+/example/bin/
 /proof/obj/
 /alire/
 /config/

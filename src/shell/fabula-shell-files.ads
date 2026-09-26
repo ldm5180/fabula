@@ -95,10 +95,13 @@ is
 
    --  For Refused and Too_Long, Line is the offending line's number and
    --  Text (1 .. Len) its text as written, less a final CR, up to
-   --  Max_Line_Length characters.
+   --  Max_Line_Length characters.  For Refused, At_End is True when the
+   --  refusal came from Fabula.Parse.Finish (end of input, no next line
+   --  to quote a token from) rather than Feed; meaningless otherwise.
    type Load_Result is record
       Status  : Load_Status := Unreadable;
       Refusal : Parse.Refusal;
+      At_End  : Boolean := False;
       Line    : Natural := 0;
       Text    : String (1 .. Limits.Max_Line_Length) := [others => ' '];
       Len     : Text_Length := 0;

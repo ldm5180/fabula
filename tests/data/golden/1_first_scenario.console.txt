@@ -1,0 +1,17 @@
+Feature: My first feature  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/1_first_scenario.feature:1
+
+Scenario: First Scenario  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/1_first_scenario.feature:4
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/1_first_scenario.feature:5
+[   PASSED    ] When I place 1 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/1_first_scenario.feature:6
+[   PASSED    ] Then The box contains 1 item  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/1_first_scenario.feature:7
+
+Scenario: Alternative Words  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/1_first_scenario.feature:9
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/1_first_scenario.feature:10
+[   PASSED    ] When I place 1 x "banana" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/1_first_scenario.feature:11
+[   PASSED    ] Then 1 item is "banana"  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/1_first_scenario.feature:12
+[   PASSED    ] And I place 1 x "banana" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/1_first_scenario.feature:13
+[   PASSED    ] Then 2 items are "banana"  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/1_first_scenario.feature:14
+
+
+2 Scenarios (2 passed)
+8 Steps (8 passed)

@@ -3,6 +3,7 @@ with AUnit.Test_Cases;
 with Fabula_Args_Tests;
 with Fabula_Ast_Tests;
 with Fabula_Check_Tests;
+with Fabula_Cli_Tests;
 with Fabula_Console_Tests;
 with Fabula_Corpus_Tests;
 with Fabula_Dispatch_Tests;
@@ -68,6 +69,8 @@ package body Fabula_Suite is
         new Fabula_Format_Tests.Test;
       Format_Json_Test : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Format_Json_Tests.Test;
+      Cli_Test         : constant AUnit.Test_Cases.Test_Case_Access :=
+        new Fabula_Cli_Tests.Test;
    begin
       AUnit.Test_Suites.Add_Test (Result, Limits_Test);
       AUnit.Test_Suites.Add_Test (Result, Scan_Test);
@@ -87,6 +90,7 @@ package body Fabula_Suite is
       AUnit.Test_Suites.Add_Test (Result, Run_Select_Test);
       AUnit.Test_Suites.Add_Test (Result, Format_Test);
       AUnit.Test_Suites.Add_Test (Result, Format_Json_Test);
+      AUnit.Test_Suites.Add_Test (Result, Cli_Test);
    end Add_Core;
 
    --  The shell's tests.

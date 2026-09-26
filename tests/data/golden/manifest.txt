@@ -1,0 +1,22 @@
+# Byte-gate manifest (state.md entry 30, review item 9). One line each:
+# <source .feature, repo-root relative>  <golden console capture>
+# Golden captures are the pinned oracle's own PLAIN console output,
+# never `--report-json` (structurally never byte-gated: see
+# tools/byte_gate.py's own docstring). Run `make gate` to check the
+# RELEASE example binary against every line below. Feature 8
+# (custom_parameters) is not here: unmatched custom parameter types
+# (kilogram, date) are a pre-existing, unrelated gap, out of this
+# review's scope.
+tests/data/cwt/parser/1_first_scenario.feature tests/data/golden/1_first_scenario.console.txt
+tests/data/cwt/parser/2_scenario_outline.feature tests/data/golden/2_scenario_outline.console.txt
+tests/data/cwt/parser/3_background.feature tests/data/golden/3_background.console.txt
+tests/data/cwt/parser/4_tags.feature tests/data/golden/4_tags.console.txt
+tests/data/cwt/parser/5_tagged_hooks.feature tests/data/golden/5_tagged_hooks.console.txt
+tests/data/cwt/parser/6_tables.feature tests/data/golden/6_tables.console.txt
+tests/data/golden/7_doc_strings_lf.feature tests/data/golden/7_doc_strings.console.txt
+tests/data/cwt/parser/9_rules.feature tests/data/golden/9_rules.console.txt
+tests/data/cwt/parser/10_continue_on_failure.feature tests/data/golden/10_continue_on_failure.console.txt
+tests/data/cwt/parser/11_manual_fails.feature tests/data/golden/11_manual_fails.console.txt
+tests/data/fixtures/failing_undefined.feature tests/data/golden/failing_undefined.console.txt
+tests/data/fixtures/outline_with_failures.feature tests/data/golden/outline_with_failures.console.txt
+tests/data/fixtures/midfile_parse_error.feature tests/data/golden/midfile_parse_error.console.txt

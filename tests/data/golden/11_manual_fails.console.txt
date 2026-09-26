@@ -1,0 +1,20 @@
+Feature: Set Scenario manual to fail  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/11_manual_fails.feature:1
+
+Scenario: Steps are skipped  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/11_manual_fails.feature:4
+[   SKIPPED   ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/11_manual_fails.feature:5
+[   SKIPPED   ] When I place 1 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/11_manual_fails.feature:6
+[   SKIPPED   ] Then The box contains 1 item  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/11_manual_fails.feature:7
+Example of 'cuke::fail_scenario()' to bring a scenario to fail before running it
+
+Scenario: Steps aren't skipped  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/11_manual_fails.feature:10
+[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/11_manual_fails.feature:11
+[   PASSED    ] When I place 1 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/11_manual_fails.feature:12
+[   PASSED    ] Then The box contains 1 item  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/11_manual_fails.feature:13
+Example of 'cuke::fail_scenario()' to bring a scenario to fail after running it
+
+Failed Scenarios:
+Steps are skipped  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/11_manual_fails.feature:4
+Steps aren't skipped  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/11_manual_fails.feature:10
+
+2 Scenarios (2 failed)
+6 Steps (3 skipped, 3 passed)

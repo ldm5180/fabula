@@ -351,9 +351,13 @@ is
    end Fetch_Line;
 
    --  The verdict once every line is read: Finish, then keep the refused
-   --  line's text.
+   --  line's text.  A refusal already standing before Finish runs came
+   --  from Feed; one that appears only after it came from Finish itself,
+   --  at end of input with no next line to quote a token from.
    procedure Conclude
-     (Path : String; Lines : Natural; Result : in out Load_Result) is
+     (Path : String; Lines : Natural; Result : in out Load_Result)
+   is
+      Failed_Before_Finish : constant Boolean := Parse.Failed (Parser);
    begin
       if Lines = 0 then
          Result.Status := Empty;
@@ -363,6 +367,7 @@ is
       if Parse.Failed (Parser) then
          Result.Status := Refused;
          Result.Refusal := Parse.Error (Parser);
+         Result.At_End := not Failed_Before_Finish;
          Result.Line := Result.Refusal.Line;
          Fetch_Line (Path, Result);
       else

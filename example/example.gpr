@@ -1,0 +1,34 @@
+with "../fabula.gpr";
+
+--  The box world: the reference interpreter's own example, ported step
+--  for step (see example/src/box_steps.ads).  Built and run by
+--  `make run`, never by `alr test`.  MODE mirrors tests/test_fabula.gpr
+--  so the example links against either optimization level of the
+--  library without a second copy of this project.
+project Example is
+
+   type Mode_Type is ("release", "debug");
+   Mode : Mode_Type := external ("MODE", "debug");
+
+   for Source_Dirs use ("src");
+   for Object_Dir use "obj/" & Mode;
+   for Exec_Dir use "bin/" & Mode;
+   for Main use ("box_main.ads");
+
+   package Compiler is
+      Common := ("-g", "-gnata", "-gnatwa", "-gnatwe", "-gnat2022");
+
+      case Mode is
+         when "release" =>
+            for Default_Switches ("Ada") use Common & ("-O3");
+
+         when "debug" =>
+            for Default_Switches ("Ada") use Common & ("-O0");
+      end case;
+   end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es");  --  Symbolic traceback.
+   end Binder;
+
+end Example;

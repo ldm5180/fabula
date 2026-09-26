@@ -1,0 +1,12 @@
+Feature: Continue on failure  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/10_continue_on_failure.feature:1
+
+Scenario: First Scenario  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/10_continue_on_failure.feature:7
+[   SKIPPED   ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/10_continue_on_failure.feature:8
+[   SKIPPED   ] When I place 1 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/10_continue_on_failure.feature:9
+[   SKIPPED   ] Then The box contains 2 item  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/10_continue_on_failure.feature:10
+[   SKIPPED   ] But I place 1 x "banana" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/10_continue_on_failure.feature:11
+[   SKIPPED   ] Then The box contains 2 item  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/10_continue_on_failure.feature:12
+
+
+1 Scenario (1 skipped)
+5 Steps (5 skipped)
