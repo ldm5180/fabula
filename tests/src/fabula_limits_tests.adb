@@ -131,6 +131,25 @@ package body Fabula_Limits_Tests is
          "Max_Search_Depth must be positive");
    end Test_Search_Limit;
 
+   --  Format's three capacities, added in P9.
+   procedure Test_Format_Limits (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert
+        (Fabula.Limits.Max_Report_Line_Length > 0,
+         "Max_Report_Line_Length must be positive");
+      Assert
+        (Fabula.Limits.Max_Escaped_Text_Length > 0,
+         "Max_Escaped_Text_Length must be positive");
+      Assert
+        (Fabula.Limits.Max_Table_Columns > 0,
+         "Max_Table_Columns must be positive");
+      Assert
+        (Fabula.Limits.Max_Failed_Scenarios > 0,
+         "Max_Failed_Scenarios must be positive");
+   end Test_Format_Limits;
+
    overriding
    procedure Register_Tests (T : in out Test) is
    begin
@@ -150,6 +169,7 @@ package body Fabula_Limits_Tests is
         (T, Test_Tag_Expr_Limits'Access, "the tag-expression capacities");
       Register_Routine
         (T, Test_Check_Frame_Limits'Access, "the check/frame capacities");
+      Register_Routine (T, Test_Format_Limits'Access, "the format capacities");
    end Register_Tests;
 
    overriding

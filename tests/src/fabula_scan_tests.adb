@@ -483,6 +483,17 @@ package body Fabula_Scan_Tests is
          "the maximum-length line's body must span the whole line");
    end Test_Max_Line_Length;
 
+   procedure Test_Spelling (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+   begin
+      Assert (Spelling (K_Given) = "Given", "Given");
+      Assert (Spelling (K_When) = "When", "When");
+      Assert (Spelling (K_Then) = "Then", "Then");
+      Assert (Spelling (K_And) = "And", "And");
+      Assert (Spelling (K_But) = "But", "But");
+      Assert (Spelling (K_Star) = "*", "the star bullet");
+   end Test_Spelling;
+
    overriding
    procedure Register_Tests (T : in out Test) is
    begin
@@ -511,6 +522,7 @@ package body Fabula_Scan_Tests is
       Register_Routine (T, Test_Blank_Lines'Access, "blank lines");
       Register_Routine
         (T, Test_Max_Line_Length'Access, "shipped maximum line length");
+      Register_Routine (T, Test_Spelling'Access, "a step keyword's spelling");
    end Register_Tests;
 
    overriding

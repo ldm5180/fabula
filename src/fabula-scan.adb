@@ -5,6 +5,29 @@ is
    Max_Keyword_Length : constant := 18;
    --  Longest fixed spelling: "Scenario Template:".
 
+   function Spelling (K : Step_Keyword) return String is
+   begin
+      case K is
+         when K_Given =>
+            return "Given";
+
+         when K_When  =>
+            return "When";
+
+         when K_Then  =>
+            return "Then";
+
+         when K_And   =>
+            return "And";
+
+         when K_But   =>
+            return "But";
+
+         when K_Star  =>
+            return "*";
+      end case;
+   end Spelling;
+
    subtype Header_Class is Line_Class range Feature_Header .. Examples_Header;
    --  The six header classes are contiguous in Line_Class, so a value
    --  of this subtype always fits the one Classification variant they

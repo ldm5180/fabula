@@ -61,4 +61,22 @@ is
    --  Directory levels a search for feature files descends, so a
    --  symbolic-link loop ends in a refusal.
 
+   Max_Report_Line_Length : constant := 3_072;
+   --  One console report line (a header or a step, with its trailing
+   --  file:line): comfortably above Max_Step_Text_Length plus a path,
+   --  a name and a bracket label.
+
+   Max_Escaped_Text_Length : constant := 6 * Max_Line_Length;
+   --  A JSON-escaped text field. Six times Max_Line_Length covers the
+   --  worst case where every source character expands to "\u00XX";
+   --  every text Format escapes is first bounded to one line.
+
+   Max_Table_Columns : constant := 64;
+   --  Columns a rendered table's column-width pass tracks.
+
+   Max_Failed_Scenarios : constant := 256;
+   --  The failed-scenarios trailer's store. A run with more failures
+   --  than this still renders the ones it kept; TDD plan item 6 names
+   --  this saturation.
+
 end Fabula.Limits;
