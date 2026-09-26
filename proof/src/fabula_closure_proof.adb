@@ -99,6 +99,8 @@ is
    use type Fabula.Ast.Examples_Handle;
    use type Fabula.Ast.Scenario_Handle;
    use type Fabula.Ast.Step_Handle;
+   use type Closure_Run.Command;
+   use type Closure_Run.Notice_Kind;
 
    --  One concrete step: whether it fits, then its resolved text.
    function Closure_Step_Length
@@ -233,6 +235,106 @@ is
           (Closure_Read_Captures (A),
            Natural'Max (Closure_Read_Doc (A), Closure_Read_Table (A)));
    end Closure_Read;
+
+   --  More moves than the closure's one-scenario feature needs.
+   Closure_Moves : constant := 64;
+
+   --  A word step with no word fails itself.
+   function Closure_Step_Outcome
+     (Kind : Closure_Step; A : Fabula.Args.List) return Fabula.Check.Outcome
+   is
+      Result : Fabula.Check.Outcome;
+   begin
+      if Kind = Word_Step and then Fabula.Args.Count (A) = 0 then
+         Fabula.Check.Fail_Step (Result, "no word");
+      end if;
+      return Result;
+   end Closure_Step_Outcome;
+
+   --  The tagged hook skips a scenario it sees no line for.
+   function Closure_Hook_Outcome
+     (Kind : Closure_Hook; F : Fabula.Frames.Frame) return Fabula.Check.Outcome
+   is
+      Result : Fabula.Check.Outcome;
+   begin
+      if Kind = Fresh_Hook and then F.Scenario_Line = 0 then
+         Fabula.Check.Skip (Result);
+      end if;
+      return Result;
+   end Closure_Hook_Outcome;
+
+   --  Runs the step or hook the pending request names, as the shell
+   --  does, and posts its outcome.
+   procedure Closure_Answer (R : in out Closure_Run.Runner)
+   with Pre => Closure_Run.Next_Request (R) /= Closure_Run.C_None
+   is
+   begin
+      if Closure_Run.Next_Request (R) = Closure_Run.C_Step then
+         Closure_Run.Post_Step_Result
+           (R,
+            Closure_Step_Outcome
+              (Closure_Run.Pending_Step_Kind (R), Closure_Run.Step_Args (R)));
+      else
+         Closure_Run.Post_Hook_Result
+           (R,
+            Closure_Hook_Outcome
+              (Closure_Run.Pending_Hook_Kind (R),
+               Closure_Run.Current_Frame (R)));
+      end if;
+   end Closure_Answer;
+
+   --  Drains R: every notice read and resumed, every request answered.
+   --  Closed counts the scenarios that closed.
+   procedure Closure_Serve
+     (R : in out Closure_Run.Runner; Closed : in out Natural) is
+   begin
+      for Move in 1 .. Closure_Moves loop
+         if Closure_Run.Has_Notice (R) then
+            if Closure_Run.Current_Notice (R).Kind
+              = Closure_Run.Scenario_Closed
+              and then Closed < Natural'Last
+            then
+               Closed := Closed + 1;
+            end if;
+            Closure_Run.Resume (R);
+         elsif Closure_Run.Next_Request (R) /= Closure_Run.C_None then
+            Closure_Answer (R);
+         else
+            exit;
+         end if;
+      end loop;
+   end Closure_Serve;
+
+   procedure Closure_Drive
+     (Ref    : Fabula.Args.Document_Access;
+      Counts : out Fabula.Results.Counts;
+      Closed : out Natural)
+   is
+      use type Fabula.Args.Document_Access;
+      R     : Closure_Run.Runner;
+      Opts  : Closure_Run.Options;
+      Lines : Closure_Run.Line_Selection := Closure_Run.All_Lines;
+   begin
+      Counts := (others => 0);
+      Closed := 0;
+      if not Closure_Run.Tables_Valid then
+         return;
+      end if;
+      Closure_Run.Set_Names (Opts, "a*:b?");
+      Closure_Run.Add_Line (Lines, 4);
+      Closure_Run.Start_Run (R, Opts);
+      Closure_Serve (R, Closed);
+      if Ref /= null and then Closure_Run.Between_Features (R) then
+         Closure_Run.Start_Feature (R, Ref, "a.feature", Lines);
+         Closure_Serve (R, Closed);
+      end if;
+      if Closure_Run.Between_Features (R) then
+         Closure_Run.Note_Parse_Error (R);
+         Closure_Run.Finish_Run (R);
+         Closure_Serve (R, Closed);
+      end if;
+      Counts := Closure_Run.Counts_Of (R);
+   end Closure_Drive;
 
    procedure Closure_Frame (F : in out Fabula.Frames.Frame) is
    begin
