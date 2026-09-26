@@ -1,4 +1,4 @@
-/Users/jason/pipeline/fabula-repo/tests/data/fixtures/midfile_parse_error.feature:8: Error at 'Examples:': Expect Tags, Scenario or Scenario Outline
+tests/data/fixtures/midfile_parse_error.feature:8: Error at 'Examples:': Expect Tags, Scenario or Scenario Outline
 Error while parsing script
 
 0 Scenario ()

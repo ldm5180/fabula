@@ -85,7 +85,7 @@ package body Fabula_Limits_Tests is
          "the choice stack must hold one choice per pattern token");
    end Test_Matcher_Limits;
 
-   --  The check, results and frame capacities added in P5.
+   --  The check, results and frame capacities.
    procedure Test_Check_Frame_Limits
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
@@ -108,7 +108,7 @@ package body Fabula_Limits_Tests is
          "a step's text is bounded the same as a scanned line");
    end Test_Check_Frame_Limits;
 
-   --  The runner's two selection capacities added in P7.
+   --  The runner's two selection capacities.
    procedure Test_Selection_Limits
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
@@ -122,7 +122,7 @@ package body Fabula_Limits_Tests is
          "Max_Line_Selections must be positive");
    end Test_Selection_Limits;
 
-   --  The shell's search bound added in P8.
+   --  The shell's directory-search bound.
    procedure Test_Search_Limit (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
    begin
@@ -131,7 +131,7 @@ package body Fabula_Limits_Tests is
          "Max_Search_Depth must be positive");
    end Test_Search_Limit;
 
-   --  Format's three capacities, added in P9.
+   --  Format's four capacities.
    procedure Test_Format_Limits (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);

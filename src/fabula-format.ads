@@ -146,7 +146,7 @@ is
 
    ---------------------------------------------------------------------
    --  The failed-scenarios trailer. Filled by the caller from
-   --  Scenario_Closed notices; TDD plan item 6 covers fill, overflow
+   --  Scenario_Closed notices; the suite covers fill, overflow
    --  saturation (silent -- a report is best-effort, not a refusal
    --  surface) and render.
    ---------------------------------------------------------------------
@@ -194,7 +194,8 @@ is
    --  -v's non-hook lines, byte-copied from the oracle (docs/
    --  report_wiring.md has each probe). The hook "executing hook" /
    --  "not executing hook" lines stay out: no notice carries which
-   --  hooks ran or were skipped, a ledgered gap, not a Format gap.
+   --  hooks ran or were skipped, a known gap upstream of Format, not
+   --  a Format gap.
    ---------------------------------------------------------------------
 
    Verbose_Separator : constant String :=
@@ -236,9 +237,9 @@ is
    --  The oracle's own wording where a probe or its source pins one --
    --  Tag_Line_Malformed included, the oracle's own analogue reached
    --  once its tag scan stops at the first non-tag token (see
-   --  docs/report_wiring.md). fabula's own wording, ledgered as a
-   --  named divergence, only for Pool_Exhausted (no oracle analogue)
-   --  and the never-produced Expected_Examples_Table.
+   --  docs/report_wiring.md). fabula's own wording, a named divergence,
+   --  only for Pool_Exhausted (no oracle analogue) and the
+   --  never-produced Expected_Examples_Table.
 
    function First_Token (Text : String) return String
    with Pre => Text'Length <= Limits.Max_Line_Length;

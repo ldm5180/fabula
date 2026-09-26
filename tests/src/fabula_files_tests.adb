@@ -172,7 +172,7 @@ package body Fabula_Files_Tests is
        & Fabula.Ast.Tag_Count (D)'Image
        & Fabula.Ast.Text_Used (D)'Image);
 
-   --  Load gives the verdict the P4 corpus routine gives.
+   --  Load gives the verdict the corpus suite's own feed gives.
    procedure Check_Corpus_File (Name : String) is
       R : Load_Result;
    begin

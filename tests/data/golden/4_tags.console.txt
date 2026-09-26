@@ -1,47 +1,47 @@
-Feature: Scenarios with tags  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:2
+Feature: Scenarios with tags  tests/data/cwt/parser/4_tags.feature:2
 
-Scenario: Tomatoes  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:4
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:5
-[   PASSED    ] When I place 5 x "Tomatoes" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:6
-[   PASSED    ] Then The box contains 5 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:7
+Scenario: Tomatoes  tests/data/cwt/parser/4_tags.feature:4
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/4_tags.feature:5
+[   PASSED    ] When I place 5 x "Tomatoes" in it  tests/data/cwt/parser/4_tags.feature:6
+[   PASSED    ] Then The box contains 5 items  tests/data/cwt/parser/4_tags.feature:7
 
-Scenario: This will be skipped  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:10
-[   SKIPPED   ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:11
-[   SKIPPED   ] When I place 1 x "whatever" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:12
+Scenario: This will be skipped  tests/data/cwt/parser/4_tags.feature:10
+[   SKIPPED   ] Given An empty box  tests/data/cwt/parser/4_tags.feature:11
+[   SKIPPED   ] When I place 1 x "whatever" in it  tests/data/cwt/parser/4_tags.feature:12
 
-Scenario: This will be skipped too  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:15
-[   SKIPPED   ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:16
-[   SKIPPED   ] When I place 1 x "whatever" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:17
-[   UNDEFINED ] Then This is an undefined step even when we use skip  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:18
+Scenario: This will be skipped too  tests/data/cwt/parser/4_tags.feature:15
+[   SKIPPED   ] Given An empty box  tests/data/cwt/parser/4_tags.feature:16
+[   SKIPPED   ] When I place 1 x "whatever" in it  tests/data/cwt/parser/4_tags.feature:17
+[   UNDEFINED ] Then This is an undefined step even when we use skip  tests/data/cwt/parser/4_tags.feature:18
 
-Scenario: Apple  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:28
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:29
-[   PASSED    ] When I place 2 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:30
-[   PASSED    ] Then The box contains 2 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:31
+Scenario: Apple  tests/data/cwt/parser/4_tags.feature:28
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/4_tags.feature:29
+[   PASSED    ] When I place 2 x "apple" in it  tests/data/cwt/parser/4_tags.feature:30
+[   PASSED    ] Then The box contains 2 items  tests/data/cwt/parser/4_tags.feature:31
 
-Scenario: Apples and Bananas  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:34
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:35
-[   PASSED    ] When I place 2 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:36
-[   PASSED    ] And I place 2 x "banana" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:37
-[   PASSED    ] Then The box contains 4 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:38
+Scenario: Apples and Bananas  tests/data/cwt/parser/4_tags.feature:34
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/4_tags.feature:35
+[   PASSED    ] When I place 2 x "apple" in it  tests/data/cwt/parser/4_tags.feature:36
+[   PASSED    ] And I place 2 x "banana" in it  tests/data/cwt/parser/4_tags.feature:37
+[   PASSED    ] Then The box contains 4 items  tests/data/cwt/parser/4_tags.feature:38
 
-Scenario Outline: Lets put "orange" into the box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:48
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:41
-[   PASSED    ] When I place 1 x "orange" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:42
-[   PASSED    ] Then The box contains 1 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:43
+Scenario Outline: Lets put "orange" into the box  tests/data/cwt/parser/4_tags.feature:48
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/4_tags.feature:41
+[   PASSED    ] When I place 1 x "orange" in it  tests/data/cwt/parser/4_tags.feature:42
+[   PASSED    ] Then The box contains 1 items  tests/data/cwt/parser/4_tags.feature:43
 
-Scenario Outline: Lets put "oranges" into the box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:53
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:41
-[   PASSED    ] When I place 3 x "oranges" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:42
-[   PASSED    ] Then The box contains 3 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:43
+Scenario Outline: Lets put "oranges" into the box  tests/data/cwt/parser/4_tags.feature:53
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/4_tags.feature:41
+[   PASSED    ] When I place 3 x "oranges" in it  tests/data/cwt/parser/4_tags.feature:42
+[   PASSED    ] Then The box contains 3 items  tests/data/cwt/parser/4_tags.feature:43
 
-Scenario Outline: Lets put "some stuff" into the box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:54
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:41
-[   PASSED    ] When I place 1 x "some stuff" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:42
-[   PASSED    ] Then The box contains 1 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:43
+Scenario Outline: Lets put "some stuff" into the box  tests/data/cwt/parser/4_tags.feature:54
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/4_tags.feature:41
+[   PASSED    ] When I place 1 x "some stuff" in it  tests/data/cwt/parser/4_tags.feature:42
+[   PASSED    ] Then The box contains 1 items  tests/data/cwt/parser/4_tags.feature:43
 
 Failed Scenarios:
-This will be skipped too  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/4_tags.feature:15
+This will be skipped too  tests/data/cwt/parser/4_tags.feature:15
 
 8 Scenarios (1 failed, 1 skipped, 6 passed)
 24 Steps (1 undefined, 4 skipped, 19 passed)

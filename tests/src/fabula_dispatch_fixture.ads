@@ -1,7 +1,7 @@
 --  The drive loop's test registry: steps and hooks that count in their
 --  context, raise on demand, and trace every call they get.  Each
---  notice is traced as the P7 scripted shell traces it, read from the
---  frame the drive loop hands over.
+--  notice is traced the way the runner's own scripted double traces
+--  it, read from the frame the drive loop hands over.
 with Fabula.Args;
 with Fabula.Check;
 with Fabula.Frames;

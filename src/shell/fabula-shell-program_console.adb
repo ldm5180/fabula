@@ -22,9 +22,9 @@ is
    Quiet_Active        : Boolean := False;
    Verbose_Active      : Boolean := False;
    Filter_Active       : Boolean := False;
-   --  state.md entry 30: Scenario_Closed carries no word of whether this
-   --  scenario was ever entered -- a -t-filtered drop and an after-hook
-   --  Ignore look identical on the notice.  Set True only by
+   --  Scenario_Closed carries no word of whether this scenario was ever
+   --  entered -- a -t-filtered drop and an after-hook Ignore look
+   --  identical on the notice.  Set True only by
    --  On_Scenario_Entered, so On_Scenario_Closed can tell them apart.
    Scenario_Is_Entered : Boolean := False;
    Dry_Run_Active      : Boolean := False;
@@ -60,8 +60,8 @@ is
       Dry_Run_Active := Dry_Run;
    end Set_Dry_Run;
 
-   --  state.md entry 30 (review item 8): the reference interpreter runs
-   --  one log level, set by -q then unconditionally overwritten by -v
+   --  The reference interpreter runs one log level, set by -q then
+   --  unconditionally overwritten by -v
    --  when both are given -- so -v always wins, not just for the
    --  step-level assertion message but for everything -q would else
    --  hide (the feature/scenario headers, the step lines, the blank).
@@ -309,9 +309,9 @@ is
       Scenario_Is_Entered := True;
       if Verbose_Active then
          Print_Tag_Check (N.Scenario, N.Data_Row);
-         --  state.md entry 30 (review item 7): -d is the one Skip trigger
-         --  the shell can see ahead of the scenario's own header line
-         --  (Set_Dry_Run's own comment covers the hook-triggered gap).
+         --  -d is the one Skip trigger the shell can see ahead of the
+         --  scenario's own header line (Set_Dry_Run's own comment covers
+         --  the hook-triggered gap).
          if Dry_Run_Active then
             Fabula.Shell.Console.Put
               (Fabula.Format.Verbose_Skip, Fabula.Shell.Console.Verbose);
@@ -347,10 +347,9 @@ is
            (Fabula.Frames.Value (Info.File), Info.Step_Line),
          Fabula.Shell.Console.Location);
       Fabula.Shell.Console.New_Line;
-      --  state.md entry 30 (review item 4): the reference interpreter
-      --  builds an unmatched outline row from its bare keyword/name/
-      --  file/line alone, no table or doc string -- undefined never
-      --  prints an argument on an outline row.
+      --  The reference interpreter builds an unmatched outline row from
+      --  its bare keyword/name/file/line alone, no table or doc string
+      --  -- undefined never prints an argument on an outline row.
       if N.Status /= Fabula.Results.Undefined or else N.Data_Row = 0 then
          Render_Step_Arguments
            (Doc,
@@ -377,9 +376,8 @@ is
 
    --  "[VERBOSE] Scenario end" + separator + ONE blank: the reference
    --  interpreter's own end-of-scenario print, embedded in every verbose
-   --  completion, kept, dropped after entry, or dropped before it
-   --  (state.md entry 30, review item 7 -- its own separator print
-   --  double-newlines).
+   --  completion, kept, dropped after entry, or dropped before it --
+   --  its own separator print double-newlines.
    procedure Print_Verbose_End_Block is
    begin
       Fabula.Shell.Console.Put
@@ -391,10 +389,10 @@ is
       Fabula.Shell.Console.New_Line;
    end Print_Verbose_End_Block;
 
-   --  The verbose end block, in the oracle's own order (state.md entry
-   --  30, review item 7: "Scenario end", separator, blank -- THEN the
-   --  pre-existing unconditional blank, never before it), plus that
-   --  trailing blank -- shared by a normal close and a post-entry
+   --  The verbose end block, in the oracle's own order ("Scenario end",
+   --  separator, blank -- THEN the pre-existing unconditional blank,
+   --  never before it), plus that trailing blank -- shared by a normal
+   --  close and a post-entry
    --  Dropped close, since both leave the same thing open: the header
    --  (and, in -v, the tag check) already printed.
    procedure Print_Scenario_End is
@@ -403,13 +401,13 @@ is
          Print_Verbose_End_Block;
       end if;
       if not Suppressed then
-         Fabula.Shell.Console.New_Line;   --  item 6: unconditional
+         Fabula.Shell.Console.New_Line;   --  unconditional
 
       end if;
    end Print_Scenario_End;
 
-   --  state.md entry 30 (review item 7): a scenario dropped before entry
-   --  (a -t filter or a before-hook Ignore) still gets its own verbose
+   --  A scenario dropped before entry (a -t filter or a before-hook
+   --  Ignore) still gets its own verbose
    --  tag-check, "ignored" line and end block in the oracle -- printed
    --  here from the same Print_Tag_Check the kept path uses, since the
    --  notice carries no word of which drop it was.  A before-hook's
@@ -516,7 +514,7 @@ is
       Fabula
         .Shell
         .Console
-        .New_Line;   --  item 7: the report-level blank, unconditional
+        .New_Line;   --  the report-level blank, unconditional
       Fabula.Shell.Console.Put (Fabula.Format.Scenarios_Summary (Counts));
       Fabula.Shell.Console.New_Line;
       Fabula.Shell.Console.Put (Fabula.Format.Steps_Summary (Counts));

@@ -5,7 +5,7 @@
 
 export PATH := $(PATH):$(HOME)/.alire/bin
 
-.PHONY: all build test prove format validation shape example gate run ci help
+.PHONY: all build test prove format validation shape example gate run demo ci help
 
 all: build
 
@@ -42,15 +42,44 @@ example: build
 	alr exec -- gprbuild -p -P example/example.gpr -XMODE=release
 
 ## gate        Byte-gate the RELEASE example against the pinned oracle
+#              (the corpus manifest, then the example/features/ one --
+#              both run in well under a second, so both stay in `ci`)
 gate: example
 	python3 tools/byte_gate.py
+	python3 tools/byte_gate.py tests/data/golden/example_manifest.txt
 
 ## run         Build (debug) and run the example against the byte-gate feature
 run: example
 	./example/bin/debug/box_main tests/data/cwt/parser/1_first_scenario.feature
 
+## demo        Run the RELEASE example over example/features/; exit 1 by
+#              design (11_manual_fails.feature fails one scenario on
+#              purpose). A fresh run of the pinned oracle over the same
+#              directory reports:
+#                39 Scenarios (3 failed, 2 skipped, 34 passed)
+#                119 Steps (1 undefined, 12 skipped, 106 passed)
+#              This target checks both: fabula's own exit code and its
+#              summary lines must match those counts exactly.
+demo: example
+	@output="$$(./example/bin/release/box_main example/features 2>&1)"; \
+	status=$$?; \
+	printf '%s\n' "$$output"; \
+	if [ "$$status" -ne 1 ]; then \
+		echo "demo: expected exit 1, got $$status" >&2; \
+		exit 1; \
+	fi; \
+	if ! printf '%s\n' "$$output" | grep -qxF '39 Scenarios (3 failed, 2 skipped, 34 passed)'; then \
+		echo "demo: scenario summary drifted from the pinned oracle" >&2; \
+		exit 1; \
+	fi; \
+	if ! printf '%s\n' "$$output" | grep -qxF '119 Steps (1 undefined, 12 skipped, 106 passed)'; then \
+		echo "demo: step summary drifted from the pinned oracle" >&2; \
+		exit 1; \
+	fi; \
+	echo "demo: exit 1 as expected; summary matches the pinned oracle"
+
 ## ci          Run every gate, cheapest first
-ci: shape format validation test prove example gate
+ci: shape format validation test prove example gate demo
 
 ## help        List targets
 help:

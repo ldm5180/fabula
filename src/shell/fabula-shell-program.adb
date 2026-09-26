@@ -60,11 +60,10 @@ is
 
    Json_Active : Boolean := False;
 
-   --  state.md entry 30: a refusal never lets the run exit 0.  Set
-   --  for every discovery status but Found and Missing (the oracle's
-   --  observed exit-0 cases); Too_Long needs no flag of its own --
-   --  it counts as a parse error instead, so
-   --  Fabula.Results.Run_Failed already covers it.
+   --  A refusal never lets the run exit 0.  Set for every discovery
+   --  status but Found and Missing (the oracle's observed exit-0
+   --  cases); Too_Long needs no flag of its own -- it counts as a parse
+   --  error instead, so Fabula.Results.Run_Failed already covers it.
    Had_File_Error : Boolean := False;
 
    procedure On_Notice (N : Runner.Notice; Info : Fabula.Frames.Frame) is
@@ -147,15 +146,13 @@ is
       Fabula.Shell.Console.New_Line;
    end Report_Parse_Error;
 
-   --  state.md entry 30: every status but Found and Missing fails
-   --  the run, even when its own message stays unprinted (-json).
+   --  Every status but Found and Missing fails the run, even when its
+   --  own message stays unprinted (-json).
    --  An unreadable directory fails too: silently passing a tree the
    --  walk could not enter would report success with scenarios unrun.
    function Discover_Status_Fails
      (Status : Fabula.Shell.Files.Search_Status) return Boolean
-   is (Status
-       not in Fabula.Shell.Files.Found
-            | Fabula.Shell.Files.Missing);
+   is (Status not in Fabula.Shell.Files.Found | Fabula.Shell.Files.Missing);
 
    procedure Report_Discover_Status
      (Argument : String; Status : Fabula.Shell.Files.Search_Status)
@@ -170,9 +167,9 @@ is
              "Too many line selections in '" & Argument & "'",
            when Fabula.Shell.Files.Path_Too_Long                      =>
              "Path too long: '" & Argument & "'",
-           --  state.md entry 30: the oracle stays silent and exits 0 on a
-           --  non-feature positional (probe-confirmed); fabula reports and
-           --  fails instead, per the review's general refusal rule.
+           --  The oracle stays silent and exits 0 on a non-feature
+           --  positional (probe-confirmed); fabula reports and fails
+           --  instead, per its general refusal rule.
            when Fabula.Shell.Files.Not_Feature                        =>
              "Error: Not a feature file '" & Argument & "'",
            when Fabula.Shell.Files.Too_Many_Files                     =>
@@ -181,7 +178,7 @@ is
              "Directory nested too deep under '" & Argument & "'",
            --  The reference interpreter aborts on an unreadable
            --  directory, so no wording exists to copy; fabula names
-           --  the failure and exits 1 (state.md entry 30).
+           --  the failure and exits 1.
            when Fabula.Shell.Files.Unreadable                         =>
              "Error: Cannot read directory under '" & Argument & "'");
    begin
@@ -201,8 +198,8 @@ is
      (Path : String; Status : Fabula.Shell.Files.Load_Status)
    is
       use type Fabula.Shell.Files.Load_Status;
-      --  state.md entry 30: Empty and Unreadable print the oracle's own
-      --  "File not found" wording (probe-confirmed) and stay exit-0;
+      --  Empty and Unreadable print the oracle's own "File not found"
+      --  wording (probe-confirmed) and stay exit-0;
       --  Too_Long is a parse error instead (Run_One_File), never here.
       Message : constant String :=
         (case Status is
@@ -302,8 +299,8 @@ is
          Runner.Note_Parse_Error (R);
          Report_Parse_Error (Path, Load_Res);
       else
-         --  state.md entry 30: Too_Long counts as a parse error (never a
-         --  silent exit 0); Empty/Unreadable stay exit-0, no count.
+         --  Too_Long counts as a parse error (never a silent exit 0);
+         --  Empty/Unreadable stay exit-0, no count.
          if Load_Res.Status = Fabula.Shell.Files.Too_Long then
             Runner.Note_Parse_Error (R);
          end if;
@@ -316,10 +313,10 @@ is
    --  target.
    ---------------------------------------------------------------------
 
-   --  state.md entry 30 (review item 10): Refused (the pattern or
-   --  expression itself did not compile) and Unbound (it compiled, but
-   --  no ">=" ever bound it to a step/hook kind) are different mistakes
-   --  with different fixes; the startup report now names which one.
+   --  Refused (the pattern or expression itself did not compile) and
+   --  Unbound (it compiled, but no ">=" ever bound it to a step/hook
+   --  kind) are different mistakes with different fixes; the startup
+   --  report now names which one.
    function Bad_Row_Word (Status : Steps.Row_Status) return String
    is (case Status is
          when Steps.Row_Ok  => "",

@@ -1,4 +1,4 @@
---  Outside the proof by design decision D7: the language's own 'Value
+--  Outside the proof by design: the language's own 'Value
 --  conversions, which raise on text that is out of range or not a
 --  number.  The one waived unit in tools/proof-waivers.
 pragma SPARK_Mode (Off);

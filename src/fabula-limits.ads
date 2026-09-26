@@ -76,8 +76,8 @@ is
 
    Max_Failed_Scenarios : constant := 256;
    --  The failed-scenarios trailer's store. A run with more failures
-   --  than this still renders the ones it kept; TDD plan item 6 names
-   --  this saturation.
+   --  than this still renders the ones it kept -- saturation, not a
+   --  refusal.
 
    Max_Cli_Positionals : constant := 256;
    --  Raw positional argv tokens (paths, each with optional line

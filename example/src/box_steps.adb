@@ -49,8 +49,8 @@ is
    function Contains (Ctx : Box_Context; Item : String) return Boolean
    is (Count_Of (Ctx, Item) > 0);
 
-   --  state.md entry 30 (review item 10): the reference interpreter's
-   --  own labeled-box constructor takes its label only the first time --
+   --  The reference interpreter's own labeled-box constructor takes its
+   --  label only the first time --
    --  a later call, even with a different label, returns the box
    --  already built and ignores the new argument.  Ported as a guard,
    --  not a fabula-side reinterpretation: fabula's one flat Box_Context

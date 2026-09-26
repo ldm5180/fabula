@@ -24,9 +24,9 @@ is
 
    Any_Feature_Written       : Boolean := False;
    First_Scenario_In_Feature : Boolean := True;
-   --  state.md entry 30: Scenario_Closed carries no word of whether this
-   --  scenario was ever entered -- a -t-filtered drop and an after-hook
-   --  Ignore look identical on the notice.  Set True only by
+   --  Scenario_Closed carries no word of whether this scenario was ever
+   --  entered -- a -t-filtered drop and an after-hook Ignore look
+   --  identical on the notice.  Set True only by
    --  On_Scenario_Entered, so On_Scenario_Closed can tell them apart.
    Scenario_Is_Entered       : Boolean := False;
    --  A step's own closing brace is deferred one notice, so it can carry
@@ -45,11 +45,10 @@ is
       Has_File : Boolean;
       Status   : out Fabula.Shell.Reports.Status) is
    begin
-      --  state.md entry 30 (review item 10): --report-json= (fabula's
-      --  own merged form) can set Has_File with an empty value; the
-      --  reference interpreter's own classification treats no value at
-      --  all as stdout, so an empty one falls back the same way rather
-      --  than opening an empty path and failing.
+      --  --report-json= (fabula's own merged form) can set Has_File with
+      --  an empty value; the reference interpreter's own classification
+      --  treats no value at all as stdout, so an empty one falls back
+      --  the same way rather than opening an empty path and failing.
       if Has_File and then File'Length > 0 then
          Fabula.Shell.Reports.Open (Report, File, Status);
       else
@@ -131,8 +130,8 @@ is
    end Header_Row_For;
 
    --  An outline row's 1-based position within its OWN Examples block;
-   --  0 for a plain scenario.  state.md entry 30 (review item 6): the
-   --  row's own position (Data_Row - Rows.First + 1) rather than a
+   --  0 for a plain scenario.  Uses the row's own position
+   --  (Data_Row - Rows.First + 1) rather than a
    --  running count of scenarios actually seen -- a `:line` selection or
    --  a `-n` filter can run rows out of order or skip some outright, and
    --  a running count would number them by arrival, not by row.
@@ -327,10 +326,10 @@ is
            (Fabula.Format.Argument_Object_Depth, False));
    end Write_Doc_Argument;
 
-   --  state.md entry 30 (review item 4): the reference interpreter
-   --  builds an unmatched outline row from its bare keyword/name/file/
-   --  line alone, no table or doc string at all -- Suppressed forces
-   --  the empty form regardless of what the AST step node holds.
+   --  The reference interpreter builds an unmatched outline row from its
+   --  bare keyword/name/file/line alone, no table or doc string at all
+   --  -- Suppressed forces the empty form regardless of what the AST
+   --  step node holds.
    procedure Write_Step_Arguments
      (Doc        : Fabula.Ast.Document;
       Step       : Fabula.Ast.Step_Handle;
@@ -376,9 +375,9 @@ is
    --  match only while its request is pending, gone by Step_Closed, so
    --  this re-derives it from the notice's own resolved text: the same
    --  table and the same text always find the same row.  Empty for a
-   --  skipped or undefined step (state.md entry 30: neither one ran, so
-   --  neither has a match to report, whatever Reg.Find would find by
-   --  text alone) -- matching the oracle's own fallback.
+   --  skipped or undefined step (neither one ran, so neither has a
+   --  match to report, whatever Reg.Find would find by text alone) --
+   --  matching the oracle's own fallback.
    function Match_Location_Text
      (Status : Fabula.Results.Status; Info : Fabula.Frames.Frame) return String
    is
@@ -563,11 +562,11 @@ is
          return;   --  never entered; no JSON element was opened for it
 
       end if;
-      --  state.md entry 30: an after-hook Ignore (or one mid-steps, via
-      --  a Step_After hook) can drop a scenario whose element -- and
-      --  some of its steps -- already opened; Finish_Pending_Step closes
-      --  whatever step is left hanging with no trailing comma, so the
-      --  array and the element close out valid either way.
+      --  An after-hook Ignore (or one mid-steps, via a Step_After hook)
+      --  can drop a scenario whose element -- and some of its steps --
+      --  already opened; Finish_Pending_Step closes whatever step is
+      --  left hanging with no trailing comma, so the array and the
+      --  element close out valid either way.
       Finish_Pending_Step (More => False);
       Write_Line
         (Fabula.Format.Close_Array

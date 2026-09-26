@@ -1,19 +1,19 @@
-Feature: A failing step and an undefined step  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/failing_undefined.feature:1
+Feature: A failing step and an undefined step  tests/data/fixtures/failing_undefined.feature:1
 
-Scenario: The step fails  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/failing_undefined.feature:3
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/failing_undefined.feature:4
-[   PASSED    ] When I place 1 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/failing_undefined.feature:5
+Scenario: The step fails  tests/data/fixtures/failing_undefined.feature:3
+[   PASSED    ] Given An empty box  tests/data/fixtures/failing_undefined.feature:4
+[   PASSED    ] When I place 1 x "apple" in it  tests/data/fixtures/failing_undefined.feature:5
 Value 1 is not equal to 2
-[   FAILED    ] Then The box contains 2 items  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/failing_undefined.feature:6
+[   FAILED    ] Then The box contains 2 items  tests/data/fixtures/failing_undefined.feature:6
 
-Scenario: The step is undefined  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/failing_undefined.feature:8
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/failing_undefined.feature:9
-[   UNDEFINED ] When Nobody registered this step at all  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/failing_undefined.feature:10
-[   SKIPPED   ] Then The box contains 1 item  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/failing_undefined.feature:11
+Scenario: The step is undefined  tests/data/fixtures/failing_undefined.feature:8
+[   PASSED    ] Given An empty box  tests/data/fixtures/failing_undefined.feature:9
+[   UNDEFINED ] When Nobody registered this step at all  tests/data/fixtures/failing_undefined.feature:10
+[   SKIPPED   ] Then The box contains 1 item  tests/data/fixtures/failing_undefined.feature:11
 
 Failed Scenarios:
-The step fails  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/failing_undefined.feature:3
-The step is undefined  /Users/jason/pipeline/fabula-repo/tests/data/fixtures/failing_undefined.feature:8
+The step fails  tests/data/fixtures/failing_undefined.feature:3
+The step is undefined  tests/data/fixtures/failing_undefined.feature:8
 
 2 Scenarios (2 failed)
 6 Steps (1 failed, 1 undefined, 1 skipped, 3 passed)

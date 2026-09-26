@@ -1,17 +1,17 @@
-Feature: We always need apples!  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/3_background.feature:1
+Feature: We always need apples!  tests/data/cwt/parser/3_background.feature:1
 
-Scenario: Apples Apples Apples  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/3_background.feature:7
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/3_background.feature:4
-[   PASSED    ] When I place 1 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/3_background.feature:5
-[   PASSED    ] When I place 1 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/3_background.feature:8
-[   PASSED    ] Then The box contains 2 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/3_background.feature:9
+Scenario: Apples Apples Apples  tests/data/cwt/parser/3_background.feature:7
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/3_background.feature:4
+[   PASSED    ] When I place 1 x "apple" in it  tests/data/cwt/parser/3_background.feature:5
+[   PASSED    ] When I place 1 x "apple" in it  tests/data/cwt/parser/3_background.feature:8
+[   PASSED    ] Then The box contains 2 items  tests/data/cwt/parser/3_background.feature:9
 
-Scenario: Apples and Bananas  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/3_background.feature:11
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/3_background.feature:4
-[   PASSED    ] When I place 1 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/3_background.feature:5
-[   PASSED    ] When I place 1 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/3_background.feature:12
-[   PASSED    ] And I place 1 x "banana" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/3_background.feature:13
-[   PASSED    ] Then The box contains 3 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/3_background.feature:14
+Scenario: Apples and Bananas  tests/data/cwt/parser/3_background.feature:11
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/3_background.feature:4
+[   PASSED    ] When I place 1 x "apple" in it  tests/data/cwt/parser/3_background.feature:5
+[   PASSED    ] When I place 1 x "apple" in it  tests/data/cwt/parser/3_background.feature:12
+[   PASSED    ] And I place 1 x "banana" in it  tests/data/cwt/parser/3_background.feature:13
+[   PASSED    ] Then The box contains 3 items  tests/data/cwt/parser/3_background.feature:14
 
 
 2 Scenarios (2 passed)

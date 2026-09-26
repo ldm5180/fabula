@@ -133,7 +133,7 @@ package body Fabula_Cli_Tests is
 
    ---------------------------------------------------------------------
    --  --report-json: the shell's own pre-classification, folded into
-   --  one token (docs/report_wiring.md; state.md's deviation ledger).
+   --  one token (docs/report_wiring.md).
    ---------------------------------------------------------------------
 
    procedure Test_Report_Json_Console

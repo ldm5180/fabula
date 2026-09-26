@@ -1,8 +1,8 @@
 Feature: A scenario dropped after it entered
-  Not a port of a reference-interpreter corpus file (state.md entry 30,
-  review item 3) -- exercises an After hook that ignores a scenario once
-  its own steps already streamed, to check the console still closes the
-  scenario out and the JSON report still comes out well-formed.
+  Not a port of a reference-interpreter corpus file -- exercises an
+  After hook that ignores a scenario once its own steps already
+  streamed, to check the console still closes the scenario out and the
+  JSON report still comes out well-formed.
 
   @ignore_after
   Scenario: Ignored after all its steps ran
