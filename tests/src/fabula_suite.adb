@@ -3,6 +3,7 @@ with AUnit.Test_Cases;
 with Fabula_Expressions_Tests;
 with Fabula_Limits_Tests;
 with Fabula_Scan_Tests;
+with Fabula_Tags_Tests;
 
 package body Fabula_Suite is
 
@@ -20,10 +21,13 @@ package body Fabula_Suite is
         new Fabula_Scan_Tests.Test;
       Expressions_Test : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Expressions_Tests.Test;
+      Tags_Test        : constant AUnit.Test_Cases.Test_Case_Access :=
+        new Fabula_Tags_Tests.Test;
    begin
       AUnit.Test_Suites.Add_Test (Result, Limits_Test);
       AUnit.Test_Suites.Add_Test (Result, Scan_Test);
       AUnit.Test_Suites.Add_Test (Result, Expressions_Test);
+      AUnit.Test_Suites.Add_Test (Result, Tags_Test);
       return Result;
    end Suite;
 
