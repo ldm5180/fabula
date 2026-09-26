@@ -36,6 +36,9 @@ package body Fabula_Limits_Tests is
       Assert
         (Fabula.Limits.Max_Doc_Lines > 0, "Max_Doc_Lines must be positive");
       Assert
+        (Fabula.Limits.Max_Examples_Blocks > 0,
+         "Max_Examples_Blocks must be positive");
+      Assert
         (Fabula.Limits.Max_Features_Per_Run > 0,
          "Max_Features_Per_Run must be positive");
       Assert
