@@ -24,6 +24,12 @@ is
 
    type Step_Keyword is (K_Given, K_When, K_Then, K_And, K_But, K_Star);
 
+   --  K's spelling as written in a step line: "Given", "When", "Then",
+   --  "And", "But", "*". The one place this table lives, for any
+   --  caller that must print a step's keyword back out.
+   function Spelling (K : Step_Keyword) return String
+   with Post => Spelling'Result'Length > 0;
+
    type Fence_Kind is (Quotes, Backticks);
 
    subtype Length is Natural range 0 .. Limits.Max_Line_Length;
