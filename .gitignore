@@ -1,0 +1,10 @@
+/obj/
+/lib/
+/bin/
+/tests/obj/
+/tests/bin/
+/proof/obj/
+/alire/
+/config/
+/docs/tdd-log.md
+.DS_Store

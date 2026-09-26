@@ -1,0 +1,17 @@
+with "../config/fabula_config.gpr";
+project Proof is
+
+   --  SPARK proof target.  Not built by `alr build`; analysed with
+   --  `gnatprove -P proof/proof.gpr`.  Sources are the library plus this
+   --  directory's own closure-proof units, which pull in every core unit
+   --  a later phase adds so the closure lint can confirm gnatprove
+   --  actually analyzed it.  The crate-config with resolves sml for the
+   --  parser and runner machines; never with sml-ada by path.
+   for Source_Dirs use ("../src", "src");
+   for Object_Dir use "obj";
+
+   package Compiler is
+      for Default_Switches ("Ada") use ("-gnat2022", "-gnata");
+   end Compiler;
+
+end Proof;

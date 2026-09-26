@@ -1,0 +1,8 @@
+#  Core units gnatprove has not analyzed, and why each is still excused.
+#
+#  This file is the reason the proof-closure lint can stay ON.  An
+#  unanalyzed core unit that is not listed here fails the lint; a waiver
+#  naming a unit gnatprove HAS since analyzed is stale and fails too, so
+#  the list cannot outlive what it excuses.
+#
+#  columns: unit  reason

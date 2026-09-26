@@ -1,0 +1,68 @@
+with AUnit.Assertions; use AUnit.Assertions;
+
+with Fabula.Limits;
+
+package body Fabula_Limits_Tests is
+
+   use AUnit.Test_Cases.Registration;
+
+   --  Trivial by design: every constant in Fabula.Limits is a shipped
+   --  capacity, so this proves the harness runs a real assertion rather
+   --  than exercising the values themselves.
+   procedure Test_Limits_Are_Positive
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert
+        (Fabula.Limits.Max_Line_Length > 0,
+         "Max_Line_Length must be positive");
+      Assert
+        (Fabula.Limits.Text_Arena_Bytes > 0,
+         "Text_Arena_Bytes must be positive");
+      Assert (Fabula.Limits.Max_Steps > 0, "Max_Steps must be positive");
+      Assert
+        (Fabula.Limits.Max_Scenarios > 0, "Max_Scenarios must be positive");
+      Assert (Fabula.Limits.Max_Rules > 0, "Max_Rules must be positive");
+      Assert
+        (Fabula.Limits.Max_Table_Rows > 0, "Max_Table_Rows must be positive");
+      Assert
+        (Fabula.Limits.Max_Table_Cells > 0,
+         "Max_Table_Cells must be positive");
+      Assert (Fabula.Limits.Max_Tags > 0, "Max_Tags must be positive");
+      Assert
+        (Fabula.Limits.Max_Examples_Rows > 0,
+         "Max_Examples_Rows must be positive");
+      Assert
+        (Fabula.Limits.Max_Doc_Lines > 0, "Max_Doc_Lines must be positive");
+      Assert
+        (Fabula.Limits.Max_Features_Per_Run > 0,
+         "Max_Features_Per_Run must be positive");
+      Assert
+        (Fabula.Limits.Max_Step_Defs > 0, "Max_Step_Defs must be positive");
+      Assert (Fabula.Limits.Max_Hooks > 0, "Max_Hooks must be positive");
+      Assert
+        (Fabula.Limits.Max_Pattern_Length > 0,
+         "Max_Pattern_Length must be positive");
+      Assert
+        (Fabula.Limits.Max_Args_Per_Step > 0,
+         "Max_Args_Per_Step must be positive");
+      Assert
+        (Fabula.Limits.Text_Arena_Bytes >= Fabula.Limits.Max_Line_Length,
+         "the arena must hold at least one full line");
+   end Test_Limits_Are_Positive;
+
+   overriding
+   procedure Register_Tests (T : in out Test) is
+   begin
+      Register_Routine
+        (T,
+         Test_Limits_Are_Positive'Access,
+         "every shipped capacity is positive");
+   end Register_Tests;
+
+   overriding
+   function Name (T : Test) return AUnit.Message_String
+   is (AUnit.Format ("Fabula.Limits (shipped capacities)"));
+
+end Fabula_Limits_Tests;
