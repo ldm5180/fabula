@@ -1,0 +1,44 @@
+with "aunit";
+with "../fabula.gpr";
+
+--  Test runner project for fabula.  Built and executed by `alr test`
+--  (see the [[actions]] entry in alire.toml).  It withs the library under
+--  test plus the AUnit framework that Alire provides as a dependency.
+project Test_Fabula is
+
+   --  MODE selects the test build's optimization level (the library
+   --  itself builds once, under the Alire profile):
+   --    release  -O3
+   --    debug    -O0
+   --  Per-mode object and exec dirs keep the two builds from reusing
+   --  each other's stale artifacts.
+   type Mode_Type is ("release", "debug");
+   Mode : Mode_Type := external ("MODE", "debug");
+
+   for Source_Dirs use ("src");
+   for Object_Dir use "obj/" & Mode;
+   for Exec_Dir use "bin/" & Mode;
+   for Main use ("test_runner.adb");
+
+   package Compiler is
+      --  -gnata keeps the library's pre/postconditions enabled while testing;
+      --  -gnatwe holds the test code itself to warnings-as-errors.  -gnatwC
+      --  turns off the "condition is always True" warning: Fabula_Limits_Tests
+      --  asserts each shipped capacity is positive, and every one is a
+      --  compile-time constant, so the condition is always true by design.
+      Common := ("-g", "-gnata", "-gnatwa", "-gnatwC", "-gnatwe", "-gnat2022");
+
+      case Mode is
+         when "release" =>
+            for Default_Switches ("Ada") use Common & ("-O3");
+
+         when "debug" =>
+            for Default_Switches ("Ada") use Common & ("-O0");
+      end case;
+   end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es");  --  Symbolic traceback.
+   end Binder;
+
+end Test_Fabula;

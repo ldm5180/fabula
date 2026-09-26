@@ -1,0 +1,8 @@
+#  Shapes knowingly over a limit, and why each one is still here.
+#
+#  This file is the reason `make shape` can stay ON.  A violation that is
+#  not listed here fails the build; a listed one whose value has GROWN
+#  fails; and a line for a shape that no longer violates fails too, so the
+#  list cannot outlive what it excuses.  A waiver may only ever shrink.
+#
+#  columns: path  unit  metric  value  reason

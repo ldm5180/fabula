@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    # foundation is the v1 development branch (and, on an empty repo,
+    # the default branch the first push creates) — CI must run there.
+    branches: [main, master, foundation]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Run JavaScript actions on Node 24 now (the default from 2026-06-16).  This
+# silences the Node 20 deprecation warnings, including those from the actions
+# that alire-project/setup-alire@v6 (the latest) pins internally
+# (actions/cache/restore, actions/setup-node), which we can't bump ourselves.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  build-and-test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Alire + GNAT toolchain
+        uses: alire-project/setup-alire@v6
+        # Defaults: alr 2.1.1, toolchain "gnat_native gprbuild".
+
+      - name: Build the library (validation profile)
+        # The `validation` profile adds -gnatwe (warnings are errors),
+        # -gnata (assertions/contracts) and -gnato (overflow checks) on top
+        # of the default warning + style set, so CI fails on any warning.
+        run: alr --non-interactive build --validation
+
+      - name: Run the test suite (debug -O0 and release -O3)
+        # `alr test` builds tests/test_fabula.gpr and runs the AUnit
+        # runner, which exits non-zero on any failed assertion.  It builds
+        # and runs the suite in both optimization modes (debug -O0,
+        # release -O3).
+        run: alr --non-interactive test
+
+  proof:
+    name: SPARK proof
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Alire + GNAT toolchain
+        uses: alire-project/setup-alire@v6
+
+      - name: Build
+        # Populates the shared dependency cache so the proof project's tree
+        # resolves for gnatprove.
+        run: alr --non-interactive build
+
+      - name: Install gnatprove
+        run: |
+          alr --non-interactive install --prefix="$HOME/.alire" gnatprove
+          echo "$HOME/.alire/bin" >> "$GITHUB_PATH"
+
+      - name: Prove
+        # --checks-as-errors=on fails the job if any check is unproved.
+        run: alr exec -- gnatprove -P proof/proof.gpr -j0 --level=2 --checks-as-errors=on --warnings=error
+
+      - name: Proof-closure lint
+        # Fails on any core unit gnatprove did not analyze -- the
+        # "unasked unit" failure the prove step above cannot see.
+        run: python3 tools/proof_closure_lint.py
+
+  format:
+    name: Formatting (gnatformat --check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Alire + GNAT toolchain
+        uses: alire-project/setup-alire@v6
+
+      - name: Install gnatformat
+        run: |
+          alr --non-interactive install --prefix="$HOME/.alire" gnatformat_bin
+          echo "$HOME/.alire/bin" >> "$GITHUB_PATH"
+
+      - name: Check formatting
+        run: |
+          files=$(git ls-files '*.ads' '*.adb')
+          echo "Checking:"; echo "$files"
+          gnatformat --no-project --check $files
+
+  shape:
+    name: Shape + proof-closure selftest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Shape lint selftest
+        run: python3 tools/shape_check.py --selftest
+
+      - name: Subprogram-shape lint
+        run: python3 tools/shape_check.py
+
+      - name: Proof-closure lint selftest
+        run: python3 tools/proof_closure_lint.py --selftest

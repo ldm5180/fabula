@@ -1,0 +1,45 @@
+name = "fabula"
+description = "BDD Cucumber and Gherkin implementation in Ada 2022"
+version = "0.1.0-dev"
+
+authors = ["Lenny Maiorani", "Jason Affourtit"]
+maintainers = ["Lenny Maiorani <639247+ldm5180@users.noreply.github.com>"]
+maintainers-logins = ["ldm5180"]
+licenses = "MIT"
+website = "https://github.com/ldm5180/fabula"
+tags = ["bdd", "cucumber", "gherkin", "testing", "spark"]
+
+project-files = ["fabula.gpr"]
+
+[[depends-on]]
+sml = "*"
+aunit = "^26.0.0"
+
+[[pins]]
+sml = { url = "https://github.com/ldm5180/sml-ada.git", commit = "3ccd0e4bf51685ebd832383c12166e795473a037" }
+
+[build-switches]
+"*".ada_version = "Ada2022"
+
+#  `alr test` runs actions with an empty GPR_PROJECT_PATH, so each wraps its
+#  command in `alr exec --` to pick up the toolchain and AUnit.  Argv-only
+#  actions (no `sh -c`, no `&&`) so this runs on Windows too; the runner exits
+#  non-zero on any failing assertion, so a failure fails the job.  The suite is
+#  built and run in both optimization modes (debug -O0, release -O3); the
+#  library itself builds once under the Alire profile, so the -O sweep covers
+#  the test units and the generics they instantiate.
+[[actions]]
+type = "test"
+command = ["alr", "exec", "--", "gprbuild", "-p", "-XMODE=debug", "-P", "tests/test_fabula.gpr"]
+
+[[actions]]
+type = "test"
+command = ["alr", "exec", "--", "tests/bin/debug/test_runner"]
+
+[[actions]]
+type = "test"
+command = ["alr", "exec", "--", "gprbuild", "-p", "-XMODE=release", "-P", "tests/test_fabula.gpr"]
+
+[[actions]]
+type = "test"
+command = ["alr", "exec", "--", "tests/bin/release/test_runner"]
