@@ -6,3 +6,4 @@
 #  the list cannot outlive what it excuses.
 #
 #  columns: unit  reason
+fabula-args-numbers  D7: decimal text conversion ('Value) stays outside the proof; the specs are SPARK, the bodies SPARK_Mode Off; conversions receive arbitrary user-selected text, and a bad read raises Constraint_Error, which the shell turns into a failed step
