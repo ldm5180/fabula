@@ -23,6 +23,10 @@ is
    Max_Doc_Lines     : constant := 4_096;
    --  Pool capacities for one parsed document.
 
+   Max_Examples_Blocks : constant := 1_024;
+   --  Examples blocks in one document.  A block may hold no rows, so
+   --  Max_Examples_Rows does not bound it.
+
    Max_Features_Per_Run : constant := 256;
    Max_Step_Defs        : constant := 512;
    Max_Hooks            : constant := 64;

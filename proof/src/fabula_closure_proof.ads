@@ -2,8 +2,10 @@
 --  tools/proof_closure_lint.py fails on any unit gnatprove did not
 --  analyze.  A generic (Fabula.Tags.Eval) is analyzed only through a
 --  concrete instance, so one is instantiated here.
+with Fabula.Ast;
 with Fabula.Expressions;
 with Fabula.Limits;
+with Fabula.Parse;
 with Fabula.Scan;
 with Fabula.Tags;
 
@@ -37,4 +39,14 @@ is
      (if Fabula.Tags.Valid (Closure_Tag_Expr)
       then Closure_Eval (Closure_Tag_Expr)
       else Fabula.Tags.Error (Closure_Tag_Expr) > 0);
+
+   Empty_Slice_Is_Empty : constant Boolean :=
+     Fabula.Ast.Length (Fabula.Ast.Empty_Slice) = 0;
+
+   --  One parse of a two-line feature, as the shell will run it: proves
+   --  Start, Feed and Finish callable under their contracts, and
+   --  reaches the parser machine's sml instance (inside the private
+   --  Fabula.Grammar) at the shipped capacities.
+   procedure Closure_Parse
+     (P : out Fabula.Parse.Parser; Doc : in out Fabula.Ast.Document);
 end Fabula_Closure_Proof;
