@@ -1,6 +1,6 @@
 --  Step and hook outcomes.  A check records into an Outcome; nothing
---  here raises.  The runner reads the outcome as data (spec D5) and
---  the shell owns the only exception handler.
+--  here raises.  The runner reads the outcome as data, and the
+--  shell owns the only exception handler.
 with Fabula.Limits;
 
 package Fabula.Check

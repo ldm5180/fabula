@@ -2,7 +2,8 @@
 
 This is the authority `fabula-format.ads` points to (its own comment
 budget is 8 lines per block). It names, for each piece of console or
-JSON output, which `Fabula.Format` function P10 calls, when, and every
+JSON output, which `Fabula.Format` function the composition root
+calls, when, and every
 probe-verified rule behind the choice. The oracle referred to
 throughout is the pinned reference interpreter (SHA 662b4e4); probes
 were run against a rebuilt copy with JSON reporting enabled (the
@@ -12,7 +13,8 @@ time).
 ## Console, one feature file at a time
 
 1. **Feature header.** There is no feature-level notice in
-   `Fabula.Run` — P10 prints it itself, right when it calls
+   `Fabula.Run` — the composition root prints it itself, right when
+   it calls
    `Start_Feature`, using the Document's `Feature (Doc).Head` and the
    file path: `Header_Text` then `Location_Text`, then one blank line.
    Rule and Background headers never print at all — the oracle's own
@@ -104,9 +106,10 @@ time).
    fixture: under `-q` alone, only "Failed Scenarios:" and the two
    summary lines print; under `-q -v` together, the feature header,
    the scenario's own header, every step line, and the assertion
-   message all come back, byte-identical to a plain run. P10 must
-   reproduce this asymmetry — including which half of item 5 sits at
-   which level — not skip a fixed set of calls.
+   message all come back, byte-identical to a plain run. The
+   composition root must reproduce this asymmetry — including which
+   half of the failure-message rule sits at which level — not skip
+   a fixed set of calls.
 
 9. **`--report-json` silences the console path entirely.** The oracle
    never calls any of items 1-8 when a JSON report is requested — it
@@ -158,7 +161,8 @@ order from the oracle's own field-construction code.
       block**, not across the whole scenario (source-read, `ast.hpp`'s
       `push_example`, which numbers `i` from 1 within the block it is
       given; probe-confirmed: a two-block, three-row outline gives ids
-      `(1)`, `(2)`, `(1)`). P10 tracks `Example_Ref.Block` while
+      `(1)`, `(2)`, `(1)`). The composition root tracks
+      `Example_Ref.Block` while
       walking `Fabula.Expand.Next_Example` and resets its occurrence
       counter to 1 whenever `Block` changes from the previous ref.
 
@@ -198,20 +202,17 @@ two-line form, `No tags given, continuing`, the skip/ignore lines and
 (`5_tagged_hooks.feature` and `4_tags.feature`, `-v`). The hook
 `"executing hook"` / `"not executing hook"` lines stay out: no notice
 in `Fabula.Run` carries which hooks ran, were skipped, or their tag
-check's result, so there is nothing for P10 to render them from. This
-is a ledgered gap, not a Format defect — closing it would need a new
-notice shape, out of this phase's scope.
+check's result, so there is nothing for the composition root to
+render them from. This is a recorded gap, not a Format defect —
+closing it would need a new notice shape.
 
 ## Parse errors
 
 `Parse_Error_Text (File, Line_No, Kind, At_End, Token)` then
-`Parse_Error_Trailer` on its own line. `At_End` is true only when the
-refusal came from `Fabula.Parse.Finish` (end of input, no next line to
-quote a token from) rather than `Feed`; **`Fabula.Parse.Refusal` does
-not currently expose this distinction**, nor does
-`Fabula.Shell.Files.Load_Result` — P10 needs a small addition (most
-naturally a boolean on `Load_Result`) before it can select `At_End`
-correctly. `Tag_Line_Malformed` renders through the same "at token"
+`Parse_Error_Trailer` on its own line. `At_End` is true only when
+the refusal came from `Fabula.Parse.Finish` (end of input, no next
+line to quote a token from) rather than `Feed`;
+`Fabula.Shell.Files.Load_Result.At_End` carries the distinction. `Tag_Line_Malformed` renders through the same "at token"
 shape as `Expected_Scenario`, but names its token via
 `First_Bad_Tag_Token`, not `First_Token`: the oracle's own tag scanner
 consumes each `@...` run as one tag, then reports whatever comes next

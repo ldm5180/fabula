@@ -167,7 +167,7 @@ package body Fabula_Format_Json_Tests is
          = "This is my cucumber-cpp hello world",
          "1_first_scenario.feature's one description line, escaped clean"
          & " -- never the oracle's own junk artifacts for the blank line"
-         & " that follows it (p9 ruling: lean clean, ledgered)");
+         & " that follows it (a deliberate choice: lean over faithful)");
    end Test_Clean_Description;
 
    procedure Test_Description_Content_Multi_Line
@@ -246,7 +246,8 @@ package body Fabula_Format_Json_Tests is
    --  Examples block rather than numbering across the whole scenario
    --  (source-read, probe-confirmed: a two-block, three-row outline
    --  gives ids "(1)", "(2)", "(1)"). This walks Fabula.Expand exactly
-   --  as P10 must: track Ref.Block, reset the counter when it changes.
+   --  as the composition root does: track Ref.Block, reset the
+   --  counter when it changes.
    procedure Test_Outline_Occurrence_Restarts_Per_Block
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
@@ -293,10 +294,10 @@ package body Fabula_Format_Json_Tests is
    --  brace, arguments, keyword, line, match/location, close. Split
    --  from the tail below to keep each routine's body short.
    --
-   --  Ruling: "location" holds the matched step definition's
-   --  registered pattern text (Fabula.Registry.Pattern_Text), stable
-   --  and meaningful, where the oracle writes a C++ source path with
-   --  no fabula analogue. Named divergence, ledgered in
+   --  "location" holds the matched step definition's registered
+   --  pattern text (Fabula.Registry.Pattern_Text), stable and
+   --  meaningful, where the oracle writes a C++ source path with no
+   --  fabula analogue. Named divergence, recorded in
    --  docs/report_wiring.md.
    function Step_Object_Head return String
    is (Open_Object (Step_Object_Depth)

@@ -1,0 +1,63 @@
+Feature: This is a doc string example  example/features/7_doc_strings.feature:2
+
+Scenario: Doc string with quotes  example/features/7_doc_strings.feature:4
+[   PASSED    ] Given An empty box with a label  example/features/7_doc_strings.feature:5
+"""
+This is a docstring with quotes
+after a step
+"""
+[   PASSED    ] Then The box is labeled  example/features/7_doc_strings.feature:10
+
+Scenario: Doc string with backticks  example/features/7_doc_strings.feature:12
+[   PASSED    ] Given An empty box with a label  example/features/7_doc_strings.feature:13
+"""
+This is a docstring with backticks
+after a step
+"""
+[   PASSED    ] Then The box is labeled  example/features/7_doc_strings.feature:18
+
+Scenario: Doc string as vector  example/features/7_doc_strings.feature:20
+[   PASSED    ] Given An empty box with a label  example/features/7_doc_strings.feature:21
+"""
+This is a docstring
+which we access
+as std::vector<std::string>
+"""
+[   PASSED    ] Then The box is labeled  example/features/7_doc_strings.feature:27
+
+Scenario: Doc string with a content type tag for a customs declaration  example/features/7_doc_strings.feature:29
+[   PASSED    ] Given An empty box with a label  example/features/7_doc_strings.feature:30
+"""
+Fragile electronics
+"""
+[   PASSED    ] When The box gets a customs declaration  example/features/7_doc_strings.feature:34
+"""
+{ "value_usd": 250, "contents": "electronics" }
+"""
+[   PASSED    ] Then The customs declaration content type should be "json"  example/features/7_doc_strings.feature:38
+
+Scenario Outline: Doc string with a shipping label template in a scenario outline  example/features/7_doc_strings.feature:53
+[   PASSED    ] Given An empty box with a label  example/features/7_doc_strings.feature:41
+"""
+Fragile electronics
+"""
+[   PASSED    ] When The box gets a shipping label  example/features/7_doc_strings.feature:45
+"""
+Ship to: Berlin, Germany. Barcode template: <barcode>
+"""
+[   PASSED    ] Then The shipping label should equal "Ship to: Berlin, Germany. Barcode template: <barcode>"  example/features/7_doc_strings.feature:49
+
+Scenario Outline: Doc string with a shipping label template in a scenario outline  example/features/7_doc_strings.feature:54
+[   PASSED    ] Given An empty box with a label  example/features/7_doc_strings.feature:41
+"""
+Fragile electronics
+"""
+[   PASSED    ] When The box gets a shipping label  example/features/7_doc_strings.feature:45
+"""
+Ship to: Tokyo, Japan. Barcode template: <barcode>
+"""
+[   PASSED    ] Then The shipping label should equal "Ship to: Tokyo, Japan. Barcode template: <barcode>"  example/features/7_doc_strings.feature:49
+
+
+6 Scenarios (6 passed)
+15 Steps (15 passed)

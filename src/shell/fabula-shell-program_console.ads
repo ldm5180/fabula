@@ -19,10 +19,10 @@ package Fabula.Shell.Program_Console with SPARK_Mode => Off is
    procedure Set_Quiet (Quiet : Boolean);
    procedure Set_Verbose (Verbose : Boolean);
 
-   --  state.md entry 30 (review item 7): -d marks every scenario Skipped
-   --  before Scenario_Entered fires (Fabula.Run.Enter), so this alone is
-   --  enough to print the oracle's "Scenario skipped with 'skip_scenario'"
-   --  line for a dry run. A per-scenario Skip called from a step
+   --  -d marks every scenario Skipped before Scenario_Entered fires
+   --  (Fabula.Run.Enter), so this alone is enough to print the oracle's
+   --  "Scenario skipped with 'skip_scenario'" line for a dry run. A
+   --  per-scenario Skip called from a step
    --  definition's own before-hook has no such run-wide flag -- Notice
    --  carries no word of it, and there is no accessor for it on Fabula.Run
    --  -- so that trigger stays unprinted, a known, disclosed gap.

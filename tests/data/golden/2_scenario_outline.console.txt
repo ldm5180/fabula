@@ -1,24 +1,24 @@
-Feature: Examples - Scenario Outline  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:2
+Feature: Examples - Scenario Outline  tests/data/cwt/parser/2_scenario_outline.feature:2
 
-Scenario Outline: Scenario Outline with "apple"  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:11
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:5
-[   PASSED    ] When I place 1 x "apple" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:6
-[   PASSED    ] Then The box contains 1 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:7
+Scenario Outline: Scenario Outline with "apple"  tests/data/cwt/parser/2_scenario_outline.feature:11
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/2_scenario_outline.feature:5
+[   PASSED    ] When I place 1 x "apple" in it  tests/data/cwt/parser/2_scenario_outline.feature:6
+[   PASSED    ] Then The box contains 1 items  tests/data/cwt/parser/2_scenario_outline.feature:7
 
-Scenario Outline: Scenario Outline with "bananas"  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:12
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:5
-[   PASSED    ] When I place 2 x "bananas" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:6
-[   PASSED    ] Then The box contains 2 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:7
+Scenario Outline: Scenario Outline with "bananas"  tests/data/cwt/parser/2_scenario_outline.feature:12
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/2_scenario_outline.feature:5
+[   PASSED    ] When I place 2 x "bananas" in it  tests/data/cwt/parser/2_scenario_outline.feature:6
+[   PASSED    ] Then The box contains 2 items  tests/data/cwt/parser/2_scenario_outline.feature:7
 
-Scenario Template: Alternative Keywords  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:21
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:15
-[   PASSED    ] When I place 1 x "pen" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:16
-[   PASSED    ] Then The box contains 1 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:17
+Scenario Template: Alternative Keywords  tests/data/cwt/parser/2_scenario_outline.feature:21
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/2_scenario_outline.feature:15
+[   PASSED    ] When I place 1 x "pen" in it  tests/data/cwt/parser/2_scenario_outline.feature:16
+[   PASSED    ] Then The box contains 1 items  tests/data/cwt/parser/2_scenario_outline.feature:17
 
-Scenario Template: Alternative Keywords  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:22
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:15
-[   PASSED    ] When I place 3 x "collegeblocks" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:16
-[   PASSED    ] Then The box contains 3 items  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/2_scenario_outline.feature:17
+Scenario Template: Alternative Keywords  tests/data/cwt/parser/2_scenario_outline.feature:22
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/2_scenario_outline.feature:15
+[   PASSED    ] When I place 3 x "collegeblocks" in it  tests/data/cwt/parser/2_scenario_outline.feature:16
+[   PASSED    ] Then The box contains 3 items  tests/data/cwt/parser/2_scenario_outline.feature:17
 
 
 4 Scenarios (4 passed)

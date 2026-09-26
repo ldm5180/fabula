@@ -1,6 +1,6 @@
 --  Decimal text to numbers, for the numeric readers of Fabula.Args.
---  The bodies stay outside the proof (design decision D7): proving
---  decimal text conversion is not in scope for this version.  The
+--  The bodies stay outside the proof by design: proving decimal
+--  text conversion is not in scope for this version.  The
 --  conversions receive arbitrary text the user chose to read as a
 --  number; a bad read raises Constraint_Error, which the shell turns
 --  into a failed step.

@@ -1,0 +1,12 @@
+Feature: Continue on failure  example/features/10_continue_on_failure.feature:1
+
+Scenario: First Scenario  example/features/10_continue_on_failure.feature:7
+[   SKIPPED   ] Given An empty box  example/features/10_continue_on_failure.feature:8
+[   SKIPPED   ] When I place 1 x "apple" in it  example/features/10_continue_on_failure.feature:9
+[   SKIPPED   ] Then The box contains 2 item  example/features/10_continue_on_failure.feature:10
+[   SKIPPED   ] But I place 1 x "banana" in it  example/features/10_continue_on_failure.feature:11
+[   SKIPPED   ] Then The box contains 2 item  example/features/10_continue_on_failure.feature:12
+
+
+1 Scenario (1 skipped)
+5 Steps (5 skipped)

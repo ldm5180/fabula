@@ -1,0 +1,25 @@
+Feature: Examples - Scenario Outline  example/features/2_scenario_outline.feature:2
+
+Scenario Outline: Scenario Outline with "apple"  example/features/2_scenario_outline.feature:11
+[   PASSED    ] Given An empty box  example/features/2_scenario_outline.feature:5
+[   PASSED    ] When I place 1 x "apple" in it  example/features/2_scenario_outline.feature:6
+[   PASSED    ] Then The box contains 1 items  example/features/2_scenario_outline.feature:7
+
+Scenario Outline: Scenario Outline with "bananas"  example/features/2_scenario_outline.feature:12
+[   PASSED    ] Given An empty box  example/features/2_scenario_outline.feature:5
+[   PASSED    ] When I place 2 x "bananas" in it  example/features/2_scenario_outline.feature:6
+[   PASSED    ] Then The box contains 2 items  example/features/2_scenario_outline.feature:7
+
+Scenario Template: Alternative Keywords  example/features/2_scenario_outline.feature:21
+[   PASSED    ] Given An empty box  example/features/2_scenario_outline.feature:15
+[   PASSED    ] When I place 1 x "pen" in it  example/features/2_scenario_outline.feature:16
+[   PASSED    ] Then The box contains 1 items  example/features/2_scenario_outline.feature:17
+
+Scenario Template: Alternative Keywords  example/features/2_scenario_outline.feature:22
+[   PASSED    ] Given An empty box  example/features/2_scenario_outline.feature:15
+[   PASSED    ] When I place 3 x "collegeblocks" in it  example/features/2_scenario_outline.feature:16
+[   PASSED    ] Then The box contains 3 items  example/features/2_scenario_outline.feature:17
+
+
+4 Scenarios (4 passed)
+12 Steps (12 passed)

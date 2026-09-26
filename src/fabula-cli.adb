@@ -331,10 +331,10 @@ is
          Result.Is_Help := True;
          return;
       end if;
-      --  state.md entry 30 (review item 10): -h/--help wins over any
-      --  other argument, a refusal included, wherever it sits in argv --
-      --  the reference interpreter checks it before parsing anything
-      --  else, so a bad flag earlier in the line never hides it.
+      --  -h/--help wins over any other argument, a refusal included,
+      --  wherever it sits in argv -- the reference interpreter checks
+      --  it before parsing anything else, so a bad flag earlier in the
+      --  line never hides it.
       for J in Args'Range loop
          if Value (Args (J)) in "-h" | "--help" then
             Result.Is_Help := True;

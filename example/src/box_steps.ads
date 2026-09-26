@@ -1,8 +1,8 @@
 --  The box world: the reference interpreter's own example, ported step
---  for step.  fabula has one flat Context per scenario (D4), so the two
---  type-indexed context slots the reference interpreter's step bodies
---  use (context<box>, context<string>) become two components of one
---  Box_Context record instead.
+--  for step.  fabula gives each scenario one flat Context record, so
+--  the two type-indexed context slots the reference interpreter's
+--  step bodies use (context<box>, context<string>) become two
+--  components of one Box_Context record instead.
 with Fabula.Args;
 with Fabula.Check;
 with Fabula.Frames;
@@ -40,8 +40,9 @@ is
       Ignore_After_Tag);
 
    Max_Items        : constant := 1_024;
-   --  state.md entry 30: 64 silently truncated 6_tables' 100-item box,
-   --  passing the oracle's own scenario where fabula failed it.
+   --  At 64 the port silently truncated the reference interpreter's
+   --  100-item box scenario and failed it where the interpreter
+   --  passes; the byte gate over that file caught the undercount.
    Max_Item_Length  : constant := 128;
    Max_Label_Length : constant := 128;
    Max_Note_Length  : constant := 2_048;
@@ -104,9 +105,9 @@ is
       After ("@will_fail_after") >= Fail_After,
       After >= Close_Box,
       After ("@ship or @important") >= Ship_Box,
-      --  state.md entry 30 (review item 3): not a port of the reference
-      --  interpreter's own hooks -- an After hook that ignores, to drive
-      --  the fixture for a scenario dropped once its steps already ran.
+      --  Not a port of the reference interpreter's own hooks -- an
+      --  After hook that ignores, to drive the fixture for a scenario
+      --  dropped once its steps already ran.
       After ("@ignore_after") >= Ignore_After_Tag];
 
    procedure Execute

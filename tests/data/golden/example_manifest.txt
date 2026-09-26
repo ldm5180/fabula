@@ -1,0 +1,19 @@
+# Example-suite byte-gate manifest. One line each:
+# <source .feature under example/features/>  <golden console capture>
+# Golden captures are the pinned oracle's own PLAIN console output over
+# the LF-normalized example/features/ copies. Every file here is
+# already LF (the port strips CR from the corpus copy before writing
+# it), so unlike the corpus manifest, no separate LF-only entry is
+# needed for feature 7. Run after `make example`:
+#   python3 tools/byte_gate.py tests/data/golden/example_manifest.txt
+# or `make gate`, which runs this manifest plus the corpus one.
+example/features/1_first_scenario.feature tests/data/golden/example/1_first_scenario.console.txt
+example/features/2_scenario_outline.feature tests/data/golden/example/2_scenario_outline.console.txt
+example/features/3_background.feature tests/data/golden/example/3_background.console.txt
+example/features/4_tags.feature tests/data/golden/example/4_tags.console.txt
+example/features/5_tagged_hooks.feature tests/data/golden/example/5_tagged_hooks.console.txt
+example/features/6_tables.feature tests/data/golden/example/6_tables.console.txt
+example/features/7_doc_strings.feature tests/data/golden/example/7_doc_strings.console.txt
+example/features/9_rules.feature tests/data/golden/example/9_rules.console.txt
+example/features/10_continue_on_failure.feature tests/data/golden/example/10_continue_on_failure.console.txt
+example/features/11_manual_fails.feature tests/data/golden/example/11_manual_fails.console.txt

@@ -27,8 +27,8 @@ package body Fabula_Format_Tests is
    is (Step (Doc, Scenario (Doc, S).Steps.First + Step_Handle (N) - 1));
 
    ---------------------------------------------------------------------
-   --  TDD item 1: status words, bracket labels, byte-exact against the
-   --  oracle's own step-prefix formatter.
+   --  Status words and bracket labels, byte-exact against the
+   --  reference interpreter's own step-prefix formatter.
    ---------------------------------------------------------------------
 
    procedure Test_Status_Words (T : in out AUnit.Test_Cases.Test_Case'Class) is
@@ -79,7 +79,7 @@ package body Fabula_Format_Tests is
    end Test_Header_Step_Location;
 
    ---------------------------------------------------------------------
-   --  TDD item 2: count summaries. The three oracle-probed lines are
+   --  Count summaries. The three oracle-probed lines are
    --  byte-exact (6_tables.feature, 11_manual_fails.feature); the
    --  mixed cases exercise the comma-joining and category order the
    --  probes never combine in one run.
@@ -169,7 +169,7 @@ package body Fabula_Format_Tests is
    end Test_Steps_Summary_All_Four;
 
    ---------------------------------------------------------------------
-   --  TDD item 3: step lines from a parsed corpus fixture -- a table
+   --  Step lines from a parsed corpus fixture -- a table
    --  (6_tables.feature) and a doc string (7_doc_strings.feature),
    --  both byte-verified against the rebuilt oracle.
    ---------------------------------------------------------------------
@@ -235,7 +235,7 @@ package body Fabula_Format_Tests is
    end Test_Doc_String_Rendering;
 
    ---------------------------------------------------------------------
-   --  TDD item 4: parse-error lines for both corpus refusal files, the
+   --  Parse-error lines for both corpus refusal files, the
    --  "at end" shape, and the trailer constant.
    ---------------------------------------------------------------------
 
@@ -323,11 +323,10 @@ package body Fabula_Format_Tests is
    end Test_Parse_Error_Tag_Line_Malformed;
 
    ---------------------------------------------------------------------
-   --  Review item 4: -v's non-hook lines, each byte-copied from a
-   --  rebuilt-oracle probe (5_tagged_hooks.feature and 4_tags.feature,
-   --  -v). The hook "executing hook" / "not executing hook" lines are
-   --  a ledgered gap: no notice carries which hooks ran or were
-   --  skipped.
+   --  -v's non-hook lines, each byte-copied from a rebuilt-oracle
+   --  probe (5_tagged_hooks.feature and 4_tags.feature, -v). The hook
+   --  "executing hook" / "not executing hook" lines are a known gap:
+   --  no notice carries which hooks ran or were skipped.
    ---------------------------------------------------------------------
 
    procedure Test_Verbose_Separator
@@ -402,7 +401,7 @@ package body Fabula_Format_Tests is
    end Test_Verbose_Skip_Ignore_End;
 
    ---------------------------------------------------------------------
-   --  TDD item 6: the failed-scenarios store -- fill, overflow
+   --  The failed-scenarios store -- fill, overflow
    --  saturation, render.
    ---------------------------------------------------------------------
 
@@ -424,8 +423,9 @@ package body Fabula_Format_Tests is
       Assert (Failed_Line (Store, 2) = 10, "second line");
    end Test_Failed_Store_Fill;
 
-   --  The trailer P10 renders from a filled store, byte-verified
-   --  against the oracle's own 11_manual_fails.feature trailer.
+   --  The trailer the composition root renders from a filled store,
+   --  byte-verified against the reference interpreter's own
+   --  11_manual_fails.feature trailer.
    procedure Test_Failed_Store_Rendered_Trailer
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
@@ -485,7 +485,7 @@ package body Fabula_Format_Tests is
    ---------------------------------------------------------------------
 
    --  Status words, bracket labels, header/step/location text and the
-   --  count summaries (TDD items 1 and 2).
+   --  count summaries.
    procedure Add_Status_And_Summary_Tests (T : in out Test) is
    begin
       Register_Routine (T, Test_Status_Words'Access, "status words");
@@ -518,7 +518,7 @@ package body Fabula_Format_Tests is
          "a step summary with all four categories");
    end Add_Status_And_Summary_Tests;
 
-   --  Tables, doc strings and parse-error lines (TDD items 3 and 4).
+   --  Tables, doc strings and parse-error lines.
    procedure Add_Rendering_Tests (T : in out Test) is
    begin
       Register_Routine
@@ -546,7 +546,7 @@ package body Fabula_Format_Tests is
          "a malformed tag line, the oracle's own analogue");
    end Add_Rendering_Tests;
 
-   --  -v's non-hook lines (review item 4).
+   --  -v's non-hook lines.
    procedure Add_Verbose_Tests (T : in out Test) is
    begin
       Register_Routine
@@ -560,8 +560,8 @@ package body Fabula_Format_Tests is
         (T, Test_Verbose_Skip_Ignore_End'Access, "skip, ignore and end");
    end Add_Verbose_Tests;
 
-   --  The failed-scenarios store (TDD item 6). The JSON structural
-   --  glue, escaping, descriptions and scenario ids (TDD item 5) moved
+   --  The failed-scenarios store. The JSON structural
+   --  glue, escaping, descriptions and scenario ids moved
    --  to Fabula_Format_Json_Tests once this file passed the shipped
    --  file-length limit (R8).
    procedure Add_Store_Tests (T : in out Test) is

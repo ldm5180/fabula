@@ -463,10 +463,10 @@ is
    procedure Finish (P : in out Parser; Doc : in out Fabula.Ast.Document) is
    begin
       if not Stopped (P) then
-         --  state.md entry 30: an "at end" refusal names the file's true
-         --  last line (P.Last_Line); the reference interpreter's own
-         --  message names one past it (N+1) instead. A deliberate,
-         --  ledgered line-number-family divergence, not a fix target.
+         --  An "at end" refusal names the file's true last line
+         --  (P.Last_Line); the reference interpreter's own message names
+         --  one past it (N+1) instead. A deliberate divergence, not a
+         --  fix target.
          Step (P, Doc, G.End_Event (P.Last_Line));
       end if;
    end Finish;

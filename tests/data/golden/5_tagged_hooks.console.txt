@@ -1,15 +1,15 @@
-Feature: Scenarios with tags  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/5_tagged_hooks.feature:1
+Feature: Scenarios with tags  tests/data/cwt/parser/5_tagged_hooks.feature:1
 
-Scenario: We want to ship cucumbers  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/5_tagged_hooks.feature:4
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/5_tagged_hooks.feature:5
-[   PASSED    ] When I place 1 x "cucumber" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/5_tagged_hooks.feature:6
-[   PASSED    ] Then The box contains 1 item  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/5_tagged_hooks.feature:7
+Scenario: We want to ship cucumbers  tests/data/cwt/parser/5_tagged_hooks.feature:4
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/5_tagged_hooks.feature:5
+[   PASSED    ] When I place 1 x "cucumber" in it  tests/data/cwt/parser/5_tagged_hooks.feature:6
+[   PASSED    ] Then The box contains 1 item  tests/data/cwt/parser/5_tagged_hooks.feature:7
 The box is shipped! 
 
-Scenario: Important items must be shipped immediately  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/5_tagged_hooks.feature:10
-[   PASSED    ] Given An empty box  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/5_tagged_hooks.feature:11
-[   PASSED    ] When I place 2 x "important items" in it  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/5_tagged_hooks.feature:12
-[   PASSED    ] Then The box contains 2 item  /Users/jason/pipeline/fabula-repo/tests/data/cwt/parser/5_tagged_hooks.feature:13
+Scenario: Important items must be shipped immediately  tests/data/cwt/parser/5_tagged_hooks.feature:10
+[   PASSED    ] Given An empty box  tests/data/cwt/parser/5_tagged_hooks.feature:11
+[   PASSED    ] When I place 2 x "important items" in it  tests/data/cwt/parser/5_tagged_hooks.feature:12
+[   PASSED    ] Then The box contains 2 item  tests/data/cwt/parser/5_tagged_hooks.feature:13
 The box is shipped! 
 
 

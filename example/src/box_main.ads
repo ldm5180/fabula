@@ -1,5 +1,5 @@
---  The box binary: Fabula.Main instantiated over Box_Steps, exactly the
---  shape spec.md sketches for a user's own binary.
+--  The box binary: Fabula.Main instantiated over Box_Steps, exactly
+--  the shape the README shows for a user's own binary.
 with Box_Steps;
 with Fabula.Main;
 

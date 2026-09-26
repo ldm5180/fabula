@@ -1,33 +1,42 @@
-"""The automated byte gate (state.md entry 30, P10 review item 9).
+"""The automated byte gate.
 
-Every entry in ``tests/data/golden/manifest.txt`` pairs a ``.feature``
-file with a golden console capture from the pinned oracle (``cwt-
-cucumber``, the SHA `docs/` and `state.md` name). This script runs the
-RELEASE example binary (``example/bin/release/box_main``) over every
-source file in the manifest and ``cmp``s its plain console stdout
-against the matching golden byte for byte -- the same check the P10
-review round ran by hand to find the CRITICAL a wider probe caught
-(state.md entry 30, item 1: a 64-item box silently truncating
-`6_tables.feature`'s 100-item row).
+Each manifest entry pairs a ``.feature`` file with a golden console
+capture from the pinned oracle (``cwt-cucumber``). This script runs
+the RELEASE example binary (``example/bin/release/box_main``) over
+every source file in the manifest and ``cmp``s its plain console
+stdout against the matching golden byte for byte -- the same check
+that, run by hand at a narrower capacity, once let a 64-item box
+silently truncate ``6_tables.feature``'s 100-item row until a wider
+probe caught it. Two manifests ship: the corpus set
+(``tests/data/golden/manifest.txt``, the default) and the example
+suite (``tests/data/golden/example_manifest.txt``); ``make gate``
+runs both.
 
 Console mode only. ``--report-json`` is never gated here: `match.
 location` has no oracle counterpart at all (a C++ source position
-fabula cannot reproduce, ledgered where it is computed), so a JSON
-capture could never be byte-identical by construction, gate or no gate.
+fabula cannot reproduce), so a JSON capture could never be
+byte-identical by construction, gate or no gate.
 
 Feature 7 ships CRLF line endings; the oracle's own scanner double-
-counts each CRLF inside a doc string (a ledgered oracle bug), so its
-line numbers over the ORIGINAL file would never match fabula's correct
+counts each CRLF inside a doc string (an oracle bug), so its line
+numbers over the ORIGINAL file would never match fabula's correct
 ones.  The manifest points feature 7's entry at an LF-normalized copy
 of the source, `tests/data/golden/7_doc_strings_lf.feature`, generated
 once from the pinned corpus original (`tr -d '\\r'`) -- the corpus
 original itself stays untouched and byte-identical to the oracle's own
 copy.
 
+Every comparison runs the binary with the manifest's own repo-root-
+relative path string and `cwd` set to the repo root, never an absolute
+path: fabula's console output echoes back exactly the path string it
+was given, so the golden captures stay byte-identical regardless of
+where the repo is checked out.
+
 Run from the repo root, after `make example` (or `make gate`, which
 depends on it)::
 
     python3 tools/byte_gate.py
+    python3 tools/byte_gate.py tests/data/golden/example_manifest.txt
 """
 
 from __future__ import annotations
@@ -53,7 +62,7 @@ def read_manifest(path: pathlib.Path) -> list[tuple[str, str]]:
     return entries
 
 
-def run_gate() -> int:
+def run_gate(manifest: pathlib.Path) -> int:
     if not EXAMPLE_BINARY.exists():
         print(
             f"byte_gate: {EXAMPLE_BINARY} does not exist -- run "
@@ -62,15 +71,21 @@ def run_gate() -> int:
         )
         return 1
 
-    entries = read_manifest(MANIFEST)
+    entries = read_manifest(manifest)
     failures: list[str] = []
     for source, golden in entries:
-        source_path = REPO_ROOT / source
         golden_path = REPO_ROOT / golden
+        # `source` is passed to the binary exactly as the manifest spells
+        # it (repo-root relative) with `cwd=REPO_ROOT`, never resolved to
+        # an absolute path first: fabula's Location text echoes whatever
+        # string it was given, so an absolute argument would bake this
+        # machine's own path into the comparison and never match a
+        # golden captured on a different host or CI runner.
         result = subprocess.run(
-            [str(EXAMPLE_BINARY), str(source_path)],
+            [str(EXAMPLE_BINARY), source],
             capture_output=True,
             check=False,
+            cwd=REPO_ROOT,
         )
         actual = result.stdout + result.stderr
         expected = golden_path.read_bytes()
@@ -91,4 +106,11 @@ def run_gate() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(run_gate())
+    # An optional manifest path lets `make gate` reuse this same
+    # script against the second manifest without duplicating the
+    # comparison logic. A relative argument resolves against the
+    # repo root, like the entries inside it.
+    manifest_arg = (
+        REPO_ROOT / sys.argv[1] if len(sys.argv) > 1 else MANIFEST
+    )
+    sys.exit(run_gate(manifest_arg))
