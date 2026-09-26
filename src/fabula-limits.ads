@@ -34,4 +34,9 @@ is
    --  One compiled step pattern's token table, and the depth of the
    --  choice stack its matcher backtracks through.
 
+   Max_Tag_Expr_Length : constant := 256;
+   Max_Tag_Expr_Tokens : constant := 64;
+   --  One tag expression's source length, and its compiled postfix
+   --  token table (also the bound of the shunting-yard operator stack).
+
 end Fabula.Limits;

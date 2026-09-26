@@ -52,6 +52,19 @@ package body Fabula_Limits_Tests is
          "the arena must hold at least one full line");
    end Test_Limits_Are_Positive;
 
+   --  The tag-expression compiler's two capacities.
+   procedure Test_Tag_Expr_Limits (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert
+        (Fabula.Limits.Max_Tag_Expr_Length > 0,
+         "Max_Tag_Expr_Length must be positive");
+      Assert
+        (Fabula.Limits.Max_Tag_Expr_Tokens > 0,
+         "Max_Tag_Expr_Tokens must be positive");
+   end Test_Tag_Expr_Limits;
+
    --  The pattern matcher's two capacities, and the relation between
    --  them: the matcher keeps at most one choice per pattern token.
    procedure Test_Matcher_Limits (T : in out AUnit.Test_Cases.Test_Case'Class)
@@ -80,6 +93,8 @@ package body Fabula_Limits_Tests is
         (T,
          Test_Matcher_Limits'Access,
          "the matcher's capacities are consistent");
+      Register_Routine
+        (T, Test_Tag_Expr_Limits'Access, "the tag-expression capacities");
    end Register_Tests;
 
    overriding
