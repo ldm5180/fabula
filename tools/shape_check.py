@@ -132,6 +132,7 @@ _FOREIGN = re.compile(
     r"(?:\bPR\s*#\d+"        # PR #436
     r"|\bissue\s*#\d+"       # issue #2
     r"|§\s*\w+"         # section 8, of some other document
+    r"|\bsection\s+\d+"      # spec section 2, of some other document
     r"|\b[\w/]+\.(?:go|cpp|hpp):\d+"    # some_file.cpp:41
     r"|\b[\w/]+\.(?:go|cpp|hpp)\b)",    # some_file.cpp
     re.I,
@@ -808,7 +809,8 @@ SELFTEST_FOREIGN = '''\
 package Fixture.Foreign is
 
    --  Fixed in PR #436, reported as issue #2, specified in the plan's
-   --  §8, and ported from some_file.go:41 via other_file.cpp:12.
+   --  §8 and spec section 2, and ported from some_file.go:41 via
+   --  other_file.cpp:12.
    procedure Nothing;
 
 end Fixture.Foreign;
@@ -889,7 +891,14 @@ def selftest() -> int:
                 failures.append(f"{unit} must produce no finding, produced {over}")
 
         foreign = check_foreign(SELFTEST_FOREIGN.split("\n"))
-        if foreign != ["PR#436", "issue#2", "§8", "some_file.go:41", "other_file.cpp:12"]:
+        if foreign != [
+            "PR#436",
+            "issue#2",
+            "§8",
+            "section2",
+            "some_file.go:41",
+            "other_file.cpp:12",
+        ]:
             failures.append(f"foreign check: got {foreign}")
 
         dated = check_dated(SELFTEST_DATED.split("\n"))

@@ -1,6 +1,7 @@
 with AUnit.Test_Cases;
 
 with Fabula_Limits_Tests;
+with Fabula_Scan_Tests;
 
 package body Fabula_Suite is
 
@@ -14,8 +15,11 @@ package body Fabula_Suite is
       --  parameter is a distinct GNAT warning under -gnatwa.
       Limits_Test : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Limits_Tests.Test;
+      Scan_Test   : constant AUnit.Test_Cases.Test_Case_Access :=
+        new Fabula_Scan_Tests.Test;
    begin
       AUnit.Test_Suites.Add_Test (Result, Limits_Test);
+      AUnit.Test_Suites.Add_Test (Result, Scan_Test);
       return Result;
    end Suite;
 
