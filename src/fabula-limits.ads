@@ -52,4 +52,9 @@ is
    Max_Step_Text_Length : constant := Max_Line_Length;
    --  A step's own text, the same bound as a scanned line.
 
+   Max_Name_Filter_Length : constant := 1_024;
+   --  The -n option's pattern list, its ':' separators included.
+   Max_Line_Selections    : constant := 64;
+   --  The line numbers one file:line:line argument selects.
+
 end Fabula.Limits;

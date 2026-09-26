@@ -108,9 +108,25 @@ package body Fabula_Limits_Tests is
          "a step's text is bounded the same as a scanned line");
    end Test_Check_Frame_Limits;
 
+   --  The runner's two selection capacities added in P7.
+   procedure Test_Selection_Limits
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert
+        (Fabula.Limits.Max_Name_Filter_Length > 0,
+         "Max_Name_Filter_Length must be positive");
+      Assert
+        (Fabula.Limits.Max_Line_Selections > 0,
+         "Max_Line_Selections must be positive");
+   end Test_Selection_Limits;
+
    overriding
    procedure Register_Tests (T : in out Test) is
    begin
+      Register_Routine
+        (T, Test_Selection_Limits'Access, "the runner's selection capacities");
       Register_Routine
         (T,
          Test_Limits_Are_Positive'Access,

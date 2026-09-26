@@ -1,7 +1,8 @@
 --  The proof closure.  Every core unit must be reachable from here;
 --  tools/proof_closure_lint.py fails on any unit gnatprove did not
---  analyze.  A generic (Fabula.Tags.Eval) is analyzed only through a
---  concrete instance, so one is instantiated here.
+--  analyze.  A generic (Fabula.Tags.Eval, Fabula.Registry, Fabula.Run)
+--  is analyzed only through a concrete instance, so one is
+--  instantiated here.
 with Fabula.Args;
 with Fabula.Ast;
 with Fabula.Check;
@@ -9,9 +10,11 @@ with Fabula.Expand;
 with Fabula.Expressions;
 with Fabula.Frames;
 with Fabula.Limits;
+with Fabula.Names;
 with Fabula.Parse;
 with Fabula.Registry;
 with Fabula.Results;
+with Fabula.Run;
 with Fabula.Scan;
 with Fabula.Tags;
 
@@ -124,5 +127,25 @@ is
    --  Every Args reader, each behind the guard its precondition names,
    --  as a step body calls them.
    procedure Closure_Read (A : Fabula.Args.List; Longest : out Natural);
+
+   --  The name patterns of the -n option, alone and as a list.
+   Closure_Names_Match : constant Boolean :=
+     Fabula.Names.Matches ("a b", "a*")
+     and then Fabula.Names.Matches_Any ("b", "a:?");
+
+   --  The runner over the sample tables, as the binary instantiates it.
+   package Closure_Run is new
+     Fabula.Run
+       (Reg   => Closure_Registry,
+        Steps => Closure_Steps,
+        Hooks => Closure_Hooks);
+
+   --  One whole run as the shell drives it: every request answered,
+   --  every notice read and resumed, one feature, one parse error.
+   --  Closed counts the scenarios that closed.  The shell makes Ref.
+   procedure Closure_Drive
+     (Ref    : Fabula.Args.Document_Access;
+      Counts : out Fabula.Results.Counts;
+      Closed : out Natural);
 
 end Fabula_Closure_Proof;
