@@ -64,10 +64,17 @@ time).
      Error — the oracle's `update_scenario_status` runs after every
      step and every after-hook.
 
-6. **The blank line after every scenario** (`Scenario_Closed`, not
-   dropped) is unconditional and always prints, whatever the outcome —
-   the oracle's own `verbose_end_print` calls `log::info (new_line)`
-   with no guard. It does **not** print for a dropped scenario (item 2).
+6. **The blank line after every scenario** (`Scenario_Closed`) prints
+   whenever the scenario's own header already printed: a normal close,
+   or a `Dropped` close whose notice's `Entered` flag is true (the
+   scenario passed its tag filter and before-hooks, so item 2's header
+   already ran, and a step or an after-hook dropped it later) — the
+   oracle's own `verbose_end_print` calls `log::info (new_line)` with
+   no guard, and `Program_Console.Close_Dropped` reads `Entered` to
+   decide the same thing without keeping a flag of its own. A scenario
+   dropped before entry (`Entered` false) never got a header, so
+   nothing prints for it outside `-v` (item 8's
+   `Print_Dropped_Before_Entry`).
 
 ## After the run (`Run_Finished`)
 
@@ -193,6 +200,24 @@ order from the oracle's own field-construction code.
     lines (the oracle's own join, not a newline join, confirmed against
     its JSON report specifically — its console printer joins
     differently, item 4).
+
+16. **The JSON writer machine decides every comma and bracket.**
+    `Fabula.Shell.Program_Json`'s `Writer_State` (`No_Report`,
+    `Feature_Empty`, `In_Element`, `Step_Open`, `After_Element`,
+    `After_Feature`, `Report_Closed`) tracks where the report stands.
+    `On_Notice` turns a `Scenario_Entered` notice into `E_Element_Entered`,
+    a `Step_Closed` notice into `E_Step_Done`, and a `Scenario_Closed`
+    notice into `E_Element_Closed` always — `Scenario_Opened` writes
+    nothing, since a scenario may still be dropped before it enters.
+    The 14-row table has one row per state the program can be in when
+    each of its six events arrives — `Fire` asserts this — and each
+    row's command (`First_Feature`, `Next_Element`, `Close_Last_Step`,
+    ...) is where the comma-or-not and bracket-or-not decisions live,
+    so the composition root never keeps its own flag for either. A
+    scenario dropped before entry never sends `E_Element_Entered` (its
+    `Scenario_Entered` notice never happened), so its `E_Element_Closed`
+    lands on a still-`Feature_Empty` or still-`After_Element` state and
+    writes `Nothing`: no element was ever opened, and nothing closes.
 
 ## Verbose (`-v`) — non-hook lines only
 
