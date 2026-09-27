@@ -12,6 +12,7 @@ with Fabula.Expressions;
 with Fabula.Frames;
 with Fabula.Limits;
 with Fabula.Names;
+with Fabula.Numbers;
 with Fabula.Parse;
 with Fabula.Registry;
 with Fabula.Results;
@@ -67,12 +68,26 @@ is
    --  gnatprove analyzes it rather than skipping it as Off.
    package Closure_Compare is new
      Fabula.Check.Compare
-       (Item  => Integer,
-        Image => Fabula.Check.Integer_Image);
+       (Item       => Integer,
+        Image      => Fabula.Check.Integer_Image,
+        Item_Reads => Fabula.Numbers.Integer_Reads);
 
-   --  Reaches Closure_Compare's six comparisons and the plain checks
-   --  and scenario controls declared directly on Fabula.Check.
+   --  Reaches Closure_Compare's six comparisons, with a read on either
+   --  side too, and the plain checks and scenario controls declared
+   --  directly on Fabula.Check.
    procedure Closure_Check (R : in out Fabula.Check.Outcome);
+
+   --  A SPARK step body's numeric reads, with no assumption: a capture
+   --  through Args.Int and any text through Numbers.Parse_Integer.  It
+   --  takes both branches of each result and reads Value only where Ok
+   --  holds, so its proof shows a SPARK caller needs no exception
+   --  contract.  Its assertions show the parser's contract fixes the
+   --  exact result of a literal text.
+   procedure Closure_Numbers
+     (A     : Fabula.Args.List;
+      Text  : String;
+      R     : in out Fabula.Check.Outcome;
+      Total : out Integer);
 
    --  One scenario's worth of counters, reaching the exit rule.
    procedure Closure_Results (C : in out Fabula.Results.Counts);

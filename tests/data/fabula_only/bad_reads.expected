@@ -1,0 +1,22 @@
+# fabula's own expectation, not oracle output: each line must appear in `box_main -c bad_reads.feature`.
+The item count is not a valid Integer: malformed text
+The item count is not a valid Integer: out of range
+The table needs an item and a count in each row
+The table needs ITEM and QUANTITY columns
+The table needs ITEM and QUANTITY rows
+The step needs a data table
+The step needs a doc string
+The item index is not a valid Integer: out of range
+Value is not a valid Integer: out of range
+The y coordinate is not a valid Integer: out of range
+[   PASSED    ] Then The box contains 0 items  tests/data/fabula_only/bad_reads.feature:9
+[   PASSED    ] Then The box contains 0 items  tests/data/fabula_only/bad_reads.feature:17
+[   PASSED    ] Then The box contains 0 items  tests/data/fabula_only/bad_reads.feature:24
+[   PASSED    ] Then The box contains 0 items  tests/data/fabula_only/bad_reads.feature:29
+[   PASSED    ] Then The box contains 0 items  tests/data/fabula_only/bad_reads.feature:35
+[   PASSED    ] Then The box contains 0 items  tests/data/fabula_only/bad_reads.feature:42
+[   PASSED    ] Then The box contains 0 items  tests/data/fabula_only/bad_reads.feature:49
+[   PASSED    ] Then The box contains 0 items  tests/data/fabula_only/bad_reads.feature:54
+[   PASSED    ] Then The box contains 0 items  tests/data/fabula_only/bad_reads.feature:58
+11 Scenarios (11 failed)
+31 Steps (12 failed, 19 passed)

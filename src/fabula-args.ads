@@ -7,6 +7,7 @@
 with Fabula.Ast;
 with Fabula.Expressions;
 with Fabula.Limits;
+with Fabula.Numbers;
 
 package Fabula.Args
   with SPARK_Mode
@@ -55,19 +56,20 @@ is
    with Post => Count (A) = Count (A)'Old;
 
    ---------------------------------------------------------------------
-   --  Captures.  The numeric readers raise Constraint_Error on text
-   --  their type cannot hold; the shell turns that into a failed step.
-   --  Text and Word read a {word} or {} capture of exactly two double
-   --  quotes -- what an empty Examples value substitutes to -- as "".
+   --  Captures.  The numeric readers return a Fabula.Numbers result,
+   --  which says why when the capture's text is not a number of the
+   --  type.  Text and Word read a {word} or {} capture of exactly two
+   --  double quotes -- what an empty Examples value substitutes to --
+   --  as "".
    ---------------------------------------------------------------------
 
-   function Int (A : List; N : Positive) return Integer
+   function Int (A : List; N : Positive) return Numbers.Integer_Reads.Read
    with Pre => N <= Count (A);
 
-   function Long (A : List; N : Positive) return Long_Long_Integer
+   function Long (A : List; N : Positive) return Numbers.Long_Reads.Read
    with Pre => N <= Count (A);
 
-   function Real (A : List; N : Positive) return Long_Float
+   function Real (A : List; N : Positive) return Numbers.Real_Reads.Read
    with Pre => N <= Count (A);
 
    function Text (A : List; N : Positive) return String
@@ -125,7 +127,8 @@ is
        Cell'Result'First = 1
        and then Cell'Result'Length <= Limits.Max_Line_Length;
 
-   function Cell_Int (A : List; Row, Col : Positive) return Integer
+   function Cell_Int
+     (A : List; Row, Col : Positive) return Numbers.Integer_Reads.Read
    with
      Pre =>
        Has_Table (A)

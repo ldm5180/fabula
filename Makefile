@@ -5,7 +5,7 @@
 
 export PATH := $(PATH):$(HOME)/.alire/bin
 
-.PHONY: all build test prove format validation shape example gate recapture-check run demo ci help
+.PHONY: all build test prove format validation shape example gate fabula-only recapture-check run demo ci help
 
 all: build
 
@@ -61,6 +61,31 @@ recapture-check:
 run: example
 	./example/bin/debug/box_main tests/data/cwt/parser/1_first_scenario.feature
 
+## fabula-only Run the RELEASE example with -c over tests/data/fabula_only/
+#              and require exit 1 and every line of each .expected file.
+#              These are fabula's own expectations, NOT oracle output (the
+#              reference interpreter reads bad number text as 0 and does not
+#              fail the step), so they are no byte-parity golden.
+fabula-only: example
+	@status=0; \
+	for feature in tests/data/fabula_only/*.feature; do \
+		output="$$(./example/bin/release/box_main -c "$$feature" 2>&1)"; \
+		code=$$?; \
+		if [ "$$code" -ne 1 ]; then \
+			echo "fabula-only: $$feature: expected exit 1, got $$code" >&2; \
+			status=1; \
+		fi; \
+		while IFS= read -r line; do \
+			case "$$line" in '#'*|'') continue ;; esac; \
+			if ! printf '%s\n' "$$output" | grep -qxF -- "$$line"; then \
+				echo "fabula-only: $$feature: missing line: $$line" >&2; \
+				status=1; \
+			fi; \
+		done < "$${feature%.feature}.expected"; \
+	done; \
+	if [ "$$status" -ne 0 ]; then exit 1; fi; \
+	echo "fabula-only: every expected line present (fabula's own expectations, not oracle output)"
+
 ## demo        Run the RELEASE example over example/features/; exit 1 by
 #              design (11_manual_fails.feature fails one scenario on
 #              purpose). A fresh run of the pinned oracle over the same
@@ -69,7 +94,7 @@ run: example
 #                119 Steps (1 undefined, 12 skipped, 106 passed)
 #              This target checks both: fabula's own exit code and its
 #              summary lines must match those counts exactly.
-demo: example
+demo: example fabula-only
 	@output="$$(./example/bin/release/box_main example/features 2>&1)"; \
 	status=$$?; \
 	printf '%s\n' "$$output"; \

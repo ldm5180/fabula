@@ -19,12 +19,57 @@ is
       Closure_Compare.Greater_Or_Equal (R, 1, 1);
       Closure_Compare.Less (R, 1, 2);
       Closure_Compare.Less_Or_Equal (R, 1, 1);
+      Closure_Compare.Equal (R, 1, Fabula.Numbers.Parse_Integer ("1"));
+      Closure_Compare.Less (R, Fabula.Numbers.Parse_Integer ("x"), 2);
       Fabula.Check.Is_True (R, True);
       Fabula.Check.Text_Equal (R, "a", "b");
       Fabula.Check.Skip (R);
       Fabula.Check.Fail (R, "closure");
       Fabula.Check.Fail_Step (R);
    end Closure_Check;
+
+   use type Fabula.Numbers.Integer_Reads.Read;
+
+   procedure Closure_Numbers
+     (A     : Fabula.Args.List;
+      Text  : String;
+      R     : in out Fabula.Check.Outcome;
+      Total : out Integer)
+   is
+      Parsed : constant Fabula.Numbers.Integer_Reads.Read :=
+        Fabula.Numbers.Parse_Integer (Text);
+   begin
+      pragma
+        Assert
+          (Fabula.Numbers.Parse_Integer ("-007")
+             = Fabula.Numbers.Integer_Reads.Success (-7));
+      pragma
+        Assert
+          (Fabula.Numbers.Parse_Integer ("2147483648")
+             = Fabula.Numbers.Integer_Reads.Failure
+                 (Fabula.Numbers.Out_Of_Range));
+      if Parsed.Ok then
+         Total := Parsed.Value;
+      else
+         Total := 0;
+         Fabula.Check.Fail_Step (R, Fabula.Numbers.Reason (Parsed.Error));
+      end if;
+      if Fabula.Args.Count (A) = 0 then
+         return;
+      end if;
+      declare
+         Captured : constant Fabula.Numbers.Integer_Reads.Read :=
+           Fabula.Args.Int (A, 1);
+      begin
+         if Captured.Ok
+           and then Captured.Value in 0 .. 9
+           and then Total in 0 .. 9
+         then
+            Total := Total + Captured.Value;
+         end if;
+         Closure_Compare.Equal (R, Total, Captured);
+      end;
+   end Closure_Numbers;
 
    procedure Closure_Results (C : in out Fabula.Results.Counts) is
    begin
@@ -179,9 +224,9 @@ is
       Longest :=
         Natural'Max
           (Fabula.Args.Text (A, 1)'Length, Fabula.Args.Word (A, 1)'Length);
-      if Fabula.Args.Int (A, 1) > 0
-        and then Fabula.Args.Long (A, 1) > 0
-        and then Fabula.Args.Real (A, 1) > 0.0
+      if Fabula.Args.Int (A, 1).Ok
+        and then Fabula.Args.Long (A, 1).Ok
+        and then Fabula.Args.Real (A, 1).Ok
       then
          Longest := Longest + 1;
       end if;
@@ -214,7 +259,10 @@ is
          return 0;
       end if;
       Longest := Fabula.Args.Cell (A, 2, 2)'Length;
-      if Fabula.Args.Cell_Int (A, 1, 1) > 0 then
+      if Fabula.Numbers.Integer_Reads.Value_Or
+           (Fabula.Args.Cell_Int (A, 1, 1), 0)
+        > 0
+      then
          Longest := Longest + 1;
       end if;
       if Fabula.Args.Has_Column (A, Key) then

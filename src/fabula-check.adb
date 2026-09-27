@@ -201,6 +201,107 @@ is
          Append_Message (R, Image (Want));
       end Less_Or_Equal;
 
+      procedure Fail_Read
+        (R     : in out Outcome;
+         Error : Numbers.Read_Error;
+         What  : String := "Value") is
+      begin
+         Begin_Failure (R);
+         Append_Message (R, (if What'Length > 0 then What else "Value"));
+         Append_Message (R, " is not a valid ");
+         Append_Message (R, Item_Reads.Name);
+         Append_Message (R, ": ");
+         Append_Message (R, Numbers.Reason (Error));
+      end Fail_Read;
+
+      --  A comparison with a read on one side: a good read goes through
+      --  Plain, the plain comparison, so both share one message path.
+      generic
+         with
+           procedure Plain
+             (R : in out Outcome; Got, Want : Item; Message : String);
+      procedure Want_Read
+        (R : in out Outcome; Got : Item; Want : Read; Message : String);
+
+      procedure Want_Read
+        (R : in out Outcome; Got : Item; Want : Read; Message : String) is
+      begin
+         if Want.Ok then
+            Plain (R, Got, Want.Value, Message);
+         else
+            Fail_Read (R, Want.Error);
+         end if;
+      end Want_Read;
+
+      generic
+         with
+           procedure Plain
+             (R : in out Outcome; Got, Want : Item; Message : String);
+      procedure Got_Read
+        (R : in out Outcome; Got : Read; Want : Item; Message : String);
+
+      procedure Got_Read
+        (R : in out Outcome; Got : Read; Want : Item; Message : String) is
+      begin
+         if Got.Ok then
+            Plain (R, Got.Value, Want, Message);
+         else
+            Fail_Read (R, Got.Error);
+         end if;
+      end Got_Read;
+
+      procedure Equal_Want is new Want_Read (Equal);
+      procedure Not_Equal_Want is new Want_Read (Not_Equal);
+      procedure Greater_Want is new Want_Read (Greater);
+      procedure Greater_Or_Equal_Want is new Want_Read (Greater_Or_Equal);
+      procedure Less_Want is new Want_Read (Less);
+      procedure Less_Or_Equal_Want is new Want_Read (Less_Or_Equal);
+
+      procedure Equal_Got is new Got_Read (Equal);
+      procedure Not_Equal_Got is new Got_Read (Not_Equal);
+      procedure Greater_Got is new Got_Read (Greater);
+      procedure Greater_Or_Equal_Got is new Got_Read (Greater_Or_Equal);
+      procedure Less_Got is new Got_Read (Less);
+      procedure Less_Or_Equal_Got is new Got_Read (Less_Or_Equal);
+
+      procedure Equal
+        (R : in out Outcome; Got : Item; Want : Read; Message : String := "")
+      renames Equal_Want;
+      procedure Not_Equal
+        (R : in out Outcome; Got : Item; Want : Read; Message : String := "")
+      renames Not_Equal_Want;
+      procedure Greater
+        (R : in out Outcome; Got : Item; Want : Read; Message : String := "")
+      renames Greater_Want;
+      procedure Greater_Or_Equal
+        (R : in out Outcome; Got : Item; Want : Read; Message : String := "")
+      renames Greater_Or_Equal_Want;
+      procedure Less
+        (R : in out Outcome; Got : Item; Want : Read; Message : String := "")
+      renames Less_Want;
+      procedure Less_Or_Equal
+        (R : in out Outcome; Got : Item; Want : Read; Message : String := "")
+      renames Less_Or_Equal_Want;
+
+      procedure Equal
+        (R : in out Outcome; Got : Read; Want : Item; Message : String := "")
+      renames Equal_Got;
+      procedure Not_Equal
+        (R : in out Outcome; Got : Read; Want : Item; Message : String := "")
+      renames Not_Equal_Got;
+      procedure Greater
+        (R : in out Outcome; Got : Read; Want : Item; Message : String := "")
+      renames Greater_Got;
+      procedure Greater_Or_Equal
+        (R : in out Outcome; Got : Read; Want : Item; Message : String := "")
+      renames Greater_Or_Equal_Got;
+      procedure Less
+        (R : in out Outcome; Got : Read; Want : Item; Message : String := "")
+      renames Less_Got;
+      procedure Less_Or_Equal
+        (R : in out Outcome; Got : Read; Want : Item; Message : String := "")
+      renames Less_Or_Equal_Got;
+
    end Compare;
 
    --  Trims the leading blank the reference interpreter's own formatter

@@ -1,16 +1,20 @@
 with AUnit.Assertions; use AUnit.Assertions;
 
-with Fabula.Args;  use Fabula.Args;
-with Fabula.Ast;   use Fabula.Ast;
+with Fabula.Args;    use Fabula.Args;
+with Fabula.Ast;     use Fabula.Ast;
 with Fabula.Expand;
 with Fabula.Expressions;
-with Fabula.Parse; use Fabula.Parse;
+with Fabula.Numbers; use Fabula.Numbers;
+with Fabula.Parse;   use Fabula.Parse;
 
 with Fabula_Fixtures; use Fabula_Fixtures;
 
 package body Fabula_Args_Tests is
 
    use AUnit.Test_Cases.Registration;
+   use type Integer_Reads.Read;
+   use type Long_Reads.Read;
+   use type Real_Reads.Read;
 
    --  A document is a megabyte-scale record: it lives at library level,
    --  never on a test routine's stack.  The runner hands a List this
@@ -25,6 +29,9 @@ package body Fabula_Args_Tests is
      (Count => 0, Items => <>);
 
    Big_Long : constant Long_Long_Integer := 9_000_000_000;
+
+   --  Eleven nines: past Integer'Last, well inside Long_Long_Integer.
+   Eleven_Nines : constant Long_Long_Integer := 99_999_999_999;
 
    procedure Load (Name : String) is
    begin
@@ -78,11 +85,15 @@ package body Fabula_Args_Tests is
            "I place 3 x ""pen"" in box at -.5 for 9000000000 with the rest");
    begin
       Assert (Count (A) = 6, "six captures, got" & Count (A)'Image);
-      Assert (Int (A, 1) = 3, "1: {int}");
+      Assert (Int (A, 1) = Integer_Reads.Success (3), "1: {int}");
       Assert (Text (A, 2) = "pen", "2: {string} without its quotes");
       Assert (Word (A, 3) = "box", "3: {word}");
-      Assert (Real (A, 4) = -0.5, "4: {float} with no leading digit");
-      Assert (Long (A, 5) = Big_Long, "5: {long} past Integer'Last");
+      Assert
+        (Real (A, 4) = Real_Reads.Success (-0.5),
+         "4: {float} with no leading digit");
+      Assert
+        (Long (A, 5) = Long_Reads.Success (Big_Long),
+         "5: {long} past Integer'Last");
       Assert (Text (A, 6) = "the rest", "6: {} to the end");
       Assert (not Has_Doc (A) and then not Has_Table (A), "no doc, no table");
    end Test_Captures;
@@ -92,12 +103,45 @@ package body Fabula_Args_Tests is
       pragma Unreferenced (T);
       A : constant List := Matched ("{double} and {int}", "1.25 and -7");
    begin
-      Assert (Real (A, 1) = 1.25, "a {double}");
-      Assert (Int (A, 2) = -7, "a negative {int}");
-      Assert (Long (A, 2) = -7, "the same capture read as a Long");
-      Assert (Real (A, 2) = -7.0, "and as a Real");
+      Assert (Real (A, 1) = Real_Reads.Success (1.25), "a {double}");
+      Assert (Int (A, 2) = Integer_Reads.Success (-7), "a negative {int}");
+      Assert
+        (Long (A, 2) = Long_Reads.Success (-7),
+         "the same capture read as a Long");
+      Assert (Real (A, 2) = Real_Reads.Success (-7.0), "and as a Real");
       Assert (Text (A, 1) = "1.25", "and as text");
    end Test_Caller_Types;
+
+   --  A read that cannot hold the capture is a failed result, never an
+   --  exception.  A {word} of digits reads as a number, as the reference
+   --  interpreter's own conversion does.
+   procedure Test_Cross_Type (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      A : constant List :=
+        Matched
+          ("{float} then {word} then {word} then {int}",
+           "1.5 then 7 then seven then 99999999999");
+   begin
+      Assert
+        (Int (A, 1) = Integer_Reads.Failure (Malformed),
+         "a {float} read as an Int");
+      Assert
+        (Long (A, 1) = Long_Reads.Failure (Malformed),
+         "a {float} read as a Long");
+      Assert (Int (A, 2) = Integer_Reads.Success (7), "a {word} of digits");
+      Assert
+        (Int (A, 3) = Integer_Reads.Failure (Malformed),
+         "a {word} of letters");
+      Assert
+        (Real (A, 3) = Real_Reads.Failure (Malformed),
+         "a {word} of letters read as a Real");
+      Assert
+        (Int (A, 4) = Integer_Reads.Failure (Out_Of_Range),
+         "an {int} past Integer'Last");
+      Assert
+        (Long (A, 4) = Long_Reads.Success (Eleven_Nines),
+         "the same {int} read as a Long");
+   end Test_Cross_Type;
 
    --  A {word} or {} capture of exactly two double quotes reads as the
    --  empty string, as an empty Examples value substitutes to them.
@@ -183,7 +227,12 @@ package body Fabula_Args_Tests is
       Assert (Cell (A, 1, 1) = "apple", "(1, 1)");
       Assert (Cell (A, 2, 1) = "strawberry", "(2, 1)");
       Assert (Cell (A, 3, 2) = "5", "(3, 2)");
-      Assert (Cell_Int (A, 2, 2) = 3, "(2, 2) as an integer");
+      Assert
+        (Cell_Int (A, 2, 2) = Integer_Reads.Success (3),
+         "(2, 2) as an integer");
+      Assert
+        (Cell_Int (A, 1, 1) = Integer_Reads.Failure (Malformed),
+         "(1, 1) is not an integer");
       Assert (not Has_Table (Plain_Step (1, 1)), "a step with no table");
    end Test_Raw;
 
@@ -239,7 +288,8 @@ package body Fabula_Args_Tests is
       Ref := Fabula.Expand.First_Example (Doc, 5);
       A := Step_Args (5, 1, Ref);
       Assert (Cell (A, 1, 1) = "pen", "<item 1> in row 1");
-      Assert (Cell_Int (A, 2, 2) = 3, "<count 2> in row 2");
+      Assert
+        (Cell_Int (A, 2, 2) = Integer_Reads.Success (3), "<count 2> in row 2");
       Ref := Fabula.Expand.Next_Example (Doc, 5, Ref);
       Assert (Cell (Step_Args (5, 1, Ref), 2, 1) = "table", "the next row");
       Ref := Fabula.Expand.First_Example (Doc, 7);
@@ -258,6 +308,8 @@ package body Fabula_Args_Tests is
         (T, Test_Captures'Access, "every reader, left to right from 1");
       Register_Routine
         (T, Test_Caller_Types'Access, "the caller's type decides");
+      Register_Routine
+        (T, Test_Cross_Type'Access, "a read the capture cannot fill fails");
       Register_Routine
         (T, Test_Empty_Quotes'Access, "two quotes read as empty");
       Register_Routine (T, Test_Doc_String'Access, "doc string views");

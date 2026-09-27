@@ -15,6 +15,7 @@ with Fabula_Format_Tests;
 with Fabula_Frames_Tests;
 with Fabula_Limits_Tests;
 with Fabula_Names_Tests;
+with Fabula_Numbers_Tests;
 with Fabula_Parse_Tests;
 with Fabula_Registry_Tests;
 with Fabula_Reports_Tests;
@@ -31,8 +32,8 @@ package body Fabula_Suite is
    --  first: allocating directly into an anonymous-access actual
    --  parameter is a distinct GNAT warning under -gnatwa.
 
-   --  The proved core's tests.
-   procedure Add_Core (Result : AUnit.Test_Suites.Access_Test_Suite) is
+   --  The proved core's tests, first its parsing units.
+   procedure Add_Parsing (Result : AUnit.Test_Suites.Access_Test_Suite) is
       Limits_Test      : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Limits_Tests.Test;
       Scan_Test        : constant AUnit.Test_Cases.Test_Case_Access :=
@@ -47,6 +48,18 @@ package body Fabula_Suite is
         new Fabula_Parse_Tests.Test;
       Corpus_Test      : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Corpus_Tests.Test;
+   begin
+      AUnit.Test_Suites.Add_Test (Result, Limits_Test);
+      AUnit.Test_Suites.Add_Test (Result, Scan_Test);
+      AUnit.Test_Suites.Add_Test (Result, Expressions_Test);
+      AUnit.Test_Suites.Add_Test (Result, Tags_Test);
+      AUnit.Test_Suites.Add_Test (Result, Ast_Test);
+      AUnit.Test_Suites.Add_Test (Result, Parse_Test);
+      AUnit.Test_Suites.Add_Test (Result, Corpus_Test);
+   end Add_Parsing;
+
+   --  The rest of the proved core's tests.
+   procedure Add_Core (Result : AUnit.Test_Suites.Access_Test_Suite) is
       Check_Test       : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Check_Tests.Test;
       Results_Test     : constant AUnit.Test_Cases.Test_Case_Access :=
@@ -57,6 +70,8 @@ package body Fabula_Suite is
         new Fabula_Registry_Tests.Test;
       Expand_Test      : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Expand_Tests.Test;
+      Numbers_Test     : constant AUnit.Test_Cases.Test_Case_Access :=
+        new Fabula_Numbers_Tests.Test;
       Args_Test        : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Args_Tests.Test;
       Names_Test       : constant AUnit.Test_Cases.Test_Case_Access :=
@@ -72,18 +87,12 @@ package body Fabula_Suite is
       Cli_Test         : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Cli_Tests.Test;
    begin
-      AUnit.Test_Suites.Add_Test (Result, Limits_Test);
-      AUnit.Test_Suites.Add_Test (Result, Scan_Test);
-      AUnit.Test_Suites.Add_Test (Result, Expressions_Test);
-      AUnit.Test_Suites.Add_Test (Result, Tags_Test);
-      AUnit.Test_Suites.Add_Test (Result, Ast_Test);
-      AUnit.Test_Suites.Add_Test (Result, Parse_Test);
-      AUnit.Test_Suites.Add_Test (Result, Corpus_Test);
       AUnit.Test_Suites.Add_Test (Result, Check_Test);
       AUnit.Test_Suites.Add_Test (Result, Results_Test);
       AUnit.Test_Suites.Add_Test (Result, Frames_Test);
       AUnit.Test_Suites.Add_Test (Result, Registry_Test);
       AUnit.Test_Suites.Add_Test (Result, Expand_Test);
+      AUnit.Test_Suites.Add_Test (Result, Numbers_Test);
       AUnit.Test_Suites.Add_Test (Result, Args_Test);
       AUnit.Test_Suites.Add_Test (Result, Names_Test);
       AUnit.Test_Suites.Add_Test (Result, Run_Test);
@@ -114,6 +123,7 @@ package body Fabula_Suite is
       Result : constant AUnit.Test_Suites.Access_Test_Suite :=
         AUnit.Test_Suites.New_Suite;
    begin
+      Add_Parsing (Result);
       Add_Core (Result);
       Add_Shell (Result);
       return Result;

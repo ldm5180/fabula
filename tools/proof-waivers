@@ -6,4 +6,4 @@
 #  the list cannot outlive what it excuses.
 #
 #  columns: unit  reason
-fabula-args-numbers  decimal text conversion ('Value) stays outside the proof by design; the specs are SPARK, the bodies SPARK_Mode Off; conversions receive arbitrary user-selected text, and a bad read raises Constraint_Error, which the shell turns into a failed step
+fabula-numbers-real_text  decimal text to Long_Float ('Value) stays outside the proof by design: a correctly rounded conversion is out of scope; the spec is SPARK, the body SPARK_Mode Off; Parse_Real passes it only text that its proved grammar check accepted (-?[0-9]*\.?[0-9]+), and the body never raises: it catches Constraint_Error and tests 'Valid, so an overflow to infinity is Out_Of_Range

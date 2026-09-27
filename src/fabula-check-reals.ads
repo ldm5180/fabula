@@ -3,5 +3,10 @@
 --  form of SPARK_Mode.
 pragma SPARK_Mode;
 
+with Fabula.Numbers;
+
 package Fabula.Check.Reals is new
-  Fabula.Check.Compare (Item => Long_Float, Image => Fabula.Check.Real_Image);
+  Fabula.Check.Compare
+    (Item       => Long_Float,
+     Image      => Fabula.Check.Real_Image,
+     Item_Reads => Fabula.Numbers.Real_Reads);

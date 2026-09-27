@@ -3,7 +3,10 @@
 --  aspect, form of SPARK_Mode.
 pragma SPARK_Mode;
 
+with Fabula.Numbers;
+
 package Fabula.Check.Longs is new
   Fabula.Check.Compare
-    (Item  => Long_Long_Integer,
-     Image => Fabula.Check.Long_Image);
+    (Item       => Long_Long_Integer,
+     Image      => Fabula.Check.Long_Image,
+     Item_Reads => Fabula.Numbers.Long_Reads);

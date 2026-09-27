@@ -126,32 +126,50 @@ package body Fabula_Dispatch_Tests is
           others           => 0));
    end Test_Step_Exceptions;
 
-   --  Line is Prefix and then something more.
-   function Carries_Message (Line, Prefix : String) return Boolean
-   is (Line'Length > Prefix'Length
-       and then Line (Line'First .. Line'First + Prefix'Length - 1) = Prefix);
-
-   --  A numeric reader's Constraint_Error, with the run-time's own text.
-   procedure Test_Args_Exception (T : in out AUnit.Test_Cases.Test_Case'Class)
-   is
+   --  A numeric read is a result, never an exception.  A failed read
+   --  fails its step through Check with the type and the reason, and the
+   --  body returns without editing the context: the count after it goes
+   --  on from 2.  A good read edits the context as the body says.
+   procedure Test_Args_Result (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
-      Prefix : constant String := "failed I read seven as a number: ";
-      R      : Counting_Run.Runner;
+      R : Counting_Run.Runner;
    begin
       Run_Counting
-        ([+"Feature: misread",
+        ([+"Feature: reads",
           +"  Scenario: misread",
-          +"    Given I read seven as a number"],
-         (others => <>),
+          +"    Given I count",
+          +"    And I read seven as a number",
+          +"    And I count",
+          +"  Scenario: read",
+          +"    Given I read 10 as a number",
+          +"    And I count"],
+         (Continue_On_Failure => True, others => <>),
          Counting_Run.All_Lines,
          R);
-      Assert (Natural (Log.Length) = 8, "eight trace lines");
-      Assert (Log (5) = "step misread", "the step ran: " & Log (5));
-      Assert
-        (Carries_Message (Log.Element (6), Prefix),
-         "a failed step with a message: " & Log (6));
-      Assert (Log (7) = "close failed misread", "the scenario: " & Log (7));
-   end Test_Args_Exception;
+      Assert_Trace
+        (Log,
+         [+"hook run_open 1",
+          +"open misread",
+          +"hook open_count 1",
+          +"enter misread",
+          +"step count 2",
+          +"passed I count",
+          +"step read_number",
+          +("failed I read seven as a number: "
+            & "Value is not a valid Integer: malformed text"),
+          +"step count 3",
+          +"passed I count",
+          +"close failed misread",
+          +"open read",
+          +"hook open_count 1",
+          +"enter read",
+          +"step read_number",
+          +"passed I read 10 as a number",
+          +"step count 11",
+          +"passed I count",
+          +"close passed read",
+          +"hook run_close 1"]);
+   end Test_Args_Result;
 
    --  The exception's failure replaces everything the body recorded: the
    --  scenario-failing order is gone, so with -c the next step runs.
@@ -330,7 +348,7 @@ package body Fabula_Dispatch_Tests is
          Test_Step_Exceptions'Access,
          "a raising step fails with its message");
       Register_Routine
-        (T, Test_Args_Exception'Access, "a numeric reader's exception");
+        (T, Test_Args_Result'Access, "a failed numeric read is a result");
       Register_Routine
         (T, Test_Order_Dropped'Access, "an exception drops the body's order");
       Register_Routine

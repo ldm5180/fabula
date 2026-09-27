@@ -3,6 +3,8 @@ with Ada.Exceptions;
 with Ada.Strings;       use Ada.Strings;
 with Ada.Strings.Fixed; use Ada.Strings.Fixed;
 
+with Fabula.Check.Ints;
+with Fabula.Numbers;
 with Fabula.Results;
 
 package body Fabula_Dispatch_Fixture is
@@ -39,9 +41,17 @@ package body Fabula_Dispatch_Fixture is
             Log.Append (Name);
             Ada.Exceptions.Raise_Exception (Bare_Error'Identity, "");
 
-         when Misread         =>
+         when Read_Number     =>
             Log.Append (Name);
-            Ctx.Items := Fabula.Args.Int (A, 1);
+            declare
+               Number : constant Fabula.Numbers.Integer_Reads.Read :=
+                 Fabula.Args.Int (A, 1);
+            begin
+               Fabula.Check.Ints.Greater_Or_Equal (R, Number, 0);
+               if Number.Ok and then Number.Value >= 0 then
+                  Ctx.Items := Number.Value;
+               end if;
+            end;
 
          when Fail_And_Raise  =>
             Log.Append (Name);
