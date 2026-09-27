@@ -2,9 +2,7 @@ name: CI
 
 on:
   push:
-    # foundation is the v1 development branch (and, on an empty repo,
-    # the default branch the first push creates) — CI must run there.
-    branches: [main, master, foundation]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -121,3 +119,6 @@ jobs:
 
       - name: Run the byte gate
         run: make gate
+
+      - name: Run the demo (fabula-only checks, the JSON checks, the snapshots)
+        run: make demo
