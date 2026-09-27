@@ -12,8 +12,8 @@ is
      (None,
       Expected_Feature,          --  content before, or without, Feature:
       Expected_Scenario,         --  a line the grammar has no place for
-      Expected_Examples_Table,   --  reserved: an Examples description
-      --                             swallows every line until a row
+      Expected_Examples_Table,   --  reserved: an Examples block with
+      --                             no table is accepted
       Unterminated_Doc_String,
       Ragged_Table,              --  wrong cell count vs the block
       Unterminated_Table_Row,    --  a row with no closing '|'

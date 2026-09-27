@@ -19,7 +19,15 @@ is
    --  Feature_Tags and Block_Tags hold a line of tags waiting for the
    --  header it belongs to; the tags themselves wait in Work.Pending.
    --  A *_Head state is a header's description, which runs until one
-   --  of the lines that end it in the reference interpreter.
+   --  of the lines that end it.  A feature or rule description ends
+   --  at the reference interpreter's lines.  A background, scenario,
+   --  outline or Examples description ends at its first step or row,
+   --  or at a tag, scenario, outline or rule line; an outline or
+   --  Examples description also ends at an Examples line.  Under a
+   --  plain scenario an Examples line is refused, as after a step.  A
+   --  Feature or Background line stays description, and so does an
+   --  Examples line under a background, as in the official Gherkin
+   --  grammar.
    type State is
      (Prologue,
       Feature_Tags,
@@ -203,7 +211,7 @@ is
         Evaluate    => Evaluate,
         Execute     => Execute);
 
-   Rows : constant := 138;
+   Rows : constant := 141;
    --  The transition table's length; a Parser embeds a machine of it.
 
    function Started return SM.Machine
