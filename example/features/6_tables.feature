@@ -1,9 +1,9 @@
 
 Feature: This represents tables
-  We have three options:
-  - raw access
-  - rows hash
-  - key/value pairs
+  Fabula.Args reads a table three ways:
+  - Cell (row, column)
+  - Hash_Value (header row as keys)
+  - Pair_Value (key, value rows)
 
   Scenario: Adding items with raw
     Given An empty box

@@ -2,17 +2,18 @@ package body Fabula.Check
   with SPARK_Mode
 is
 
-   --  Copied verbatim from the reference interpreter's own default
-   --  check and scenario-control messages, used whenever the caller's
-   --  own Message is empty.
+   --  The default messages, used whenever the caller's own Message is
+   --  empty.  The two check messages are the reference interpreter's
+   --  own words; the two scenario-control messages name the Ada
+   --  operation that set the failure.
    Is_True_Default       : constant String :=
      "Expected given condition to be true, but it was false";
    Is_False_Default      : constant String :=
      "Expected given condition to be false, but it was true";
    Fail_Scenario_Default : constant String :=
-     "Scenario set to failed with 'cuke::fail_scenario()'";
+     "Scenario set to failed with Fabula.Check.Fail";
    Fail_Step_Default     : constant String :=
-     "Step set to failed with 'cuke::fail_step()'";
+     "Step set to failed with Fabula.Check.Fail_Step";
 
    --  Clears Passing and the message, leaving Order untouched: callers
    --  that also change Order (Fail) set it themselves right after.

@@ -324,9 +324,11 @@ package body Fabula_Format_Tests is
 
    ---------------------------------------------------------------------
    --  -v's non-hook lines, each byte-copied from a rebuilt-oracle
-   --  probe (5_tagged_hooks.feature and 4_tags.feature, -v). The hook
-   --  "executing hook" / "not executing hook" lines are a known gap:
-   --  no notice carries which hooks ran or were skipped.
+   --  probe (5_tagged_hooks.feature and 4_tags.feature, -v), except
+   --  the skip and ignore lines, which state the outcome and name no
+   --  call. The hook "executing hook" / "not
+   --  executing hook" lines are a known gap: no notice carries which
+   --  hooks ran or were skipped.
    ---------------------------------------------------------------------
 
    procedure Test_Verbose_Separator
@@ -389,13 +391,11 @@ package body Fabula_Format_Tests is
       pragma Unreferenced (T);
    begin
       Assert
-        (Verbose_Skip
-         = "[   VERBOSE   ] Scenario skipped with 'skip_scenario'",
-         "skip_scenario, probed on 4_tags.feature -v");
+        (Verbose_Skip = "[   VERBOSE   ] Scenario skipped",
+         "a scenario that -d skipped");
       Assert
-        (Verbose_Ignore
-         = "[   VERBOSE   ] Scenario ignored with 'ignore_scenario'",
-         "ignore_scenario, probed on 4_tags.feature -v");
+        (Verbose_Ignore = "[   VERBOSE   ] Scenario ignored",
+         "an ignored scenario, whether Ignore or a -t filter dropped it");
       Assert
         (Verbose_End = "[   VERBOSE   ] Scenario end", "every scenario's end");
    end Test_Verbose_Skip_Ignore_End;

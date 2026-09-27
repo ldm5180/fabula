@@ -17,12 +17,12 @@ Feature: This is a doc string example
     ```
     Then The box is labeled
 
-  Scenario: Doc string as vector 
+  Scenario: Doc string as one String 
     Given An empty box with a label
     """
     This is a docstring 
     which we access 
-    as std::vector<std::string>
+    as one Ada String with Fabula.Args.Doc_String
     """
     Then The box is labeled
 

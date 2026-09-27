@@ -198,8 +198,14 @@ order from the oracle's own field-construction code.
 
 `Fabula.Format` delivers the separator, `Scenario Start`, the tag-check
 two-line form, `No tags given, continuing`, the skip/ignore lines and
-`Scenario end` — every one byte-copied from a rebuilt-oracle probe
-(`5_tagged_hooks.feature` and `4_tags.feature`, `-v`). The hook
+`Scenario end`. All but the skip/ignore lines are byte-copied from a
+rebuilt-oracle probe (`5_tagged_hooks.feature` and `4_tags.feature`,
+`-v`). The oracle's skip/ignore lines name its C++ calls; fabula's
+read `Scenario skipped` and `Scenario ignored`: they state the
+outcome and name no call. Only `-d` prints the skip line; a `Skip`
+from a hook does not (the gap `Program_Console.Set_Dry_Run`
+discloses). Ignore and a `-t` filter both print the ignore line. No
+gated capture uses `-v`, so the byte gate is unaffected. The hook
 `"executing hook"` / `"not executing hook"` lines stay out: no notice
 in `Fabula.Run` carries which hooks ran, were skipped, or their tag
 check's result, so there is nothing for the composition root to

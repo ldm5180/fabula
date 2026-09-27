@@ -7,7 +7,7 @@ package body Box_Steps
 is
 
    ---------------------------------------------------------------------
-   --  The box: add_item(s), items_count, at, count, contains.
+   --  The box.
    ---------------------------------------------------------------------
 
    procedure Add_Items
@@ -66,8 +66,6 @@ is
       Ctx.Has_Label := True;
    end Set_Label;
 
-   --  cwt's step bodies borrow one context<std::string> slot for both
-   --  the customs declaration and the shipping label; Note is that slot.
    function Note_Value (Ctx : Box_Context) return String
    is (Ctx.Note (1 .. Ctx.Note_Len));
 
@@ -236,13 +234,13 @@ is
          when Fail_Before      =>
             Fabula.Check.Fail
               (R,
-               "Example of 'cuke::fail_scenario()' to bring a scenario to "
+               "Example of Fabula.Check.Fail to bring a scenario to "
                & "fail before running it");
 
          when Fail_After       =>
             Fabula.Check.Fail
               (R,
-               "Example of 'cuke::fail_scenario()' to bring a scenario to "
+               "Example of Fabula.Check.Fail to bring a scenario to "
                & "fail after running it");
 
          when Close_Box        =>

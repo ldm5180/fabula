@@ -6,3 +6,5 @@
 #  list cannot outlive what it excuses.  A waiver may only ever shrink.
 #
 #  columns: path  unit  metric  value  reason
+tests/src/fabula_args_tests.adb                            std::                        carryover  2  quotes upstream corpus 7, which the test loads, byte for byte
+tests/src/fabula_format_json_tests.adb                     cucumber-cpp                 carryover  1  quotes upstream corpus 1, which the test loads, byte for byte

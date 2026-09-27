@@ -62,14 +62,13 @@ is
    procedure Text_Not_Equal
      (R : in out Outcome; Got, Want : String; Message : String := "");
 
-   --  Skip and Ignore mirror the reference interpreter's skip_scenario
-   --  and ignore_scenario: they set Order only, never Passing.
+   --  Skip and Ignore set Order only, never Passing.
    procedure Skip (R : in out Outcome);
    procedure Ignore (R : in out Outcome);
 
    procedure Fail (R : in out Outcome; Message : String := "");
-   --  fail_scenario: Passing False AND Order Fail_Scenario.
+   --  Passing False AND Order Fail_Scenario.
    procedure Fail_Step (R : in out Outcome; Message : String := "");
-   --  fail_step: Passing False, Order stays Continue.
+   --  Passing False, Order stays Continue.
 
 end Fabula.Check;

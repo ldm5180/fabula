@@ -327,7 +327,7 @@ package body Fabula_Check_Tests is
       Assert (not R.Passing, "Fail sets Passing False");
       Assert (R.Order = Fail_Scenario, "Fail sets Order to Fail_Scenario");
       Assert
-        (Msg (R) = "Scenario set to failed with 'cuke::fail_scenario()'",
+        (Msg (R) = "Scenario set to failed with Fabula.Check.Fail",
          "default Fail message, got """ & Msg (R) & """");
 
       Reset (R);
@@ -344,7 +344,7 @@ package body Fabula_Check_Tests is
       Assert (not R.Passing, "Fail_Step sets Passing False");
       Assert (R.Order = Continue, "Fail_Step leaves Order at Continue");
       Assert
-        (Msg (R) = "Step set to failed with 'cuke::fail_step()'",
+        (Msg (R) = "Step set to failed with Fabula.Check.Fail_Step",
          "default Fail_Step message, got """ & Msg (R) & """");
 
       Reset (R);

@@ -19,7 +19,7 @@ Feature: Scenarios with tags
 
   @ignore
   Scenario: This is ignored completely
-    No reporting with using cuke::ignore_scenario() in a hook
+    No report: the @ignore Before hook calls Fabula.Check.Ignore
     Given It does not matter how many
     * Undefined steps are in my Scenario
     * Nothing will land in the report here ... 
