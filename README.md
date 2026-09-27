@@ -137,7 +137,7 @@ needed:
   interpreter's behavior, so check the scenario count in scripts.
 
 The proof runs at level 2 with checks and warnings as errors:
-**2,897 checks proved** across 27 core units, zero `pragma Assume`,
+**2,954 checks proved** across 27 core units, zero `pragma Assume`,
 one waiver (the decimal-to-`Long_Float` conversion, deliberately
 outside the proof; its grammar check is proved). A proof-closure
 lint fails the build if any core unit — or any generic without an
@@ -243,7 +243,7 @@ the step with the type and the reason.
 
 ```console
 make build      # the library (Alire)
-make test       # AUnit suite, -O0 and -O3   (296 tests)
+make test       # AUnit suite, -O0 and -O3   (301 tests)
 make prove      # gnatprove, checks+warnings as errors, closure lint
 make format     # gnatformat --check
 make shape      # shape, literal and block lint + selftests
