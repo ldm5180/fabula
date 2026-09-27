@@ -24,11 +24,6 @@ is
 
    Any_Feature_Written       : Boolean := False;
    First_Scenario_In_Feature : Boolean := True;
-   --  Scenario_Closed carries no word of whether this scenario was ever
-   --  entered -- a -t-filtered drop and an after-hook Ignore look
-   --  identical on the notice.  Set True only by
-   --  On_Scenario_Entered, so On_Scenario_Closed can tell them apart.
-   Scenario_Is_Entered       : Boolean := False;
    --  A step's own closing brace is deferred one notice, so it can carry
    --  the right trailing comma (another step follows) or none (nothing
    --  does) without ever guessing ahead -- the same close-out fires
@@ -548,17 +543,14 @@ is
         (Fabula.Format.Open_Object (Fabula.Format.Scenario_Object_Depth));
       Write_Scenario_Header (N, Info, Block);
       Step_Close_Pending := False;
-      Scenario_Is_Entered := True;
    end On_Scenario_Entered;
 
    procedure On_Scenario_Closed (N : Runner.Notice; Info : Fabula.Frames.Frame)
    is
-      Header_Row  : Fabula.Ast.Examples_Row_Handle;
-      Block       : Fabula.Ast.Examples_Handle;
-      Was_Entered : constant Boolean := Scenario_Is_Entered;
+      Header_Row : Fabula.Ast.Examples_Row_Handle;
+      Block      : Fabula.Ast.Examples_Handle;
    begin
-      Scenario_Is_Entered := False;
-      if N.Dropped and then not Was_Entered then
+      if N.Dropped and then not N.Entered then
          return;   --  never entered; no JSON element was opened for it
 
       end if;

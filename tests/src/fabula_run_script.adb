@@ -61,17 +61,17 @@ package body Fabula_Run_Script is
    function Lower (S : String) return String
    renames Ada.Characters.Handling.To_Lower;
 
+   function Image (C : Fabula.Results.Status_Counts) return String
+   is (C (Fabula.Results.Passed)'Image
+       & C (Fabula.Results.Failed)'Image
+       & C (Fabula.Results.Skipped)'Image
+       & C (Fabula.Results.Undefined)'Image);
+
    function Image (C : Fabula.Results.Counts) return String
    is ("scenarios P/F/S/U"
-       & C.Scenarios_Passed'Image
-       & C.Scenarios_Failed'Image
-       & C.Scenarios_Skipped'Image
-       & C.Scenarios_Undefined'Image
+       & Image (C.Scenarios)
        & ", steps P/F/S/U"
-       & C.Steps_Passed'Image
-       & C.Steps_Failed'Image
-       & C.Steps_Skipped'Image
-       & C.Steps_Undefined'Image
+       & Image (C.Steps)
        & ", parse/hook errors"
        & C.Parse_Errors'Image
        & C.Hook_Errors'Image);
@@ -110,7 +110,9 @@ package body Fabula_Run_Script is
                  else "")
               & Message (N.Outcome),
             when Run.Scenario_Closed  =>
-              (if N.Dropped
+              (if N.Dropped and then N.Entered
+               then "drop after entry " & Fabula.Frames.Value (F.Scenario)
+               elsif N.Dropped
                then "drop " & Fabula.Frames.Value (F.Scenario)
                else
                  "close "

@@ -370,12 +370,6 @@ is
    --  Count summaries.
    ---------------------------------------------------------------------
 
-   --  A + B, capped at Natural'Last: the same saturating rule
-   --  Fabula.Results uses for each counter, so a summary's total can
-   --  never overflow even at the shipped saturation point.
-   function Sat_Add (A, B : Natural) return Natural
-   is (if A > Natural'Last - B then Natural'Last else A + B);
-
    --  Appends "<n> <label>" to B, with a leading ", " once a prior
    --  category has already printed; Count = 0 prints nothing. Seen
    --  reports forward to the next category in the same summary.
@@ -417,36 +411,30 @@ is
    end Put_Last_Category;
 
    function Scenarios_Summary (C : Results.Counts) return String is
-      Total : constant Natural :=
-        Sat_Add
-          (Sat_Add (C.Scenarios_Failed, C.Scenarios_Skipped),
-           Sat_Add (C.Scenarios_Passed, C.Scenarios_Undefined));
+      Total : constant Natural := Results.Total (C.Scenarios);
       B     : Builder;
       Seen  : Boolean := False;
    begin
       Put (B, Check.Integer_Image (Total));
       Put (B, (if Total > 1 then " Scenarios (" else " Scenario ("));
-      Put_Category (C.Scenarios_Failed, "failed", Seen, B);
-      Put_Category (C.Scenarios_Skipped, "skipped", Seen, B);
-      Put_Last_Category (C.Scenarios_Passed, "passed", Seen, B);
+      Put_Category (C.Scenarios (Results.Failed), "failed", Seen, B);
+      Put_Category (C.Scenarios (Results.Skipped), "skipped", Seen, B);
+      Put_Last_Category (C.Scenarios (Results.Passed), "passed", Seen, B);
       Put (B, ")");
       return Text_Of (B);
    end Scenarios_Summary;
 
    function Steps_Summary (C : Results.Counts) return String is
-      Total : constant Natural :=
-        Sat_Add
-          (Sat_Add (C.Steps_Failed, C.Steps_Undefined),
-           Sat_Add (C.Steps_Skipped, C.Steps_Passed));
+      Total : constant Natural := Results.Total (C.Steps);
       B     : Builder;
       Seen  : Boolean := False;
    begin
       Put (B, Check.Integer_Image (Total));
       Put (B, (if Total > 1 then " Steps (" else " Step ("));
-      Put_Category (C.Steps_Failed, "failed", Seen, B);
-      Put_Category (C.Steps_Undefined, "undefined", Seen, B);
-      Put_Category (C.Steps_Skipped, "skipped", Seen, B);
-      Put_Last_Category (C.Steps_Passed, "passed", Seen, B);
+      Put_Category (C.Steps (Results.Failed), "failed", Seen, B);
+      Put_Category (C.Steps (Results.Undefined), "undefined", Seen, B);
+      Put_Category (C.Steps (Results.Skipped), "skipped", Seen, B);
+      Put_Last_Category (C.Steps (Results.Passed), "passed", Seen, B);
       Put (B, ")");
       return Text_Of (B);
    end Steps_Summary;

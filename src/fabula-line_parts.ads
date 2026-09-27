@@ -9,6 +9,10 @@ private package Fabula.Line_Parts
   with Pure, SPARK_Mode
 is
 
+   --  The position Fence_Run and a cell's Stop hold when the line has
+   --  none; positions in a line are numbered from 1.
+   No_Position : constant := 0;
+
    --  A span of one line; Last < First is the empty span.
    type Span is record
       First : Positive := 1;
@@ -16,7 +20,8 @@ is
    end record;
 
    function Is_Line (Line : String) return Boolean
-   is (Line'First = 1 and then Line'Length <= Limits.Max_Line_Length);
+   is (Line'First = First_Column
+       and then Line'Length <= Limits.Max_Line_Length);
 
    --  S reads safely from Line: it is empty, or inside Line's range.
    function Within (Line : String; S : Span) return Boolean
@@ -64,15 +69,15 @@ is
                    Line (K) = Line (I)))
    with Pre => Is_Line (Line);
 
-   --  The first fence run inside Line (From .. To), or 0.  The
-   --  reference lexer ends a doc string at the first such run anywhere
-   --  on a line, not only at one that leads it.
+   --  The first fence run inside Line (From .. To), or No_Position.
+   --  The reference lexer ends a doc string at the first such run
+   --  anywhere on a line, not only at one that leads it.
    function Fence_Run
      (Line : String; From : Positive; To : Natural) return Natural
    with
      Pre  => Is_Line (Line) and then To <= Line'Length,
      Post =>
-       Fence_Run'Result = 0
+       Fence_Run'Result = No_Position
        or else (Fence_Run'Result >= From
                 and then Fence_Run'Result + (Scan.Fence_Length - 1) <= To
                 and then Fence_At (Line, Fence_Run'Result));
@@ -114,12 +119,12 @@ is
    --  Table cells.
    ---------------------------------------------------------------------
 
-   --  One cell's trimmed text and the '|' that closes it (0 when the
-   --  line ends first).  A '|' after an odd run of backslashes is
-   --  text; the backslashes stay in the cell as written.
+   --  One cell's trimmed text and the '|' that closes it (No_Position
+   --  when the line ends first).  A '|' after an odd run of backslashes
+   --  is text; the backslashes stay in the cell as written.
    type Cell is record
       Text : Span;
-      Stop : Natural := 0;
+      Stop : Natural := No_Position;
    end record;
 
    function Next_Cell
@@ -129,7 +134,7 @@ is
      Post =>
        Next_Cell'Result.Text.First >= From
        and then Next_Cell'Result.Text.Last <= To
-       and then (Next_Cell'Result.Stop = 0
+       and then (Next_Cell'Result.Stop = No_Position
                  or else Next_Cell'Result.Stop in From .. To);
 
    type Row_Shape is record

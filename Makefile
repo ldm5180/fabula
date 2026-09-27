@@ -65,8 +65,13 @@ run: example
 #              and require exit 1 and every line of each .expected file.
 #              These are fabula's own expectations, NOT oracle output (the
 #              reference interpreter reads bad number text as 0 and does not
-#              fail the step), so they are no byte-parity golden.
+#              fail the step), so they are no byte-parity golden.  Then
+#              check the --report-json output for a scenario dropped before
+#              and after entry: valid JSON, the expected scenarios and steps
+#              (tools/json_report_check.py, also fabula's own expectations).
 fabula-only: example
+	python3 tools/json_report_check.py --selftest
+	python3 tools/json_report_check.py
 	@status=0; \
 	for feature in tests/data/fabula_only/*.feature; do \
 		output="$$(./example/bin/release/box_main -c "$$feature" 2>&1)"; \

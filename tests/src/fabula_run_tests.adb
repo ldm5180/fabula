@@ -17,7 +17,7 @@ package body Fabula_Run_Tests is
    use type Fabula.Ast.Examples_Row_Handle;
    use type Fabula.Ast.Scenario_Handle;
    use type Fabula.Ast.Step_Handle;
-   use type Fabula.Results.Status;
+   use all type Fabula.Results.Status;
 
    Passing : constant Fabula.Check.Outcome := (others => <>);
 
@@ -64,7 +64,9 @@ package body Fabula_Run_Tests is
       Assert_Trace (Log, Happy_Trace);
       Assert_Counts
         (Lifecycle_Run.Counts_Of (R),
-         (Scenarios_Passed => 1, Steps_Passed => 3, others => 0));
+         (Scenarios => [Passed => 1, others => 0],
+          Steps     => [Passed => 3, others => 0],
+          others    => 0));
       Assert
         (not Fabula.Results.Run_Failed (Lifecycle_Run.Counts_Of (R)),
          "an all-passing run does not fail");
@@ -223,19 +225,16 @@ package body Fabula_Run_Tests is
       Assert_Trace (Log, Failing_Stops);
       Assert_Counts
         (Control_Run.Counts_Of (R),
-         (Scenarios_Failed => 1,
-          Steps_Passed     => 1,
-          Steps_Failed     => 1,
-          Steps_Skipped    => 2,
-          others           => 0));
+         (Scenarios => [Failed => 1, others => 0],
+          Steps     => [Passed => 1, Failed => 1, Skipped => 2, others => 0],
+          others    => 0));
       Control.Run_One (Failing_Doc, Continuing, Control_Run.All_Lines, Log, R);
       Assert_Trace (Log, Failing_Continues);
       Assert_Counts
         (Control_Run.Counts_Of (R),
-         (Scenarios_Failed => 1,
-          Steps_Passed     => 3,
-          Steps_Failed     => 1,
-          others           => 0));
+         (Scenarios => [Failed => 1, others => 0],
+          Steps     => [Passed => 3, Failed => 1, others => 0],
+          others    => 0));
    end Test_Failed_Step;
 
    Background_Doc : constant Lines :=
@@ -330,11 +329,10 @@ package body Fabula_Run_Tests is
       Assert_Trace (Log, Undefined_Stops);
       Assert_Counts
         (Control_Run.Counts_Of (R),
-         (Scenarios_Failed => 1,
-          Steps_Passed     => 1,
-          Steps_Undefined  => 2,
-          Steps_Skipped    => 1,
-          others           => 0));
+         (Scenarios => [Failed => 1, others => 0],
+          Steps     =>
+            [Passed => 1, Undefined => 2, Skipped => 1, others => 0],
+          others    => 0));
       Assert
         (Fabula.Results.Run_Failed (Control_Run.Counts_Of (R)),
          "an undefined step fails the run");
@@ -441,7 +439,7 @@ package body Fabula_Run_Tests is
       +"passed a passing step",
       +"hook close_ignore",
       +"hook close_note",
-      +"drop ignored by an after hook",
+      +"drop after entry ignored by an after hook",
       +"open after-hook check fails",
       +"enter after-hook check fails",
       +"step pass",
@@ -469,12 +467,10 @@ package body Fabula_Run_Tests is
       Assert_Trace (Log, Hook_Control_Trace);
       Assert_Counts
         (Control_Run.Counts_Of (R),
-         (Scenarios_Failed  => 7,
-          Scenarios_Skipped => 2,
-          Steps_Passed      => 3,
-          Steps_Skipped     => 6,
-          Steps_Undefined   => 1,
-          others            => 0));
+         (Scenarios => [Failed => 7, Skipped => 2, others => 0],
+          Steps     =>
+            [Passed => 3, Skipped => 6, Undefined => 1, others => 0],
+          others    => 0));
    end Test_Hook_Controls;
 
    ---------------------------------------------------------------------
@@ -514,7 +510,7 @@ package body Fabula_Run_Tests is
       +"passed a passing step",
       +"step call_ignore",
       +"passed a step that ignores",
-      +"drop a step ignores",
+      +"drop after entry a step ignores",
       +"open a step fails the scenario",
       +"enter a step fails the scenario",
       +"step call_fail",
@@ -534,7 +530,7 @@ package body Fabula_Run_Tests is
       +"passed a passing step",
       +"step call_ignore",
       +"passed a step that ignores",
-      +"drop the last step ignores"];
+      +"drop after entry the last step ignores"];
 
    procedure Test_Step_Controls (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
@@ -547,12 +543,9 @@ package body Fabula_Run_Tests is
       Assert_Trace (Log, Step_Control_Trace);
       Assert_Counts
         (Control_Run.Counts_Of (R),
-         (Scenarios_Failed  => 2,
-          Scenarios_Skipped => 1,
-          Steps_Passed      => 1,
-          Steps_Failed      => 2,
-          Steps_Skipped     => 3,
-          others            => 0));
+         (Scenarios => [Failed => 2, Skipped => 1, others => 0],
+          Steps     => [Passed => 1, Failed => 2, Skipped => 3, others => 0],
+          others    => 0));
    end Test_Step_Controls;
 
    ---------------------------------------------------------------------
@@ -602,11 +595,9 @@ package body Fabula_Run_Tests is
       Assert_Trace (Log, Step_Hook_Trace);
       Assert_Counts
         (Stepped_Run.Counts_Of (R),
-         (Scenarios_Failed => 2,
-          Steps_Passed     => 1,
-          Steps_Failed     => 2,
-          Steps_Skipped    => 2,
-          others           => 0));
+         (Scenarios => [Failed => 2, others => 0],
+          Steps     => [Passed => 1, Failed => 2, Skipped => 2, others => 0],
+          others    => 0));
    end Test_Step_Hooks;
 
    ---------------------------------------------------------------------
@@ -656,12 +647,9 @@ package body Fabula_Run_Tests is
       Assert_Trace (Log, Step_Hook_Control_Trace);
       Assert_Counts
         (Step_Control_Run.Counts_Of (R),
-         (Scenarios_Failed  => 1,
-          Scenarios_Skipped => 1,
-          Steps_Passed      => 1,
-          Steps_Failed      => 1,
-          Steps_Skipped     => 2,
-          others            => 0));
+         (Scenarios => [Failed => 1, Skipped => 1, others => 0],
+          Steps     => [Passed => 1, Failed => 1, Skipped => 2, others => 0],
+          others    => 0));
    end Test_Step_Hook_Controls;
 
    ---------------------------------------------------------------------
@@ -722,10 +710,10 @@ package body Fabula_Run_Tests is
       Assert_Trace (Log, Doomed_Skips);
       Assert_Counts
         (Doomed_Run.Counts_Of (R),
-         (Scenarios_Skipped => 2,
-          Steps_Skipped     => 2,
-          Hook_Errors       => 2,
-          others            => 0));
+         (Scenarios    => [Skipped => 2, others => 0],
+          Steps        => [Skipped => 2, others => 0],
+          Hook_Errors  => 2,
+          Parse_Errors => 0));
       Assert
         (Fabula.Results.Run_Failed (Doomed_Run.Counts_Of (R)),
          "a failed all-hook fails the run");
@@ -738,10 +726,10 @@ package body Fabula_Run_Tests is
       Assert_Trace (Log, Doomed_Continues);
       Assert_Counts
         (Doomed_Run.Counts_Of (R),
-         (Scenarios_Passed => 2,
-          Steps_Passed     => 2,
-          Hook_Errors      => 2,
-          others           => 0));
+         (Scenarios    => [Passed => 2, others => 0],
+          Steps        => [Passed => 2, others => 0],
+          Hook_Errors  => 2,
+          Parse_Errors => 0));
    end Test_Before_All;
 
    ---------------------------------------------------------------------
@@ -788,10 +776,9 @@ package body Fabula_Run_Tests is
       Assert_Trace (Log, Overflow_Trace);
       Assert_Counts
         (Bare_Run.Counts_Of (R),
-         (Scenarios_Failed => 1,
-          Steps_Passed     => 1,
-          Steps_Failed     => 2,
-          others           => 0));
+         (Scenarios => [Failed => 1, others => 0],
+          Steps     => [Passed => 1, Failed => 2, others => 0],
+          others    => 0));
    end Test_Overflow;
 
    --  An outline name too long once substituted keeps its text as

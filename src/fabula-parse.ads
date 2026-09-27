@@ -22,7 +22,7 @@ is
 
    type Refusal is record
       Kind : Error_Kind := None;
-      Line : Natural := 0;
+      Line : Natural := No_Line;
    end record;
 
    type Parser is private;   --  the sml machine plus its working state
@@ -40,7 +40,10 @@ is
       Doc    : in out Fabula.Ast.Document;
       Line   : String;
       Number : Positive)
-   with Pre => Line'First = 1 and then Line'Length <= Limits.Max_Line_Length;
+   with
+     Pre =>
+       Line'First = First_Column
+       and then Line'Length <= Limits.Max_Line_Length;
    --  After a refusal, or after Finish, further Feeds are no-ops.
 
    procedure Finish (P : in out Parser; Doc : in out Fabula.Ast.Document);
@@ -55,7 +58,7 @@ private
       Machine   : Grammar.SM.Machine (Grammar.Rows);
       Work      : Grammar.Work;
       Error     : Refusal;
-      Last_Line : Natural := 0;
+      Last_Line : Natural := No_Line;
    end record;
 
    function Failed (P : Parser) return Boolean

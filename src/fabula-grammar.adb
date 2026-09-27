@@ -1,4 +1,3 @@
-with Fabula.Line_Parts;
 with Sml.Machines.Operators;
 
 package body Fabula.Grammar
@@ -6,8 +5,6 @@ package body Fabula.Grammar
 is
 
    package Parts renames Fabula.Line_Parts;
-
-   use type Scan.Line_Class;
 
    package Op is new SM.Operators (Always => Always, Nothing => Nothing);
    use type Op.Ev, Op.Ev_Guard, Op.Ev_Built, Op.Source;
@@ -30,11 +27,14 @@ is
 
    --  Each row reads:  From + Event (Guard) / Command >= To.  Rows for
    --  one state are tried top to bottom; a line no row takes is the
-   --  state's refusal.  Blocks follow the state order.
+   --  state's refusal.  Blocks follow the state order.  Every step
+   --  writes Arrived_In and the request; the line above each block
+   --  names the other Work fields its commands write in Fabula.Parse.
    --!format off
    Table : constant SM.Transition_Table (1 .. Rows) :=
      [
       --  Before the Feature header: one tag line, then the header.
+      --  Writes: Pending, Described, Feature_Seen, Owner, Doc_Line.
       Prologue     + Tags (Well_Formed)  / Collect_Tags   >= Feature_Tags,
       Prologue     + Tags                / Refuse_Tags    >= Failed,
       Prologue     + Feature             / Open_Feature   >= Feature_Head,
@@ -44,6 +44,7 @@ is
 
       --  The feature's description ends at a tag, background, rule,
       --  scenario or outline line; every other line extends it.
+      --  Writes: Pending, Described, Last_Is_Outline, Owner, Doc_Line.
       Feature_Head + Tags (Well_Formed)  / Collect_Tags    >= Block_Tags,
       Feature_Head + Tags                / Refuse_Tags     >= Failed,
       Feature_Head + Background          / Open_Background >= Background_Head,
@@ -61,6 +62,7 @@ is
 
       --  A rule's description ends at a tag, scenario or outline line;
       --  end of input before one is the state's refusal.
+      --  Writes: Pending, Described, Last_Is_Outline, Owner, Doc_Line.
       Rule_Head + Tags (Well_Formed)  / Collect_Tags  >= Block_Tags,
       Rule_Head + Tags                / Refuse_Tags   >= Failed,
       Rule_Head + Scenario            / Open_Scenario >= Scenario_Head,
@@ -77,6 +79,7 @@ is
 
       --  Background, scenario and outline descriptions end only at
       --  the first step.
+      --  Writes: Takes_Argument, Owner, Doc_Line.
       Background_Head + Step                / Add_Step   >= In_Steps,
       Background_Head + Tags                / Describe   >= Background_Head,
       Background_Head + Feature             / Describe   >= Background_Head,
@@ -91,6 +94,7 @@ is
       Background_Head + Fence                            >= Background_Head,
       Background_Head + End_Of_Input                     >= Done,
 
+      --  Writes: Takes_Argument, Owner, Doc_Line.
       Scenario_Head + Step                / Add_Step   >= In_Steps,
       Scenario_Head + Tags                / Describe   >= Scenario_Head,
       Scenario_Head + Feature             / Describe   >= Scenario_Head,
@@ -105,6 +109,7 @@ is
       Scenario_Head + Fence                            >= Scenario_Head,
       Scenario_Head + End_Of_Input                     >= Done,
 
+      --  Writes: Takes_Argument, Owner, Doc_Line.
       Outline_Head + Step                / Add_Step   >= In_Steps,
       Outline_Head + Tags                / Describe   >= Outline_Head,
       Outline_Head + Feature             / Describe   >= Outline_Head,
@@ -121,6 +126,8 @@ is
 
       --  After a step: more steps, one argument for the last step (a
       --  doc string or a table), or the next block.
+      --  Writes: Takes_Argument, Width, Owner, Doc_Line, Pending,
+      --  Described, Last_Is_Outline.
       In_Steps + Step                     / Add_Step        >= In_Steps,
       In_Steps + Fence (Step_One_Liner)   / Add_Short_Doc   >= In_Steps,
       In_Steps + Fence (Step_Block)       / Open_Step_Doc   >= In_Doc,
@@ -136,6 +143,8 @@ is
       In_Steps + End_Of_Input                               >= Done,
 
       --  A step's table: rows of one width; blank lines do not end it.
+      --  Writes: Takes_Argument, Owner, Doc_Line, Pending, Described,
+      --  Last_Is_Outline.
       In_Table + Row (Fits_Width)         / Add_Table_Row   >= In_Table,
       In_Table + Row (Closed_Row)         / Refuse_Ragged   >= Failed,
       In_Table + Row                      / Refuse_Open_Row >= Failed,
@@ -150,12 +159,14 @@ is
       In_Table + End_Of_Input                               >= Done,
 
       --  One tag line, then the scenario, outline or Examples it tags.
+      --  Writes: Pending, Described, Last_Is_Outline, Owner, Doc_Line.
       Block_Tags + Scenario                 / Open_Scenario  >= Scenario_Head,
       Block_Tags + Outline                  / Open_Outline   >= Outline_Head,
       Block_Tags + Examples (After_Outline) / Open_Examples  >= Examples_Head,
       Block_Tags + Fence (Opens_Block)      / Open_Stray_Doc >= In_Doc,
 
       --  An Examples description ends only at the table's first row.
+      --  Writes: Width, Owner, Doc_Line.
       Examples_Head + Row (Closed_Row)    / Add_Header_Row  >= Examples_Rows,
       Examples_Head + Row                 / Refuse_Open_Row >= Failed,
       Examples_Head + Tags                / Describe        >= Examples_Head,
@@ -171,6 +182,7 @@ is
       Examples_Head + Fence                                 >= Examples_Head,
       Examples_Head + End_Of_Input                          >= Done,
 
+      --  Writes: Pending, Described, Last_Is_Outline, Owner, Doc_Line.
       Examples_Rows + Row (Fits_Width)    / Add_Example_Row >= Examples_Rows,
       Examples_Rows + Row (Closed_Row)    / Refuse_Ragged   >= Failed,
       Examples_Rows + Row                 / Refuse_Open_Row >= Failed,
@@ -185,6 +197,7 @@ is
 
       --  Inside a doc string every line is content until a fence run;
       --  the Owner guards resume the state the doc string interrupted.
+      --  Writes: no Work field.
       In_Doc + Content (Step_Doc)     / Add_Doc_Line    >= In_Doc,
       In_Doc + Content                                  >= In_Doc,
       In_Doc + Fence (Step_Doc_Ends)                    >= In_Steps,
@@ -194,8 +207,11 @@ is
       In_Doc + Fence (For_Scenario)                     >= Scenario_Head,
       In_Doc + Fence (For_Outline)                      >= Outline_Head,
       In_Doc + Fence (For_Examples)                     >= Examples_Head,
-      In_Doc + Fence                  / Refuse_Close    >= Failed,
-      In_Doc + End_Of_Input           / Refuse_Open_Doc >= Failed];
+      --  A fence no owner takes refuses by where the file is: after
+      --  the Feature header, or before it.
+      In_Doc + Fence (Feature_Seen) / Refuse_Close_In_Feature     >= Failed,
+      In_Doc + Fence                / Refuse_Close_Before_Feature >= Failed,
+      In_Doc + End_Of_Input         / Refuse_Open_Doc             >= Failed];
    --!format on
 
    function Started return SM.Machine
@@ -244,40 +260,35 @@ is
                   (Line_Of (Evt), Evt.Class.Body_First, Evt.Class.Body_Last));
 
    --  The first fence run after an opening fence's own three
-   --  characters, or 0 when the opening line does not close itself.
+   --  characters, or No_Position when the opening line does not close
+   --  itself.
    function Closing_Run (Evt : Event) return Natural
    is (if Evt.Class.Class = Scan.Doc_Fence
        then
          Parts.Fence_Run
            (Line_Of (Evt), Evt.Class.Type_First, Evt.Class.Type_Last)
-       else 0);
+       else Parts.No_Position);
 
    function Opens (Evt : Event) return Boolean
-   is (Evt.Class.Class = Scan.Doc_Fence and then Closing_Run (Evt) = 0);
+   is (Evt.Class.Class = Scan.Doc_Fence
+       and then Closing_Run (Evt) = Parts.No_Position);
 
    --  A one-line doc string with nothing after its closing run (the
    --  type slice is right-trimmed, so the run must end it).
    function Clean_One_Liner (Evt : Event) return Boolean
    is (Evt.Class.Class = Scan.Doc_Fence
-       and then Closing_Run (Evt) /= 0
+       and then Closing_Run (Evt) /= Parts.No_Position
        and then Closing_Run (Evt) + (Scan.Fence_Length - 1)
                 = Evt.Class.Type_Last);
-
-   function Shape (Evt : Event) return Parts.Row_Shape
-   is (if Evt.Class.Class = Scan.Table_Row
-       then
-         Parts.Measure_Row
-           (Line_Of (Evt), Evt.Class.Body_First, Evt.Class.Body_Last)
-       else (Terminated => False, Cells => 0));
 
    --  Inside a doc string: the line's first fence run has only blanks
    --  after it, so the closing line holds nothing else.
    function Clean_Close (Evt : Event) return Boolean
    is (declare
          Run : constant Natural :=
-           Parts.Fence_Run (Line_Of (Evt), 1, Evt.Length);
+           Parts.Fence_Run (Line_Of (Evt), First_Column, Evt.Length);
        begin
-         Run /= 0
+         Run /= Parts.No_Position
          and then Parts.Only_Blank
                     (Line_Of (Evt), Run + Scan.Fence_Length, Evt.Length));
 
@@ -299,6 +310,7 @@ is
          when Step_Doc       => Ctx.Owner = In_Steps,
          when Step_Doc_Ends  =>
            Ctx.Owner = In_Steps and then Clean_Close (Evt),
+         when Feature_Seen   => Ctx.Feature_Seen,
          when For_Feature    => Ctx.Owner = Feature_Head,
          when For_Rule       => Ctx.Owner = Rule_Head,
          when For_Background => Ctx.Owner = Background_Head,

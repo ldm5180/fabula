@@ -363,7 +363,7 @@ is
       Opts  : Closure_Run.Options;
       Lines : Closure_Run.Line_Selection := Closure_Run.All_Lines;
    begin
-      Counts := (others => 0);
+      Counts := (others => <>);
       Closed := 0;
       if not Closure_Run.Tables_Valid then
          return;
