@@ -323,6 +323,10 @@ package body Fabula_Ast_Tests is
       Assert (not Cell_Pool.Is_Live (Cell_Pool.None, 5), "None is no member");
       Assert (Cell_Pool.Is_Live (5, 5), "the newest member is live");
       Assert (not Cell_Pool.Is_Live (6, 5), "a handle past the count is not");
+      Assert (not Cell_Pool.Has_Newest (Cell_Pool.None), "an empty pool");
+      Assert (Cell_Pool.Has_Newest (1), "a pool of one has a newest member");
+      Assert (Cell_Pool.Newest (1) = 1, "the only member is the newest");
+      Assert (Cell_Pool.Newest (5) = 5, "the newest member is the count");
    end Test_Pool_Ranges;
 
    procedure Test_Clear (T : in out AUnit.Test_Cases.Test_Case'Class) is

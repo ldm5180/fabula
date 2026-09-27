@@ -2,6 +2,65 @@ package body Fabula.Ast
   with SPARK_Mode
 is
 
+   --  Whether Doc holds a node of each kind a builder appends to, and the
+   --  most recent one when it does.
+
+   function Has_Rule (Doc : Document) return Boolean
+   is (Rule_Pool.Has_Newest (Doc.Rules_Used));
+
+   function Newest_Rule (Doc : Document) return Rule_Index
+   is (Rule_Pool.Newest (Doc.Rules_Used))
+   with Pre => Has_Rule (Doc);
+
+   function Has_Scenario (Doc : Document) return Boolean
+   is (Scenario_Pool.Has_Newest (Doc.Scenarios_Used));
+
+   function Newest_Scenario (Doc : Document) return Scenario_Index
+   is (Scenario_Pool.Newest (Doc.Scenarios_Used))
+   with Pre => Has_Scenario (Doc);
+
+   function Has_Examples (Doc : Document) return Boolean
+   is (Examples_Pool.Has_Newest (Doc.Blocks_Used));
+
+   function Newest_Examples (Doc : Document) return Examples_Index
+   is (Examples_Pool.Newest (Doc.Blocks_Used))
+   with Pre => Has_Examples (Doc);
+
+   function Has_Step (Doc : Document) return Boolean
+   is (Step_Pool.Has_Newest (Doc.Steps_Used));
+
+   function Newest_Step (Doc : Document) return Step_Index
+   is (Step_Pool.Newest (Doc.Steps_Used))
+   with Pre => Has_Step (Doc);
+
+   function Has_Table (Doc : Document) return Boolean
+   is (Table_Pool.Has_Newest (Doc.Tables_Used));
+
+   function Newest_Table (Doc : Document) return Table_Index
+   is (Table_Pool.Newest (Doc.Tables_Used))
+   with Pre => Has_Table (Doc);
+
+   function Has_Table_Row (Doc : Document) return Boolean
+   is (Row_Pool.Has_Newest (Doc.Rows_Used));
+
+   function Newest_Table_Row (Doc : Document) return Row_Index
+   is (Row_Pool.Newest (Doc.Rows_Used))
+   with Pre => Has_Table_Row (Doc);
+
+   function Has_Examples_Row (Doc : Document) return Boolean
+   is (Examples_Row_Pool.Has_Newest (Doc.Example_Rows_Used));
+
+   function Newest_Examples_Row (Doc : Document) return Examples_Row_Index
+   is (Examples_Row_Pool.Newest (Doc.Example_Rows_Used))
+   with Pre => Has_Examples_Row (Doc);
+
+   function Has_Doc_String (Doc : Document) return Boolean
+   is (Doc_Pool.Has_Newest (Doc.Docs_Used));
+
+   function Newest_Doc_String (Doc : Document) return Doc_Index
+   is (Doc_Pool.Newest (Doc.Docs_Used))
+   with Pre => Has_Doc_String (Doc);
+
    function Text (Doc : Document; S : Slice) return String is
       Result : constant String (1 .. Length (S)) :=
         Doc.Arena (S.First .. S.Last);
@@ -82,10 +141,10 @@ is
             Tags   => Tags,
             Rule   => Doc.Rules_Used,
             others => <>);
-         if Doc.Rules_Used > 0 then
-            Doc.Rules (Doc.Rules_Used).Scenarios :=
+         if Has_Rule (Doc) then
+            Doc.Rules (Newest_Rule (Doc)).Scenarios :=
               Scenario_Pool.Extended
-                (Doc.Rules (Doc.Rules_Used).Scenarios, Doc.Scenarios_Used);
+                (Doc.Rules (Newest_Rule (Doc)).Scenarios, Doc.Scenarios_Used);
          end if;
       end if;
    end Add_Scenario;
@@ -99,10 +158,11 @@ is
          Doc.Blocks_Used := Doc.Blocks_Used + 1;
          Doc.Blocks (Doc.Blocks_Used) :=
            (Head => Head, Tags => Tags, others => <>);
-         if Doc.Scenarios_Used > 0 then
-            Doc.Scenarios (Doc.Scenarios_Used).Examples :=
+         if Has_Scenario (Doc) then
+            Doc.Scenarios (Newest_Scenario (Doc)).Examples :=
               Examples_Pool.Extended
-                (Doc.Scenarios (Doc.Scenarios_Used).Examples, Doc.Blocks_Used);
+                (Doc.Scenarios (Newest_Scenario (Doc)).Examples,
+                 Doc.Blocks_Used);
          end if;
       end if;
    end Add_Examples;
@@ -114,16 +174,16 @@ is
          when Feature_Block    => Doc.The_Feature.Head.Description,
          when Background_Block => Doc.The_Background.Head.Description,
          when Rule_Block       =>
-           (if Doc.Rules_Used > 0
-            then Doc.Rules (Doc.Rules_Used).Head.Description
+           (if Has_Rule (Doc)
+            then Doc.Rules (Newest_Rule (Doc)).Head.Description
             else Empty_Slice),
          when Scenario_Block   =>
-           (if Doc.Scenarios_Used > 0
-            then Doc.Scenarios (Doc.Scenarios_Used).Head.Description
+           (if Has_Scenario (Doc)
+            then Doc.Scenarios (Newest_Scenario (Doc)).Head.Description
             else Empty_Slice),
          when Examples_Block   =>
-           (if Doc.Blocks_Used > 0
-            then Doc.Blocks (Doc.Blocks_Used).Head.Description
+           (if Has_Examples (Doc)
+            then Doc.Blocks (Newest_Examples (Doc)).Head.Description
             else Empty_Slice));
 
    procedure Set_Description
@@ -137,18 +197,18 @@ is
             Doc.The_Background.Head.Description := Value;
 
          when Rule_Block       =>
-            if Doc.Rules_Used > 0 then
-               Doc.Rules (Doc.Rules_Used).Head.Description := Value;
+            if Has_Rule (Doc) then
+               Doc.Rules (Newest_Rule (Doc)).Head.Description := Value;
             end if;
 
          when Scenario_Block   =>
-            if Doc.Scenarios_Used > 0 then
-               Doc.Scenarios (Doc.Scenarios_Used).Head.Description := Value;
+            if Has_Scenario (Doc) then
+               Doc.Scenarios (Newest_Scenario (Doc)).Head.Description := Value;
             end if;
 
          when Examples_Block   =>
-            if Doc.Blocks_Used > 0 then
-               Doc.Blocks (Doc.Blocks_Used).Head.Description := Value;
+            if Has_Examples (Doc) then
+               Doc.Blocks (Newest_Examples (Doc)).Head.Description := Value;
             end if;
       end case;
    end Set_Description;
@@ -203,10 +263,10 @@ is
          Doc.Steps_Used := Doc.Steps_Used + 1;
          Doc.Steps (Doc.Steps_Used) :=
            (Keyword => Keyword, Text => Text, Line => Line, others => <>);
-         if Doc.Scenarios_Used > 0 then
-            Doc.Scenarios (Doc.Scenarios_Used).Steps :=
+         if Has_Scenario (Doc) then
+            Doc.Scenarios (Newest_Scenario (Doc)).Steps :=
               Step_Pool.Extended
-                (Doc.Scenarios (Doc.Scenarios_Used).Steps, Doc.Steps_Used);
+                (Doc.Scenarios (Newest_Scenario (Doc)).Steps, Doc.Steps_Used);
          else
             Doc.The_Background.Steps :=
               Step_Pool.Extended (Doc.The_Background.Steps, Doc.Steps_Used);
@@ -220,8 +280,8 @@ is
       if Ok then
          Doc.Tables_Used := Doc.Tables_Used + 1;
          Doc.Tables (Doc.Tables_Used) := (Rows => <>);
-         if Doc.Steps_Used > 0 then
-            Doc.Steps (Doc.Steps_Used).Table := Doc.Tables_Used;
+         if Has_Step (Doc) then
+            Doc.Steps (Newest_Step (Doc)).Table := Doc.Tables_Used;
          end if;
       end if;
    end Add_Table;
@@ -233,10 +293,10 @@ is
       if Ok then
          Doc.Rows_Used := Doc.Rows_Used + 1;
          Doc.Rows (Doc.Rows_Used) := (Cells => <>, Line => Line);
-         if Doc.Tables_Used > 0 then
-            Doc.Tables (Doc.Tables_Used).Rows :=
+         if Has_Table (Doc) then
+            Doc.Tables (Newest_Table (Doc)).Rows :=
               Row_Pool.Extended
-                (Doc.Tables (Doc.Tables_Used).Rows, Doc.Rows_Used);
+                (Doc.Tables (Newest_Table (Doc)).Rows, Doc.Rows_Used);
          end if;
       end if;
    end Add_Table_Row;
@@ -248,10 +308,10 @@ is
       if Ok then
          Doc.Cells_Used := Doc.Cells_Used + 1;
          Doc.Cells (Doc.Cells_Used) := Text;
-         if Doc.Rows_Used > 0 then
-            Doc.Rows (Doc.Rows_Used).Cells :=
+         if Has_Table_Row (Doc) then
+            Doc.Rows (Newest_Table_Row (Doc)).Cells :=
               Cell_Pool.Extended
-                (Doc.Rows (Doc.Rows_Used).Cells, Doc.Cells_Used);
+                (Doc.Rows (Newest_Table_Row (Doc)).Cells, Doc.Cells_Used);
          end if;
       end if;
    end Add_Table_Cell;
@@ -272,9 +332,10 @@ is
          Doc.Example_Rows_Used := Doc.Example_Rows_Used + 1;
          Doc.Example_Rows (Doc.Example_Rows_Used) :=
            (Cells => <>, Line => Line);
-         if Doc.Blocks_Used > 0 then
-            Doc.Blocks (Doc.Blocks_Used) :=
-              With_Row (Doc.Blocks (Doc.Blocks_Used), Doc.Example_Rows_Used);
+         if Has_Examples (Doc) then
+            Doc.Blocks (Newest_Examples (Doc)) :=
+              With_Row
+                (Doc.Blocks (Newest_Examples (Doc)), Doc.Example_Rows_Used);
          end if;
       end if;
    end Add_Examples_Row;
@@ -286,10 +347,10 @@ is
       if Ok then
          Doc.Cells_Used := Doc.Cells_Used + 1;
          Doc.Cells (Doc.Cells_Used) := Text;
-         if Doc.Example_Rows_Used > 0 then
-            Doc.Example_Rows (Doc.Example_Rows_Used).Cells :=
+         if Has_Examples_Row (Doc) then
+            Doc.Example_Rows (Newest_Examples_Row (Doc)).Cells :=
               Cell_Pool.Extended
-                (Doc.Example_Rows (Doc.Example_Rows_Used).Cells,
+                (Doc.Example_Rows (Newest_Examples_Row (Doc)).Cells,
                  Doc.Cells_Used);
          end if;
       end if;
@@ -310,8 +371,8 @@ is
             Content_Type => Content_Type,
             Line         => Line,
             Lines        => <>);
-         if Doc.Steps_Used > 0 then
-            Doc.Steps (Doc.Steps_Used).Doc := Doc.Docs_Used;
+         if Has_Step (Doc) then
+            Doc.Steps (Newest_Step (Doc)).Doc := Doc.Docs_Used;
          end if;
       end if;
    end Add_Doc_String;
@@ -323,10 +384,10 @@ is
       if Ok then
          Doc.Doc_Lines_Used := Doc.Doc_Lines_Used + 1;
          Doc.Doc_Lines (Doc.Doc_Lines_Used) := Text;
-         if Doc.Docs_Used > 0 then
-            Doc.Docs (Doc.Docs_Used).Lines :=
+         if Has_Doc_String (Doc) then
+            Doc.Docs (Newest_Doc_String (Doc)).Lines :=
               Doc_Line_Pool.Extended
-                (Doc.Docs (Doc.Docs_Used).Lines, Doc.Doc_Lines_Used);
+                (Doc.Docs (Newest_Doc_String (Doc)).Lines, Doc.Doc_Lines_Used);
          end if;
       end if;
    end Add_Doc_Line;

@@ -34,6 +34,15 @@ package Fabula.Pool_Ranges with Pure, SPARK_Mode is
    function Is_Live (H : Handle; Used : Handle) return Boolean
    is (H in Index'First .. Used);
 
+   --  Whether a pool of Used members holds any member.
+   function Has_Newest (Used : Handle) return Boolean
+   is (Used in Index);
+
+   --  The newest member of a pool of Used members.
+   function Newest (Used : Handle) return Index
+   is (Used)
+   with Pre => Has_Newest (Used);
+
    --  R widened to cover I, its pool's newest member; an empty R becomes
    --  I alone.  Children are appended right after one another, so the
    --  widened range stays contiguous.
