@@ -69,7 +69,7 @@ is
    --  carries no line.
    type Event is record
       Kind   : Event_Kind := E_End_Of_Input;
-      Number : Natural := No_Line;
+      Number : Line_Number := No_Line;
       Length : Line_Length := No_Text;
       Text   : String (1 .. Limits.Max_Line_Length) := [others => ' '];
       Class  : Scan.Classification;
@@ -90,7 +90,7 @@ is
    function Line_Event
      (Kind   : Event_Kind;
       Line   : String;
-      Number : Positive;
+      Number : Source_Line;
       Class  : Scan.Classification) return Event
    with
      Pre  =>
@@ -101,7 +101,7 @@ is
        Line_Event'Result.Kind = Kind
        and then Line_Event'Result.Number = Number;
 
-   function End_Event (Number : Natural) return Event
+   function End_Event (Number : Line_Number) return Event
    is ((Number => Number, others => <>));
 
    --  A table row's shape: whether it closes, and its cell count.  Any
@@ -174,7 +174,7 @@ is
       Requests        : Req.Block;
       Arrived_In      : State := Prologue;
       Owner           : State := Failed;
-      Doc_Line        : Natural := No_Line;
+      Doc_Line        : Line_Number := No_Line;
       Takes_Argument  : Boolean := False;
       Width           : Line_Length := No_Width;
       Last_Is_Outline : Boolean := False;

@@ -18,16 +18,16 @@ is
    ---------------------------------------------------------------------
 
    subtype Line_Count is Natural range 0 .. Limits.Max_Line_Selections;
-   type Line_Array is array (1 .. Limits.Max_Line_Selections) of Positive;
+   type Line_Array is array (1 .. Limits.Max_Line_Selections) of Source_Line;
 
    --  Distinct line numbers, in no particular order; none selects every
    --  scenario.
    type Line_Numbers is record
       Count : Line_Count := 0;
-      Lines : Line_Array := [others => 1];
+      Lines : Line_Array := [others => First_Line];
    end record;
 
-   function Selects (L : Line_Numbers; Line : Positive) return Boolean
+   function Selects (L : Line_Numbers; Line : Source_Line) return Boolean
    is (for some I in 1 .. L.Count => L.Lines (I) = Line);
 
    type Search_Status is
@@ -102,7 +102,7 @@ is
       Status  : Load_Status := Unreadable;
       Refusal : Parse.Refusal;
       At_End  : Boolean := False;
-      Line    : Natural := 0;
+      Line    : Line_Number := No_Line;
       Text    : String (1 .. Limits.Max_Line_Length) := [others => ' '];
       Len     : Text_Length := 0;
    end record;

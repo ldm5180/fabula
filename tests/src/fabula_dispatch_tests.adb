@@ -13,6 +13,7 @@ package body Fabula_Dispatch_Tests is
 
    use AUnit.Test_Cases.Registration;
    use all type Fabula.Results.Status;
+   use type Fabula.Line_Number;
 
    --  A whole run of Source through drive loop D: the Before_All hooks,
    --  the feature, the After_All hooks, each driven until it idles.
@@ -305,11 +306,13 @@ package body Fabula_Dispatch_Tests is
           +"close passed two",
           +"hook run_close 1"]);
       Lines_In.Count := Fabula.Limits.Max_Line_Selections;
-      Lines_In.Lines := [for I in Lines_In.Lines'Range => I];
+      Lines_In.Lines :=
+        [for I in Lines_In.Lines'Range => Fabula.Source_Line (I)];
       Picked := Counting.Selection (Lines_In);
       Assert
         (Picked.Count = Fabula.Limits.Max_Line_Selections
-         and then Picked.Lines (Picked.Count) = Picked.Count,
+         and then Picked.Lines (Picked.Count)
+                  = Fabula.Line_Number (Picked.Count),
          "every line of a full selection");
    end Test_Selection;
 

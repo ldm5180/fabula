@@ -2,37 +2,6 @@ package body Fabula.Ast
   with SPARK_Mode
 is
 
-   --  Widens a pool range to cover its newest member I; an empty range
-   --  becomes I alone.  Children are appended right after one another,
-   --  so the widened range stays contiguous.
-   function Extended
-     (R : Scenario_Range; I : Scenario_Index) return Scenario_Range
-   is (if R.Last < R.First then (I, I) else (R.First, I));
-
-   function Extended (R : Step_Range; I : Step_Index) return Step_Range
-   is (if R.Last < R.First then (I, I) else (R.First, I));
-
-   function Extended (R : Tag_Range; I : Tag_Index) return Tag_Range
-   is (if R.Last < R.First then (I, I) else (R.First, I));
-
-   function Extended (R : Row_Range; I : Row_Index) return Row_Range
-   is (if R.Last < R.First then (I, I) else (R.First, I));
-
-   function Extended (R : Cell_Range; I : Cell_Index) return Cell_Range
-   is (if R.Last < R.First then (I, I) else (R.First, I));
-
-   function Extended
-     (R : Doc_Line_Range; I : Doc_Line_Index) return Doc_Line_Range
-   is (if R.Last < R.First then (I, I) else (R.First, I));
-
-   function Extended
-     (R : Examples_Range; I : Examples_Index) return Examples_Range
-   is (if R.Last < R.First then (I, I) else (R.First, I));
-
-   function Extended
-     (R : Examples_Row_Range; I : Examples_Row_Index) return Examples_Row_Range
-   is (if R.Last < R.First then (I, I) else (R.First, I));
-
    function Text (Doc : Document; S : Slice) return String is
       Result : constant String (1 .. Length (S)) :=
         Doc.Arena (S.First .. S.Last);
@@ -105,19 +74,19 @@ is
       Ok   : out Boolean) is
    begin
       Ok := Doc.Scenarios_Used < Scenario_Handle'Last;
-      if not Ok then
-         return;
-      end if;
-      Doc.Scenarios_Used := Doc.Scenarios_Used + 1;
-      Doc.Scenarios (Doc.Scenarios_Used) :=
-        (Kind   => Kind,
-         Head   => Head,
-         Tags   => Tags,
-         Rule   => Doc.Rules_Used,
-         others => <>);
-      if Doc.Rules_Used > 0 then
-         Doc.Rules (Doc.Rules_Used).Scenarios :=
-           Extended (Doc.Rules (Doc.Rules_Used).Scenarios, Doc.Scenarios_Used);
+      if Ok then
+         Doc.Scenarios_Used := Doc.Scenarios_Used + 1;
+         Doc.Scenarios (Doc.Scenarios_Used) :=
+           (Kind   => Kind,
+            Head   => Head,
+            Tags   => Tags,
+            Rule   => Doc.Rules_Used,
+            others => <>);
+         if Doc.Rules_Used > 0 then
+            Doc.Rules (Doc.Rules_Used).Scenarios :=
+              Scenario_Pool.Extended
+                (Doc.Rules (Doc.Rules_Used).Scenarios, Doc.Scenarios_Used);
+         end if;
       end if;
    end Add_Scenario;
 
@@ -126,16 +95,15 @@ is
    is
    begin
       Ok := Doc.Blocks_Used < Examples_Handle'Last;
-      if not Ok then
-         return;
-      end if;
-      Doc.Blocks_Used := Doc.Blocks_Used + 1;
-      Doc.Blocks (Doc.Blocks_Used) :=
-        (Head => Head, Tags => Tags, others => <>);
-      if Doc.Scenarios_Used > 0 then
-         Doc.Scenarios (Doc.Scenarios_Used).Examples :=
-           Extended
-             (Doc.Scenarios (Doc.Scenarios_Used).Examples, Doc.Blocks_Used);
+      if Ok then
+         Doc.Blocks_Used := Doc.Blocks_Used + 1;
+         Doc.Blocks (Doc.Blocks_Used) :=
+           (Head => Head, Tags => Tags, others => <>);
+         if Doc.Scenarios_Used > 0 then
+            Doc.Scenarios (Doc.Scenarios_Used).Examples :=
+              Examples_Pool.Extended
+                (Doc.Scenarios (Doc.Scenarios_Used).Examples, Doc.Blocks_Used);
+         end if;
       end if;
    end Add_Examples;
 
@@ -192,20 +160,18 @@ is
       Ok     : out Boolean)
    is
       Current : constant Slice := Description_Of (Doc, Target);
+      Fresh   : constant Boolean := Is_Empty (Current);
       Added   : Slice;
    begin
-      if Length (Current) = 0 then
-         Append_Text (Doc, Source, Added, Ok);
-      else
-         Append_Text (Doc, ASCII.LF & Source, Added, Ok);
-      end if;
+      Append_Text
+        (Doc, (if Fresh then Source else ASCII.LF & Source), Added, Ok);
       --  Current ends right before Added in the arena: the caller
       --  appends nothing else between two lines of one description.
-      if Ok and then Length (Added) > 0 then
+      if Ok and then not Is_Empty (Added) then
          Set_Description
            (Doc,
             Target,
-            (if Length (Current) = 0
+            (if Fresh
              then Added
              else (First => Current.First, Last => Added.Last)));
       end if;
@@ -221,7 +187,7 @@ is
       if Ok then
          Doc.Tags_Used := Doc.Tags_Used + 1;
          Doc.Tags (Doc.Tags_Used) := Text;
-         Pending := Extended (Pending, Doc.Tags_Used);
+         Pending := Tag_Pool.Extended (Pending, Doc.Tags_Used);
       end if;
    end Add_Tag;
 
@@ -229,22 +195,22 @@ is
      (Doc     : in out Document;
       Keyword : Scan.Step_Keyword;
       Text    : Slice;
-      Line    : Natural;
+      Line    : Line_Number;
       Ok      : out Boolean) is
    begin
       Ok := Doc.Steps_Used < Step_Handle'Last;
-      if not Ok then
-         return;
-      end if;
-      Doc.Steps_Used := Doc.Steps_Used + 1;
-      Doc.Steps (Doc.Steps_Used) :=
-        (Keyword => Keyword, Text => Text, Line => Line, others => <>);
-      if Doc.Scenarios_Used > 0 then
-         Doc.Scenarios (Doc.Scenarios_Used).Steps :=
-           Extended (Doc.Scenarios (Doc.Scenarios_Used).Steps, Doc.Steps_Used);
-      else
-         Doc.The_Background.Steps :=
-           Extended (Doc.The_Background.Steps, Doc.Steps_Used);
+      if Ok then
+         Doc.Steps_Used := Doc.Steps_Used + 1;
+         Doc.Steps (Doc.Steps_Used) :=
+           (Keyword => Keyword, Text => Text, Line => Line, others => <>);
+         if Doc.Scenarios_Used > 0 then
+            Doc.Scenarios (Doc.Scenarios_Used).Steps :=
+              Step_Pool.Extended
+                (Doc.Scenarios (Doc.Scenarios_Used).Steps, Doc.Steps_Used);
+         else
+            Doc.The_Background.Steps :=
+              Step_Pool.Extended (Doc.The_Background.Steps, Doc.Steps_Used);
+         end if;
       end if;
    end Add_Step;
 
@@ -261,7 +227,7 @@ is
    end Add_Table;
 
    procedure Add_Table_Row
-     (Doc : in out Document; Line : Natural; Ok : out Boolean) is
+     (Doc : in out Document; Line : Line_Number; Ok : out Boolean) is
    begin
       Ok := Doc.Rows_Used < Row_Handle'Last;
       if Ok then
@@ -269,7 +235,8 @@ is
          Doc.Rows (Doc.Rows_Used) := (Cells => <>, Line => Line);
          if Doc.Tables_Used > 0 then
             Doc.Tables (Doc.Tables_Used).Rows :=
-              Extended (Doc.Tables (Doc.Tables_Used).Rows, Doc.Rows_Used);
+              Row_Pool.Extended
+                (Doc.Tables (Doc.Tables_Used).Rows, Doc.Rows_Used);
          end if;
       end if;
    end Add_Table_Row;
@@ -283,28 +250,32 @@ is
          Doc.Cells (Doc.Cells_Used) := Text;
          if Doc.Rows_Used > 0 then
             Doc.Rows (Doc.Rows_Used).Cells :=
-              Extended (Doc.Rows (Doc.Rows_Used).Cells, Doc.Cells_Used);
+              Cell_Pool.Extended
+                (Doc.Rows (Doc.Rows_Used).Cells, Doc.Cells_Used);
          end if;
       end if;
    end Add_Table_Cell;
 
+   --  Block B with Row added: its header while it has none, else its
+   --  newest data row.
+   function With_Row
+     (B : Examples_Node; Row : Examples_Row_Index) return Examples_Node
+   is (if B.Header_Row = No_Examples_Row
+       then (B with delta Header_Row => Row)
+       else (B with delta Rows => Examples_Row_Pool.Extended (B.Rows, Row)));
+
    procedure Add_Examples_Row
-     (Doc : in out Document; Line : Natural; Ok : out Boolean) is
+     (Doc : in out Document; Line : Line_Number; Ok : out Boolean) is
    begin
       Ok := Doc.Example_Rows_Used < Examples_Row_Handle'Last;
-      if not Ok then
-         return;
-      end if;
-      Doc.Example_Rows_Used := Doc.Example_Rows_Used + 1;
-      Doc.Example_Rows (Doc.Example_Rows_Used) := (Cells => <>, Line => Line);
-      if Doc.Blocks_Used = 0 then
-         return;
-      end if;
-      if Doc.Blocks (Doc.Blocks_Used).Header_Row = 0 then
-         Doc.Blocks (Doc.Blocks_Used).Header_Row := Doc.Example_Rows_Used;
-      else
-         Doc.Blocks (Doc.Blocks_Used).Rows :=
-           Extended (Doc.Blocks (Doc.Blocks_Used).Rows, Doc.Example_Rows_Used);
+      if Ok then
+         Doc.Example_Rows_Used := Doc.Example_Rows_Used + 1;
+         Doc.Example_Rows (Doc.Example_Rows_Used) :=
+           (Cells => <>, Line => Line);
+         if Doc.Blocks_Used > 0 then
+            Doc.Blocks (Doc.Blocks_Used) :=
+              With_Row (Doc.Blocks (Doc.Blocks_Used), Doc.Example_Rows_Used);
+         end if;
       end if;
    end Add_Examples_Row;
 
@@ -317,7 +288,7 @@ is
          Doc.Cells (Doc.Cells_Used) := Text;
          if Doc.Example_Rows_Used > 0 then
             Doc.Example_Rows (Doc.Example_Rows_Used).Cells :=
-              Extended
+              Cell_Pool.Extended
                 (Doc.Example_Rows (Doc.Example_Rows_Used).Cells,
                  Doc.Cells_Used);
          end if;
@@ -328,7 +299,7 @@ is
      (Doc          : in out Document;
       Fence        : Scan.Fence_Kind;
       Content_Type : Slice;
-      Line         : Natural;
+      Line         : Line_Number;
       Ok           : out Boolean) is
    begin
       Ok := Doc.Docs_Used < Doc_Handle'Last;
@@ -354,7 +325,8 @@ is
          Doc.Doc_Lines (Doc.Doc_Lines_Used) := Text;
          if Doc.Docs_Used > 0 then
             Doc.Docs (Doc.Docs_Used).Lines :=
-              Extended (Doc.Docs (Doc.Docs_Used).Lines, Doc.Doc_Lines_Used);
+              Doc_Line_Pool.Extended
+                (Doc.Docs (Doc.Docs_Used).Lines, Doc.Doc_Lines_Used);
          end if;
       end if;
    end Add_Doc_Line;

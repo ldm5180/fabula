@@ -39,7 +39,8 @@ is
 
    --  Adds Line unless it is there already.
    procedure Add
-     (L : in out Line_Numbers; Line : Positive; Status : out Search_Status) is
+     (L : in out Line_Numbers; Line : Source_Line; Status : out Search_Status)
+   is
    begin
       Status := Found;
       if Selects (L, Line) then
@@ -69,7 +70,7 @@ is
          end if;
          Add
            (Result.Lines,
-            Line_Of (Argument (Colon + 1 .. Last)),
+            Source_Line (Line_Of (Argument (Colon + 1 .. Last))),
             Result.Status);
          exit when Result.Status /= Found;
          Last := Colon - 1;
@@ -78,7 +79,7 @@ is
          if Last - Argument'First + 1 > Limits.Max_Path_Length then
             Result.Status := Path_Too_Long;
          else
-            Frames.Set (Result.Path, Argument (Argument'First .. Last));
+            Result.Path := Frames.To_Path (Argument (Argument'First .. Last));
          end if;
       end if;
       return Result;
@@ -145,7 +146,7 @@ is
          Status := Too_Many_Files;
       else
          List.Count := List.Count + 1;
-         Frames.Set (List.Files (List.Count).Path, Path);
+         List.Files (List.Count).Path := Frames.To_Path (Path);
          List.Files (List.Count).Lines := Lines;
          Status := Found;
       end if;
@@ -314,11 +315,12 @@ is
          Lines := Lines + 1;
          if Line.Kind = Overlong then
             Result.Status := Too_Long;
-            Result.Line := Lines;
+            Result.Line := Line_Number (Lines);
             Keep_Text (Result, Line);
             return;
          end if;
-         Parse.Feed (Parser, Doc, Line.Text (1 .. Line.Len), Lines);
+         Parse.Feed
+           (Parser, Doc, Line.Text (1 .. Line.Len), Source_Line (Lines));
          exit when Parse.Failed (Parser);
       end loop;
    end Feed_Lines;

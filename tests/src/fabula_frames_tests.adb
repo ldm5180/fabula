@@ -7,13 +7,13 @@ with Fabula.Limits;
 package body Fabula_Frames_Tests is
 
    use AUnit.Test_Cases.Registration;
+   use type Fabula.Line_Number;
 
    procedure Test_Name_Round_Trip (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
-      N : Name_Text;
+      N : constant Name_Text := To_Name ("a checkout scenario");
    begin
-      Set (N, "a checkout scenario");
       Assert
         (Value (N) = "a checkout scenario",
          "Name_Text round-trips, got """ & Value (N) & """");
@@ -22,10 +22,9 @@ package body Fabula_Frames_Tests is
    procedure Test_Name_Truncation (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
-      N    : Name_Text;
       Long : constant String := (Fabula.Limits.Max_Name_Length + 10) * 'x';
+      N    : constant Name_Text := To_Name (Long);
    begin
-      Set (N, Long);
       Assert
         (Value (N)'Length = Fabula.Limits.Max_Name_Length,
          "a name over the cap truncates to the cap");
@@ -38,9 +37,8 @@ package body Fabula_Frames_Tests is
    procedure Test_Path_Round_Trip (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
-      P : Path_Text;
+      P : constant Path_Text := To_Path ("features/checkout.feature");
    begin
-      Set (P, "features/checkout.feature");
       Assert
         (Value (P) = "features/checkout.feature",
          "Path_Text round-trips, got """ & Value (P) & """");
@@ -49,10 +47,9 @@ package body Fabula_Frames_Tests is
    procedure Test_Path_Truncation (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
-      P    : Path_Text;
       Long : constant String := (Fabula.Limits.Max_Path_Length + 10) * 'y';
+      P    : constant Path_Text := To_Path (Long);
    begin
-      Set (P, Long);
       Assert
         (Value (P)'Length = Fabula.Limits.Max_Path_Length,
          "a path over the cap truncates to the cap");
@@ -61,9 +58,8 @@ package body Fabula_Frames_Tests is
    procedure Test_Step_Round_Trip (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
-      S : Step_Text;
+      S : constant Step_Text := To_Step ("I place 3 apples in the box");
    begin
-      Set (S, "I place 3 apples in the box");
       Assert
         (Value (S) = "I place 3 apples in the box",
          "Step_Text round-trips, got """ & Value (S) & """");
@@ -72,11 +68,10 @@ package body Fabula_Frames_Tests is
    procedure Test_Step_Truncation (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
-      S    : Step_Text;
       Long : constant String :=
         (Fabula.Limits.Max_Step_Text_Length + 10) * 'z';
+      S    : constant Step_Text := To_Step (Long);
    begin
-      Set (S, Long);
       Assert
         (Value (S)'Length = Fabula.Limits.Max_Step_Text_Length,
          "a step text over the cap truncates to the cap");

@@ -1,4 +1,5 @@
 with Fabula.Ast;
+with Fabula.Check;
 with Fabula.Expand;
 with Fabula.Format;
 with Fabula.Results;
@@ -75,6 +76,15 @@ is
          when Fabula.Results.Failed    => "failed",
          when Fabula.Results.Skipped   => "skipped",
          when Fabula.Results.Undefined => "undefined");
+
+   Line_Key : constant String := "line";
+
+   --  The "line" field of a feature, a scenario or a step: its line
+   --  number, as a JSON number.
+   function Line_Field
+     (Line : Line_Number; Depth : Fabula.Format.Depth_Value; More : Boolean)
+      return String
+   is (Fabula.Format.Number_Field (Line_Key, Natural (Line), Depth, More));
 
    ---------------------------------------------------------------------
    --  The Examples block and header row an outline row belongs to, and
@@ -398,7 +408,7 @@ is
            (Fabula.Format.String_Field
               ("error_message",
                Fabula.Format.Escape_Json
-                 (N.Outcome.Msg (1 .. N.Outcome.Msg_Len)),
+                 (Fabula.Check.Failure_Text (N.Outcome)),
                Fabula.Format.Match_Result_Fields_Depth,
                True));
       elsif N.Status = Fabula.Results.Undefined then
@@ -455,8 +465,7 @@ is
             Fabula.Format.Step_Fields_Depth,
             True));
       Write_Line
-        (Fabula.Format.Number_Field
-           ("line", Info.Step_Line, Fabula.Format.Step_Fields_Depth, True));
+        (Line_Field (Info.Step_Line, Fabula.Format.Step_Fields_Depth, True));
       Write_Line
         (Fabula.Format.Open_Named_Object
            ("match", Fabula.Format.Step_Fields_Depth));
@@ -511,11 +520,8 @@ is
             Fabula.Format.Scenario_Fields_Depth,
             True));
       Write_Line
-        (Fabula.Format.Number_Field
-           ("line",
-            Info.Scenario_Line,
-            Fabula.Format.Scenario_Fields_Depth,
-            True));
+        (Line_Field
+           (Info.Scenario_Line, Fabula.Format.Scenario_Fields_Depth, True));
       Write_Line
         (Fabula.Format.String_Field
            ("name",
@@ -629,8 +635,7 @@ is
             Fabula.Format.Feature_Fields_Depth,
             True));
       Write_Line
-        (Fabula.Format.Number_Field
-           ("line", Head.Line, Fabula.Format.Feature_Fields_Depth, True));
+        (Line_Field (Head.Line, Fabula.Format.Feature_Fields_Depth, True));
       Write_Line
         (Fabula.Format.String_Field
            ("name",

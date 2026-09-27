@@ -15,50 +15,51 @@ is
    Fail_Step_Default     : constant String :=
      "Step set to failed with Fabula.Check.Fail_Step";
 
+   --  A failed comparison, in the reference interpreter's words:
+   --  "Value <Got> <relation> <Want>", the relation one of the phrases
+   --  below.
+   Mismatch_Prefix     : constant String := "Value ";
+   Not_Equal_Phrase    : constant String := " is not equal to ";
+   Equal_Phrase        : constant String := " is equal to ";
+   Not_Greater_Phrase  : constant String := " is not greater than ";
+   Not_At_Least_Phrase : constant String :=
+     " is not greater than or equal to ";
+   Not_Less_Phrase     : constant String := " is not less than ";
+   Not_At_Most_Phrase  : constant String := " is not less than or equal to ";
+
+   --  A failed read: "<What> is not a valid <type>: <reason>".
+   Not_Valid_Phrase : constant String := " is not a valid ";
+   Reason_Separator : constant String := ": ";
+
+   --  The blank 'Image puts before a value with no minus sign.
+   Sign_Blank : constant Character := ' ';
+
    --  Clears Passing and the message, leaving Order untouched: callers
    --  that also change Order (Fail) set it themselves right after.
-   procedure Begin_Failure (R : in out Outcome) is
+   procedure Begin_Failure (R : in out Outcome)
+   with Post => not R.Passing and then R.Order = R.Order'Old
+   is
    begin
       R.Passing := False;
-      R.Msg := [others => ' '];
-      R.Msg_Len := 0;
+      R.Message := Texts.Empty (Limits.Max_Message_Length);
    end Begin_Failure;
 
-   --  Copies as much of Piece as still fits past R.Msg_Len; the rest is
-   --  dropped.  The loop bound is R.Msg_Len itself, never an offset
-   --  read off Piece, so this is safe for any Piece regardless of its
-   --  own bounds.  The contract lets gnatprove verify this once and
-   --  reuse it at every call site, rather than inlining and re-proving
-   --  the loop at each one.
+   --  Copies as much of Piece as still fits after the message; the rest
+   --  is dropped.
    procedure Append_Message (R : in out Outcome; Piece : String)
    with
-     Pre  => R.Msg_Len <= Limits.Max_Message_Length,
      Post =>
-       R.Msg_Len in R.Msg_Len'Old .. Limits.Max_Message_Length
-       and then R.Passing = R.Passing'Old
-       and then R.Order = R.Order'Old;
-
-   procedure Append_Message (R : in out Outcome; Piece : String) is
+       R.Passing = R.Passing'Old
+       and then R.Order = R.Order'Old
+       and then Texts.Length (R.Message) >= Texts.Length (R.Message'Old)
+   is
    begin
-      for J in Piece'Range loop
-         pragma
-           Loop_Invariant
-             (R.Msg_Len in R.Msg_Len'Loop_Entry .. Limits.Max_Message_Length
-                and then R.Passing = R.Passing'Loop_Entry
-                and then R.Order = R.Order'Loop_Entry);
-         exit when R.Msg_Len = Limits.Max_Message_Length;
-         R.Msg_Len := R.Msg_Len + 1;
-         R.Msg (R.Msg_Len) := Piece (J);
-      end loop;
+      Texts.Append_Truncated (R.Message, Piece);
    end Append_Message;
 
    procedure Reset (R : out Outcome) is
    begin
-      R :=
-        (Passing => True,
-         Order   => Continue,
-         Msg     => [others => ' '],
-         Msg_Len => 0);
+      R := (others => <>);
    end Reset;
 
    procedure Record_Failure (R : in out Outcome; Message : String) is
@@ -66,6 +67,29 @@ is
       Begin_Failure (R);
       Append_Message (R, Message);
    end Record_Failure;
+
+   --  The one message path of every failed comparison: the caller's
+   --  own Message when it gives one, else "Value <Got> <Phrase> <Want>".
+   --  Text_Equal passes its two texts as they are; a Compare instance
+   --  computes the two images only when it reports the default message
+   --  (Compare.Mismatch), so a caller's Message costs no Image call.
+   procedure Report_Mismatch
+     (R          : in out Outcome;
+      Got_Image  : String;
+      Phrase     : String;
+      Want_Image : String;
+      Message    : String) is
+   begin
+      if Message'Length > 0 then
+         Record_Failure (R, Message);
+      else
+         Begin_Failure (R);
+         Append_Message (R, Mismatch_Prefix);
+         Append_Message (R, Got_Image);
+         Append_Message (R, Phrase);
+         Append_Message (R, Want_Image);
+      end if;
+   end Report_Mismatch;
 
    procedure Is_True
      (R : in out Outcome; Condition : Boolean; Message : String := "") is
@@ -89,128 +113,85 @@ is
 
    package body Compare is
 
-      --  "Value {} is not equal to {}"
+      --  A failed comparison.  Got and Want are imaged only for the
+      --  default message: Image is the caller's own function and may be
+      --  costly, or raise, and a caller's Message does not need it.
+      procedure Mismatch
+        (R       : in out Outcome;
+         Got     : Item;
+         Want    : Item;
+         Phrase  : String;
+         Message : String) is
+      begin
+         if Message'Length > 0 then
+            Record_Failure (R, Message);
+         else
+            Report_Mismatch (R, Image (Got), Phrase, Image (Want), "");
+         end if;
+      end Mismatch;
+
       procedure Equal
         (R : in out Outcome; Got, Want : Item; Message : String := "") is
       begin
-         if Got = Want then
-            return;
+         if not (Got = Want) then
+            Mismatch (R, Got, Want, Not_Equal_Phrase, Message);
          end if;
-         if Message'Length > 0 then
-            Record_Failure (R, Message);
-            return;
-         end if;
-         Begin_Failure (R);
-         Append_Message (R, "Value ");
-         Append_Message (R, Image (Got));
-         Append_Message (R, " is not equal to ");
-         Append_Message (R, Image (Want));
       end Equal;
 
-      --  "Value {} is equal to {}"
       procedure Not_Equal
         (R : in out Outcome; Got, Want : Item; Message : String := "") is
       begin
-         if Got /= Want then
-            return;
+         if Got = Want then
+            Mismatch (R, Got, Want, Equal_Phrase, Message);
          end if;
-         if Message'Length > 0 then
-            Record_Failure (R, Message);
-            return;
-         end if;
-         Begin_Failure (R);
-         Append_Message (R, "Value ");
-         Append_Message (R, Image (Got));
-         Append_Message (R, " is equal to ");
-         Append_Message (R, Image (Want));
       end Not_Equal;
 
-      --  "Value {} is not greater than {}"
       --  Got > Want, expressed with the two formal operators as
       --  Want < Got.
       procedure Greater
         (R : in out Outcome; Got, Want : Item; Message : String := "") is
       begin
-         if Want < Got then
-            return;
+         if not (Want < Got) then
+            Mismatch (R, Got, Want, Not_Greater_Phrase, Message);
          end if;
-         if Message'Length > 0 then
-            Record_Failure (R, Message);
-            return;
-         end if;
-         Begin_Failure (R);
-         Append_Message (R, "Value ");
-         Append_Message (R, Image (Got));
-         Append_Message (R, " is not greater than ");
-         Append_Message (R, Image (Want));
       end Greater;
 
-      --  "Value {} is not greater than or equal to {}"
       --  Got >= Want, expressed as not (Got < Want).
       procedure Greater_Or_Equal
         (R : in out Outcome; Got, Want : Item; Message : String := "") is
       begin
-         if not (Got < Want) then
-            return;
+         if Got < Want then
+            Mismatch (R, Got, Want, Not_At_Least_Phrase, Message);
          end if;
-         if Message'Length > 0 then
-            Record_Failure (R, Message);
-            return;
-         end if;
-         Begin_Failure (R);
-         Append_Message (R, "Value ");
-         Append_Message (R, Image (Got));
-         Append_Message (R, " is not greater than or equal to ");
-         Append_Message (R, Image (Want));
       end Greater_Or_Equal;
 
-      --  "Value {} is not less than {}"
       procedure Less
         (R : in out Outcome; Got, Want : Item; Message : String := "") is
       begin
-         if Got < Want then
-            return;
+         if not (Got < Want) then
+            Mismatch (R, Got, Want, Not_Less_Phrase, Message);
          end if;
-         if Message'Length > 0 then
-            Record_Failure (R, Message);
-            return;
-         end if;
-         Begin_Failure (R);
-         Append_Message (R, "Value ");
-         Append_Message (R, Image (Got));
-         Append_Message (R, " is not less than ");
-         Append_Message (R, Image (Want));
       end Less;
 
-      --  "Value {} is not less than or equal to {}"
       --  Got <= Want, expressed as not (Want < Got).
       procedure Less_Or_Equal
         (R : in out Outcome; Got, Want : Item; Message : String := "") is
       begin
-         if not (Want < Got) then
-            return;
+         if Want < Got then
+            Mismatch (R, Got, Want, Not_At_Most_Phrase, Message);
          end if;
-         if Message'Length > 0 then
-            Record_Failure (R, Message);
-            return;
-         end if;
-         Begin_Failure (R);
-         Append_Message (R, "Value ");
-         Append_Message (R, Image (Got));
-         Append_Message (R, " is not less than or equal to ");
-         Append_Message (R, Image (Want));
       end Less_Or_Equal;
 
       procedure Fail_Read
         (R     : in out Outcome;
          Error : Numbers.Read_Error;
-         What  : String := "Value") is
+         What  : String := Unnamed_Value) is
       begin
          Begin_Failure (R);
-         Append_Message (R, (if What'Length > 0 then What else "Value"));
-         Append_Message (R, " is not a valid ");
+         Append_Message (R, (if What'Length > 0 then What else Unnamed_Value));
+         Append_Message (R, Not_Valid_Phrase);
          Append_Message (R, Item_Reads.Name);
-         Append_Message (R, ": ");
+         Append_Message (R, Reason_Separator);
          Append_Message (R, Numbers.Reason (Error));
       end Fail_Read;
 
@@ -304,99 +285,52 @@ is
 
    end Compare;
 
-   --  Trims the leading blank the reference interpreter's own formatter
-   --  never adds -- checked on the character itself, never on I's
-   --  sign, since -0.0 compares >= 0.0 yet 'Image still gives it a
-   --  real '-' (Real_Image's reason for being this way).  The loop
-   --  invariant relates Len to the loop index J, not to Raw's own
-   --  bounds, so this cannot overflow.
-   function Integer_Image (I : Integer) return String is
-      Raw    : constant String := Integer'Image (I);
-      Result : String (1 .. Raw'Length) := [others => ' '];
-      Len    : Natural := 0;
+   --  Raw re-based to start at 1, less the blank 'Image puts before a
+   --  value with no minus sign (the reference interpreter's formatter
+   --  puts none).  The blank is found on the character itself, never on
+   --  the value's sign: -0.0 compares >= 0.0, yet its 'Image carries a
+   --  real '-' (confirmed against this GNAT: Long_Float'Image (-0.0) =
+   --  "-0.0...E+00"), which must stay.  The loop invariant relates Len
+   --  to the loop index J, not to Raw's own bounds, so this cannot
+   --  overflow.
+   function Without_Leading_Blank (Raw : String) return String is
+      Nothing_Kept : constant := 0;
+      Result       : String (1 .. Raw'Length) := [others => Sign_Blank];
+      Len          : Natural := Nothing_Kept;
    begin
       for J in Raw'Range loop
          pragma Loop_Invariant (Len <= J - Raw'First);
-         if J = Raw'First and then Raw (J) = ' ' then
-            null;
-         else
+         if J /= Raw'First or else Raw (J) /= Sign_Blank then
             Len := Len + 1;
             Result (Len) := Raw (J);
          end if;
       end loop;
       return Result (1 .. Len);
-   end Integer_Image;
+   end Without_Leading_Blank;
 
-   function Long_Image (I : Long_Long_Integer) return String is
-      Raw    : constant String := Long_Long_Integer'Image (I);
-      Result : String (1 .. Raw'Length) := [others => ' '];
-      Len    : Natural := 0;
-   begin
-      for J in Raw'Range loop
-         pragma Loop_Invariant (Len <= J - Raw'First);
-         if J = Raw'First and then Raw (J) = ' ' then
-            null;
-         else
-            Len := Len + 1;
-            Result (Len) := Raw (J);
-         end if;
-      end loop;
-      return Result (1 .. Len);
-   end Long_Image;
+   function Integer_Image (I : Integer) return String
+   is (Without_Leading_Blank (Integer'Image (I)));
 
-   --  -0.0 = 0.0 under "=" and "<", but the reference interpreter's
-   --  formatter still prints its sign (confirmed against this GNAT:
-   --  Long_Float'Image (-0.0) = "-0.0...E+00", not " 0.0...E+00"), so
-   --  checking the character, not I's sign, is what keeps it.
-   function Real_Image (I : Long_Float) return String is
-      Raw    : constant String := Long_Float'Image (I);
-      Result : String (1 .. Raw'Length) := [others => ' '];
-      Len    : Natural := 0;
-   begin
-      for J in Raw'Range loop
-         pragma Loop_Invariant (Len <= J - Raw'First);
-         if J = Raw'First and then Raw (J) = ' ' then
-            null;
-         else
-            Len := Len + 1;
-            Result (Len) := Raw (J);
-         end if;
-      end loop;
-      return Result (1 .. Len);
-   end Real_Image;
+   function Long_Image (I : Long_Long_Integer) return String
+   is (Without_Leading_Blank (Long_Long_Integer'Image (I)));
+
+   function Real_Image (I : Long_Float) return String
+   is (Without_Leading_Blank (Long_Float'Image (I)));
 
    procedure Text_Equal
      (R : in out Outcome; Got, Want : String; Message : String := "") is
    begin
-      if Got = Want then
-         return;
+      if Got /= Want then
+         Report_Mismatch (R, Got, Not_Equal_Phrase, Want, Message);
       end if;
-      if Message'Length > 0 then
-         Record_Failure (R, Message);
-         return;
-      end if;
-      Begin_Failure (R);
-      Append_Message (R, "Value ");
-      Append_Message (R, Got);
-      Append_Message (R, " is not equal to ");
-      Append_Message (R, Want);
    end Text_Equal;
 
    procedure Text_Not_Equal
      (R : in out Outcome; Got, Want : String; Message : String := "") is
    begin
-      if Got /= Want then
-         return;
+      if Got = Want then
+         Report_Mismatch (R, Got, Equal_Phrase, Want, Message);
       end if;
-      if Message'Length > 0 then
-         Record_Failure (R, Message);
-         return;
-      end if;
-      Begin_Failure (R);
-      Append_Message (R, "Value ");
-      Append_Message (R, Got);
-      Append_Message (R, " is equal to ");
-      Append_Message (R, Want);
    end Text_Not_Equal;
 
    procedure Skip (R : in out Outcome) is

@@ -1,4 +1,5 @@
 with Fabula.Line_Parts;
+with Fabula.Searches;
 
 package body Fabula.Scan
   with SPARK_Mode
@@ -154,17 +155,15 @@ is
        Find_First_Non_Whitespace'Result = Line_Parts.No_Position
        or else Find_First_Non_Whitespace'Result in Line'Range
    is
+      function Is_Content (I : Positive) return Boolean
+      is (I in Line'Range and then Line (I) not in Space_Tab_Or_Return);
+
+      function First_Content is new Searches.Find_First (Is_Content);
    begin
-      for I in Line'Range loop
-         pragma
-           Loop_Invariant
-             (for all J in Line'First .. I - 1 =>
-                Line (J) in Space_Tab_Or_Return);
-         if Line (I) not in Space_Tab_Or_Return then
-            return I;
-         end if;
-      end loop;
-      return Line_Parts.No_Position;
+      if Line'Length = 0 then
+         return Line_Parts.No_Position;
+      end if;
+      return First_Content (Line'First, Line'Last);
    end Find_First_Non_Whitespace;
 
    function Find_Content_End

@@ -268,18 +268,18 @@ package body Fabula_Format_Json_Tests is
           +"      | a |",
           +"      | 3 |"]);
       Ref := First_Example (Doc, 1);
-      Assert (Ref.Block /= 0, "the first block has a data row");
-      Block := Ref.Block;
+      Assert (Ref.Status = Row_Due, "the first block has a data row");
+      Block := Block_Of (Ref);
       Occurrence := 1;
       Assert
         (Scenario_Id ("f", "", "o", Occurrence) = "(1) f;o", "block 1, row 1");
       Ref := Next_Example (Doc, 1, Ref);
-      Occurrence := (if Ref.Block = Block then Occurrence + 1 else 1);
-      Block := Ref.Block;
+      Occurrence := (if Block_Of (Ref) = Block then Occurrence + 1 else 1);
+      Block := Block_Of (Ref);
       Assert
         (Scenario_Id ("f", "", "o", Occurrence) = "(2) f;o", "block 1, row 2");
       Ref := Next_Example (Doc, 1, Ref);
-      Occurrence := (if Ref.Block = Block then Occurrence + 1 else 1);
+      Occurrence := (if Block_Of (Ref) = Block then Occurrence + 1 else 1);
       Assert
         (Scenario_Id ("f", "", "o", Occurrence) = "(1) f;o",
          "block 2, row 1 restarts the count");

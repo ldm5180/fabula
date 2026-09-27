@@ -36,9 +36,18 @@ is
      Static_Predicate =>
        White_Space in Space_Tab_Or_Return | ASCII.LF | ASCII.VT | ASCII.FF;
 
-   --  A feature file's lines are numbered from 1, so line 0 names none:
-   --  the line of an event or a refusal before any line was read.
-   No_Line : constant := 0;
+   --  A line of a feature file, by its number.  A type of its own, so a
+   --  line number used as a length, a column or a count, or the other
+   --  way round, does not compile.  Lines are numbered from First_Line,
+   --  so No_Line names none: the line of an event or a refusal before
+   --  any line was read.
+   type Line_Number is new Natural;
+
+   No_Line    : constant Line_Number := 0;
+   First_Line : constant Line_Number := 1;
+
+   --  A line that exists in the file.
+   subtype Source_Line is Line_Number range First_Line .. Line_Number'Last;
 
    --  The index of a line's first character, in every line the scanner,
    --  the parser and the runner read.

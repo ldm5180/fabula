@@ -19,6 +19,7 @@ with Fabula.Results;
 with Fabula.Run;
 with Fabula.Scan;
 with Fabula.Tags;
+with Fabula.Texts;
 
 package Fabula_Closure_Proof
   with SPARK_Mode
@@ -94,6 +95,10 @@ is
 
    --  A Frame's bounded fields, filled and read back.
    procedure Closure_Frame (F : in out Fabula.Frames.Frame);
+
+   --  Bounded text: its contracts fix the exact text that Truncated,
+   --  Append and Append_Truncated keep.  Kept is the final length.
+   procedure Closure_Texts (Kept : out Natural);
 
    --  argv as the shell hands it over: a flag needing a value, a
    --  pre-merged --report-json=FILE, an unknown flag.  Reaches every

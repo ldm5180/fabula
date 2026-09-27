@@ -10,6 +10,11 @@ package body Fabula_Parse_Tests is
 
    use AUnit.Test_Cases.Registration;
    use type Fabula.Scan.Fence_Kind;
+   use type Fabula.Line_Number;
+   use type Doc_Line_Range;
+   use type Examples_Row_Range;
+   use type Row_Range;
+   use type Tag_Range;
 
    function "+" (Source : String) return Unbounded_String
    renames To_Unbounded_String;
@@ -29,7 +34,7 @@ package body Fabula_Parse_Tests is
    begin
       Start (P, Doc);
       for I in Source'Range loop
-         Feed (P, Doc, To_String (Source (I)), I);
+         Feed (P, Doc, To_String (Source (I)), Fabula.Source_Line (I));
       end loop;
       Finish (P, Doc);
    end Run;
@@ -45,8 +50,8 @@ package body Fabula_Parse_Tests is
       Assert (not Failed (P), What & ": must parse, got " & Outcome);
    end Assert_Parses;
 
-   procedure Assert_Refuses (Kind : Error_Kind; Line : Natural; What : String)
-   is
+   procedure Assert_Refuses
+     (Kind : Error_Kind; Line : Fabula.Line_Number; What : String) is
    begin
       Assert
         (Error (P) = (Kind, Line),

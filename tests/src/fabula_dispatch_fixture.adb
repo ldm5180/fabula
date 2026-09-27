@@ -97,7 +97,7 @@ package body Fabula_Dispatch_Fixture is
 
    --  A failing outcome's message, after a colon; nothing otherwise.
    function Message (O : Fabula.Check.Outcome) return String
-   is (if O.Passing then "" else ": " & O.Msg (1 .. O.Msg_Len));
+   is (if O.Passing then "" else ": " & Fabula.Check.Failure_Text (O));
 
    --  One notice, named from the frame the drive loop hands over.
    generic

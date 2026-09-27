@@ -56,7 +56,7 @@ package body Fabula_Corpus_Tests is
             Assert
               (Line'Length <= Fabula.Limits.Max_Line_Length,
                Name & " line" & Number'Image & " is over the line limit");
-            Feed (P, Doc, Line, Number);
+            Feed (P, Doc, Line, Fabula.Source_Line (Number));
          end;
       end loop;
       Finish (P, Doc);

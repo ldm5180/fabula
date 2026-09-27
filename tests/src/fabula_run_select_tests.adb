@@ -307,7 +307,9 @@ package body Fabula_Run_Select_Tests is
    begin
       for Number of Numbers loop
          Noted_Run.Add_Line
-           (Result, Positive'Value (Ada.Strings.Unbounded.To_String (Number)));
+           (Result,
+            Fabula.Source_Line'Value
+              (Ada.Strings.Unbounded.To_String (Number)));
       end loop;
       return Result;
    end Selecting;

@@ -46,14 +46,14 @@ is
    end Trimmed;
 
    function Fence_Run
-     (Line : String; From : Positive; To : Natural) return Natural is
+     (Line : String; From : Positive; To : Natural) return Natural
+   is
+      function Opens_Fence (I : Positive) return Boolean
+      is (Is_Line (Line) and then Fence_At (Line, I));
+
+      function First_Fence is new Searches.Find_First (Opens_Fence);
    begin
-      for I in From .. To - (Scan.Fence_Length - 1) loop
-         if Fence_At (Line, I) then
-            return I;
-         end if;
-      end loop;
-      return No_Position;
+      return First_Fence (From, To - (Scan.Fence_Length - 1));
    end Fence_Run;
 
    --  The first index in From .. To + 1 whose character is not

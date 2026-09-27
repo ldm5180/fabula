@@ -22,7 +22,7 @@ is
 
    type Refusal is record
       Kind : Error_Kind := None;
-      Line : Natural := No_Line;
+      Line : Line_Number := No_Line;
    end record;
 
    type Parser is private;   --  the sml machine plus its working state
@@ -39,7 +39,7 @@ is
      (P      : in out Parser;
       Doc    : in out Fabula.Ast.Document;
       Line   : String;
-      Number : Positive)
+      Number : Source_Line)
    with
      Pre =>
        Line'First = First_Column
@@ -58,7 +58,7 @@ private
       Machine   : Grammar.SM.Machine (Grammar.Rows);
       Work      : Grammar.Work;
       Error     : Refusal;
-      Last_Line : Natural := No_Line;
+      Last_Line : Line_Number := No_Line;
    end record;
 
    function Failed (P : Parser) return Boolean

@@ -17,7 +17,8 @@ package body Fabula_Fixtures is
    begin
       Fabula.Parse.Start (P, Doc);
       for I in Source'Range loop
-         Fabula.Parse.Feed (P, Doc, To_String (Source (I)), I);
+         Fabula.Parse.Feed
+           (P, Doc, To_String (Source (I)), Fabula.Source_Line (I));
       end loop;
       Fabula.Parse.Finish (P, Doc);
    end Parse_Lines;

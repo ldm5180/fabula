@@ -1,6 +1,7 @@
 with AUnit.Assertions;  use AUnit.Assertions;
 with Ada.Strings.Fixed; use Ada.Strings.Fixed;
 
+with Fabula;
 with Fabula.Ast;    use Fabula.Ast;
 with Fabula.Expand; use Fabula.Expand;
 with Fabula.Limits;
@@ -11,6 +12,7 @@ with Fabula_Fixtures; use Fabula_Fixtures;
 package body Fabula_Expand_Tests is
 
    use AUnit.Test_Cases.Registration;
+   use type Fabula.Line_Number;
 
    --  A document is a megabyte-scale record: it lives at library level,
    --  never on a test routine's stack.
@@ -103,8 +105,12 @@ package body Fabula_Expand_Tests is
    begin
       Load (Substitution_Doc);
       Assert (Sub (Fits).Ok, "an expansion to exactly the limit fits");
-      Assert (Sub (Fits).Len = Max, "and fills it");
+      Assert (Value (Sub (Fits))'Length = Max, "and fills it");
       Assert (not Sub (Over).Ok, "one character more refuses");
+      Assert (Value_Or (Sub ("<a>"), "kept") = "1", "Value_Or of a good one");
+      Assert
+        (Value_Or (Sub (Over), "kept") = "kept",
+         "Value_Or of a refused one is the default");
       Assert
         (not Substituted (Doc, "<a>", Header, Examples_Row_Count (Doc) + 1).Ok,
          "a row handle past the pool refuses");
@@ -118,9 +124,12 @@ package body Fabula_Expand_Tests is
    ---------------------------------------------------------------------
 
    procedure Assert_Concrete
-     (Ref : Example_Ref; S : Scenario_Index; Name : String; Line : Natural) is
+     (Ref  : Example_Ref;
+      S    : Scenario_Index;
+      Name : String;
+      Line : Fabula.Line_Number) is
    begin
-      Assert (Ref.Block /= 0, Name & ": a concrete scenario is due");
+      Assert (Ref.Status = Row_Due, Name & ": a concrete scenario is due");
       Assert
         (Value (Concrete_Name (Doc, S, Ref.Header_Row, Ref.Data_Row)) = Name,
          "expected """
@@ -147,11 +156,14 @@ package body Fabula_Expand_Tests is
       Ref := Next_Example (Doc, 1, Ref);
       Assert_Concrete (Ref, 1, "Scenario Outline with ""bananas""", 12);
       Ref := Next_Example (Doc, 1, Ref);
-      Assert (Ref.Block = 0 and then not Ref.Stale, "two rows, then done");
+      Assert (Ref.Status = Ended, "two rows, then done");
       Ref := First_Example (Doc, 2);
       Assert_Concrete (Ref, 2, "Alternative Keywords", 21);
       Ref := Next_Example (Doc, 2, Next_Example (Doc, 2, Ref));
-      Assert (Ref.Block = 0 and then not Ref.Stale, "two rows, then done");
+      Assert (Ref.Status = Ended, "two rows, then done");
+      Assert
+        (Next_Example (Doc, 2, Ref).Status = Ended,
+         "an ended walk stays ended");
    end Test_Concrete_Scenarios;
 
    --  Every data row of every outline is one concrete scenario: the
@@ -165,11 +177,11 @@ package body Fabula_Expand_Tests is
       Load ("6_tables.feature");
       for S in 1 .. Scenario_Count (Doc) loop
          Ref := First_Example (Doc, S);
-         while Ref.Block /= 0 loop
+         while Ref.Status = Row_Due loop
             Total := Total + 1;
             Ref := Next_Example (Doc, S, Ref);
          end loop;
-         Assert (not Ref.Stale, "no stored range runs past its pool");
+         Assert (Ref.Status /= Stale, "no stored range runs past its pool");
       end loop;
       Assert (Total = 7, "the manifest's 7 rows, got" & Total'Image);
    end Test_Concrete_Count;
@@ -327,9 +339,10 @@ package body Fabula_Expand_Tests is
       +"      | 3 |"];
 
    procedure Assert_Row
-     (Ref : Example_Ref; Value_Text : String; Line : Natural) is
+     (Ref : Example_Ref; Value_Text : String; Line : Fabula.Line_Number) is
    begin
-      Assert (Ref.Block /= 0, Value_Text & ": a concrete scenario is due");
+      Assert
+        (Ref.Status = Row_Due, Value_Text & ": a concrete scenario is due");
       Assert
         (Concrete_Line (Doc, Ref.Data_Row) = Line,
          Value_Text
@@ -357,7 +370,7 @@ package body Fabula_Expand_Tests is
       Ref := Next_Example (Doc, 1, Ref);
       Assert_Row (Ref, "3", 12);
       Ref := Next_Example (Doc, 1, Ref);
-      Assert (Ref.Block = 0 and then not Ref.Stale, "three rows, then done");
+      Assert (Ref.Status = Ended, "three rows, then done");
    end Test_Example_Blocks;
 
    ---------------------------------------------------------------------

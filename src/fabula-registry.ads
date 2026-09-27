@@ -8,7 +8,10 @@
 --  starts each scenario from a default-initialized one.
 with Fabula.Expressions;
 with Fabula.Limits;
+with Fabula.Searches;
 with Fabula.Tags;
+
+private with Fabula.Texts;
 
 generic
    type Step_Kind is (<>);
@@ -90,21 +93,24 @@ package Fabula.Registry with SPARK_Mode is
    function Hooks_Valid (T : Hook_Table) return Boolean
    is (for all I in T'Range => Hook_Status (T, I) = Row_Ok);
 
+   --  A row index that names no row.
+   No_Row : constant Natural := Searches.Not_Found;
+
    function First_Bad (T : Step_Table) return Natural
    with
      Post =>
-       (First_Bad'Result = 0) = Steps_Valid (T)
-       and then (if First_Bad'Result /= 0
+       (First_Bad'Result = No_Row) = Steps_Valid (T)
+       and then (if First_Bad'Result /= No_Row
                  then
                    First_Bad'Result in T'Range
                    and then Step_Status (T, First_Bad'Result) /= Row_Ok);
-   --  0 when every row is good.
+   --  No_Row when every row is good.
 
    function First_Bad_Hook (T : Hook_Table) return Natural
    with
      Post =>
-       (First_Bad_Hook'Result = 0) = Hooks_Valid (T)
-       and then (if First_Bad_Hook'Result /= 0
+       (First_Bad_Hook'Result = No_Row) = Hooks_Valid (T)
+       and then (if First_Bad_Hook'Result /= No_Row
                  then
                    First_Bad_Hook'Result in T'Range
                    and then Hook_Status (T, First_Bad_Hook'Result) /= Row_Ok);
@@ -124,7 +130,7 @@ package Fabula.Registry with SPARK_Mode is
 
    type Match_Result is record
       Found    : Boolean := False;
-      Index    : Natural := 0;          --  row index in the table
+      Index    : Natural := No_Row;          --  row index in the table
       Captures : Expressions.Capture_List;
    end record;
 
@@ -132,7 +138,7 @@ package Fabula.Registry with SPARK_Mode is
    with
      Pre  =>
        Steps_Valid (T)
-       and then Text'First = 1
+       and then Text'First = First_Column
        and then Text'Length <= Limits.Max_Line_Length,
      Post =>
        (if Find'Result.Found
@@ -144,7 +150,8 @@ package Fabula.Registry with SPARK_Mode is
                                <= Text'Length
                       and then Find'Result.Captures.Items (I).Last
                                >= Find'Result.Captures.Items (I).First - 1)
-        else Find'Result.Index = 0 and then Find'Result.Captures.Count = 0);
+        else
+          Find'Result.Index = No_Row and then Find'Result.Captures.Count = 0);
    --  Captures are slices of Text, which the caller keeps alive while
    --  it reads them.
 
@@ -174,29 +181,29 @@ package Fabula.Registry with SPARK_Mode is
 
 private
 
-   subtype Pattern_Length is Natural range 0 .. Limits.Max_Pattern_Length;
-   subtype Tag_Expr_Length is Natural range 0 .. Limits.Max_Tag_Expr_Length;
+   --  A row's source as written, its first characters when it is longer
+   --  than the row keeps.
+   subtype Pattern_Source is Texts.Bounded_Text (Limits.Max_Pattern_Length);
+   subtype Tag_Expr_Source is Texts.Bounded_Text (Limits.Max_Tag_Expr_Length);
 
    --  Expressions.Valid (Pattern) is Compile's verdict; Bound records
    --  that ">=" named the kind.  Source keeps the pattern as written.
    type Step_Row is record
-      Pattern    : Expressions.Compiled;
-      Bound      : Boolean := False;
-      Kind       : Step_Kind := Step_Kind'First;
-      Source     : String (1 .. Limits.Max_Pattern_Length) := [others => ' '];
-      Source_Len : Pattern_Length := 0;
+      Pattern : Expressions.Compiled;
+      Bound   : Boolean := False;
+      Kind    : Step_Kind := Step_Kind'First;
+      Source  : Pattern_Source;
    end record;
 
    --  Has_Expr is False for an untagged hook, whose Expr is never
    --  read.  Source keeps the tag expression as written.
    type Hook_Row is record
-      Phase      : Hook_Phase := Run_Start;
-      Bound      : Boolean := False;
-      Kind       : Hook_Kind := Hook_Kind'First;
-      Has_Expr   : Boolean := False;
-      Expr       : Tags.Compiled;
-      Source     : String (1 .. Limits.Max_Tag_Expr_Length) := [others => ' '];
-      Source_Len : Tag_Expr_Length := 0;
+      Phase    : Hook_Phase := Run_Start;
+      Bound    : Boolean := False;
+      Kind     : Hook_Kind := Hook_Kind'First;
+      Has_Expr : Boolean := False;
+      Expr     : Tags.Compiled;
+      Source   : Tag_Expr_Source;
    end record;
 
    function Step_Status (T : Step_Table; Index : Positive) return Row_Status

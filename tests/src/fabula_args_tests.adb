@@ -59,17 +59,20 @@ package body Fabula_Args_Tests is
    is
       Node : constant Step_Node :=
         Step (Doc, Scenario (Doc, S).Steps.First + Step_Handle (N) - 1);
-      A    : List := Make (Text (Doc, Node.Text), No_Captures);
    begin
-      Attach (A, Doc_Ref, Node.Doc, Node.Table);
-      if Ref.Block /= 0 then
-         Set_Example (A, Ref.Header_Row, Ref.Data_Row);
-      end if;
-      return A;
+      return
+        Make
+          (Text (Doc, Node.Text),
+           No_Captures,
+           (Doc        => Doc_Ref,
+            Doc_String => Node.Doc,
+            Table      => Node.Table,
+            Header_Row => Fabula.Expand.Header_Row_Of (Ref),
+            Data_Row   => Fabula.Expand.Data_Row_Of (Ref)));
    end Step_Args;
 
    function Plain_Step (S : Scenario_Index; N : Positive) return List
-   is (Step_Args (S, N, (others => <>)));
+   is (Step_Args (S, N, Fabula.Expand.No_Example));
 
    ---------------------------------------------------------------------
    --  Captures.
