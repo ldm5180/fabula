@@ -10,6 +10,7 @@ with Fabula.Ast;
 with Fabula.Limits;
 with Fabula.Parse;
 with Fabula.Results;
+with Fabula.Texts;
 
 package Fabula.Format
   with SPARK_Mode
@@ -40,9 +41,25 @@ is
    --  Status words and the bracket label each step line opens with.
    ---------------------------------------------------------------------
 
+   --  The shortest and the longest status word.
+   Shortest_Status_Word : constant := 6;
+   Longest_Status_Word  : constant := 9;
+
    function Status_Word (S : Results.Status) return String
-   with Post => Status_Word'Result'Length in 6 .. 9;
+   with
+     Post =>
+       Status_Word'Result'Length
+       in Shortest_Status_Word .. Longest_Status_Word;
    --  "PASSED", "FAILED", "SKIPPED", "UNDEFINED".
+
+   --  The same words in lower case, as the JSON report's "status" and
+   --  the count summaries spell them.
+   function Status_Name (S : Results.Status) return String
+   with
+     Post =>
+       Status_Name'Result'Length
+       in Shortest_Status_Word .. Longest_Status_Word;
+   --  "passed", "failed", "skipped", "undefined".
 
    Bracket_Label_Length : constant := 16;
    --  "[" & 3 spaces & word & padding & "] ": the reference
@@ -63,14 +80,43 @@ is
 
    Max_Piece : constant := Limits.Max_Report_Line_Length;
 
+   --  What a header puts between its keyword and its name, and a step
+   --  between its keyword and its text.
+   Header_Separator : constant String := ": ";
+   Step_Separator   : constant String := " ";
+
    function Header_Text (Keyword, Name : String) return String
-   with Pre => Keyword'Length + 2 + Name'Length <= Max_Piece;
+   with
+     Pre =>
+       Keyword'Length + Header_Separator'Length + Name'Length <= Max_Piece;
    --  "<Keyword>: <Name>".
 
    function Step_Text (Keyword, Text : String) return String
-   with Pre => Keyword'Length + 1 + Text'Length <= Max_Piece;
+   with
+     Pre => Keyword'Length + Step_Separator'Length + Text'Length <= Max_Piece;
    --  "<Keyword> <Text>" -- a "*" keyword prints "* Text", the same
    --  one-space rule as every other keyword.
+
+   ---------------------------------------------------------------------
+   --  The document queries both reporters make of a notice.
+   ---------------------------------------------------------------------
+
+   --  S's keyword as written ("Scenario", "Example", "Scenario
+   --  Outline"...); "" for a stale S or none.
+   function Scenario_Keyword
+     (Doc : Ast.Document; S : Ast.Scenario_Handle) return String;
+
+   --  Step's keyword as the reference interpreter spells it; "" for a
+   --  stale Step or none.
+   function Step_Keyword
+     (Doc : Ast.Document; Step : Ast.Step_Handle) return String;
+
+   --  The header row of the Examples block of S that holds Data_Row;
+   --  No_Examples_Row for a plain scenario's step or a stale handle.
+   function Header_Row_For
+     (Doc      : Ast.Document;
+      S        : Ast.Scenario_Handle;
+      Data_Row : Ast.Examples_Row_Handle) return Ast.Examples_Row_Handle;
 
    Location_Extra : constant := 24;
    --  Two leading spaces, a colon and headroom for the line number's
@@ -165,8 +211,10 @@ is
 
    function Failed_Count (Store : Failed_Store) return Failed_Scenario_Count;
 
+   No_Failures : constant Failed_Scenario_Count := 0;
+
    function Has_Failures (Store : Failed_Store) return Boolean
-   is (Failed_Count (Store) > 0);
+   is (Failed_Count (Store) > No_Failures);
 
    --  Records one failed scenario; once Store is full, further calls
    --  are no-ops and the earliest entries still render.
@@ -286,6 +334,7 @@ is
    --  that holds it; twice Depth gives the indent the probe confirms.
    ---------------------------------------------------------------------
 
+   Feature_Object_Depth      : constant := 1;
    Feature_Fields_Depth      : constant := 2;
    Scenario_Object_Depth     : constant := 3;
    Scenario_Fields_Depth     : constant := 4;
@@ -306,6 +355,50 @@ is
 
    subtype Depth_Value is Positive range 1 .. Max_Depth;
 
+   --  Each depth indents by this many blanks.
+   Indent_Per_Depth : constant := 2;
+
+   --  The report's own brackets: it opens with Report_Open, separates
+   --  two features or two scenario elements with Element_Separator,
+   --  and ends with Report_Close, or is Empty_Report when no feature
+   --  ran.
+   Report_Open       : constant String := "[";
+   Element_Separator : constant String := ",";
+   Report_Close      : constant String := "]";
+   Empty_Report      : constant String := "[]";
+
+   --  The keys, in the reference interpreter's own spelling.
+   Arguments_Key     : constant String := "arguments";
+   Cells_Key         : constant String := "cells";
+   Content_Key       : constant String := "content";
+   Description_Key   : constant String := "description";
+   Elements_Key      : constant String := "elements";
+   Error_Message_Key : constant String := "error_message";
+   Id_Key            : constant String := "id";
+   Keyword_Key       : constant String := "keyword";
+   Line_Key          : constant String := "line";
+   Location_Key      : constant String := "location";
+   Match_Key         : constant String := "match";
+   Name_Key          : constant String := "name";
+   Result_Key        : constant String := "result";
+   Rows_Key          : constant String := "rows";
+   Status_Key        : constant String := "status";
+   Steps_Key         : constant String := "steps";
+   Tags_Key          : constant String := "tags";
+   Type_Key          : constant String := "type";
+   Uri_Key           : constant String := "uri";
+
+   --  The error message of an undefined step.
+   Undefined_Step_Message : constant String := "Undefined step";
+
+   --  The pieces that open and close an object or an array; a closer
+   --  with a comma when a sibling follows.
+   Object_Open       : constant String := "{";
+   Object_Close      : constant String := "}";
+   Object_Close_More : constant String := "},";
+   Array_Close       : constant String := "]";
+   Array_Close_More  : constant String := "],";
+
    function Escape_Json (Source : String) return String
    with
      Pre  => Source'Length <= Limits.Max_Line_Length,
@@ -317,13 +410,12 @@ is
    --  twice.
 
    type Joined_Text is record
-      Ok  : Boolean := False;
-      Len : Natural range 0 .. Limits.Max_Line_Length := 0;
-      Val : String (1 .. Limits.Max_Line_Length) := [others => ' '];
+      Ok   : Boolean := False;
+      Text : Texts.Line_Text;
    end record;
 
    function Value (J : Joined_Text) return String
-   is (J.Val (1 .. J.Len));
+   is (Texts.Value (J.Text));
 
    --  D's content lines, space-joined, one string (probe-verified: the
    --  oracle's own JSON report joins doc-string lines with a single
@@ -343,12 +435,15 @@ is
    function Description_Content
      (Doc : Ast.Document; S : Ast.Slice) return Joined_Text;
 
+   --  The occurrence of a plain scenario, which has none.
+   No_Occurrence : constant Natural := 0;
+
    --  A scenario's id: "<Feature_Name>;<Scenario_Name>", or, under a
    --  Rule, "<Feature_Name>;<Rule_Name>;<Scenario_Name>". Occurrence is
-   --  0 for a plain scenario; for an outline's concrete scenario the
-   --  id gains a "(N) " prefix, N the row's 1-based position within
-   --  its OWN Examples block (never across the whole scenario -- the
-   --  caller resets its counter on every block change). See
+   --  No_Occurrence for a plain scenario; for an outline's concrete
+   --  scenario the id gains a "(N) " prefix, N the row's 1-based
+   --  position within its OWN Examples block (never across the whole
+   --  scenario -- the caller resets its counter on every block change). See
    --  docs/report_wiring.md for the Rule-folding divergence this
    --  encodes and the probes behind both rules.
    function Scenario_Id
@@ -368,7 +463,10 @@ is
    --  is needed.
 
    function Open_Object (Depth : Depth_Value) return String
-   with Post => Open_Object'Result'Length = 2 * Depth + 1;
+   with
+     Post =>
+       Open_Object'Result'Length
+       = Indent_Per_Depth * Depth + Object_Open'Length;
 
    --  "match" and "result" open on the same line as their key (the
    --  probe: `"match": {`), unlike an array's own items, which open on
@@ -378,14 +476,22 @@ is
 
    function Close_Object (Depth : Depth_Value; More : Boolean) return String
    with
-     Post => Close_Object'Result'Length = 2 * Depth + (if More then 2 else 1);
+     Post =>
+       Close_Object'Result'Length
+       = Indent_Per_Depth
+         * Depth
+         + (if More then Object_Close_More'Length else Object_Close'Length);
 
    function Open_Array (Key : String; Depth : Depth_Value) return String
    with Pre => Key'Length <= Limits.Max_Name_Length;
 
    function Close_Array (Depth : Depth_Value; More : Boolean) return String
    with
-     Post => Close_Array'Result'Length = 2 * Depth + (if More then 2 else 1);
+     Post =>
+       Close_Array'Result'Length
+       = Indent_Per_Depth
+         * Depth
+         + (if More then Array_Close_More'Length else Array_Close'Length);
 
    function Empty_Array_Field
      (Key : String; Depth : Depth_Value; More : Boolean) return String
@@ -417,23 +523,21 @@ is
 private
 
    type Failed_Entry is record
-      Name     : String (1 .. Limits.Max_Name_Length) := [others => ' '];
-      Name_Len : Natural range 0 .. Limits.Max_Name_Length := 0;
-      File     : String (1 .. Limits.Max_Path_Length) := [others => ' '];
-      File_Len : Natural range 0 .. Limits.Max_Path_Length := 0;
-      Line     : Line_Number := No_Line;
+      Name : Texts.Bounded_Text (Limits.Max_Name_Length);
+      File : Texts.Bounded_Text (Limits.Max_Path_Length);
+      Line : Line_Number := No_Line;
    end record;
 
    type Failed_Entries is
      array (1 .. Limits.Max_Failed_Scenarios) of Failed_Entry;
 
    type Failed_Store is record
-      Count : Failed_Scenario_Count := 0;
+      Count : Failed_Scenario_Count := No_Failures;
       Items : Failed_Entries;
    end record;
 
    Empty_Failed_Store : constant Failed_Store :=
-     (Count => 0, Items => [others => <>]);
+     (Count => No_Failures, Items => [others => <>]);
 
    function Failed_Count (Store : Failed_Store) return Failed_Scenario_Count
    is (Store.Count);

@@ -23,12 +23,8 @@ package body Fabula_Fixtures is
       Fabula.Parse.Finish (P, Doc);
    end Parse_Lines;
 
-   --  The file is read whole and closed before the first Feed.
-   procedure Parse_Corpus
-     (Name : String;
-      P    : out Fabula.Parse.Parser;
-      Doc  : in out Fabula.Ast.Document)
-   is
+   --  The corpus file's lines, read whole; the file is closed again.
+   function Corpus_Lines (Name : String) return Lines is
       File : File_Type;
       Read : Line_Vectors.Vector;
    begin
@@ -37,14 +33,16 @@ package body Fabula_Fixtures is
          Read.Append (To_Unbounded_String (Get_Line (File)));
       end loop;
       Close (File);
-      declare
-         Source : Lines (1 .. Natural (Read.Length));
-      begin
-         for I in Source'Range loop
-            Source (I) := Read (I);
-         end loop;
-         Parse_Lines (Source, P, Doc);
-      end;
+      return [for I in 1 .. Natural (Read.Length) => Read (I)];
+   end Corpus_Lines;
+
+   --  The file is read whole and closed before the first Feed.
+   procedure Parse_Corpus
+     (Name : String;
+      P    : out Fabula.Parse.Parser;
+      Doc  : in out Fabula.Ast.Document) is
+   begin
+      Parse_Lines (Corpus_Lines (Name), P, Doc);
    end Parse_Corpus;
 
 end Fabula_Fixtures;

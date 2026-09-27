@@ -3,6 +3,7 @@
 --  run: Fabula.Shell.Program owns the instance and feeds it the current
 --  Document, the run's modes, and every notice in order.
 with Fabula.Args;
+with Fabula.Cli;
 with Fabula.Frames;
 with Fabula.Registry;
 with Fabula.Results;
@@ -16,8 +17,9 @@ package Fabula.Shell.Program_Console with SPARK_Mode => Off is
 
    procedure Set_Document (Doc : Fabula.Args.Document_Access);
 
-   procedure Set_Quiet (Quiet : Boolean);
-   procedure Set_Verbose (Verbose : Boolean);
+   --  Quiet hides the feature and scenario headers, the step lines and
+   --  the blank after each scenario; Verbose adds the -v lines.
+   procedure Set_Log_Level (Level : Fabula.Cli.Log_Level);
 
    --  -d marks every scenario Skipped before Scenario_Entered fires
    --  (Fabula.Run.Enter), so this alone is enough to print the verbose

@@ -58,6 +58,15 @@ package body Fabula_Console_Tests is
       Assert_Text (Reset, ESC & "[0m", "Reset");
    end Test_Codes;
 
+   --  With styling off, no style adds a code.
+   procedure Check_Styling_Off is
+   begin
+      Set_Color (False);
+      for S in Style loop
+         Assert_Text (Styled ("x", S), "x", S'Image & " with styling off");
+      end loop;
+   end Check_Styling_Off;
+
    procedure Test_Styled (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
       Was : constant Boolean := Color;
@@ -68,10 +77,7 @@ package body Fabula_Console_Tests is
            (Styled ("x", S), Probed (S) & "x" & ESC & "[0m", S'Image);
       end loop;
       Assert_Text (Styled ("x", Plain), "x", "Plain never styles");
-      Set_Color (False);
-      for S in Style loop
-         Assert_Text (Styled ("x", S), "x", S'Image & " with styling off");
-      end loop;
+      Check_Styling_Off;
       Set_Color (Was);
    end Test_Styled;
 
@@ -143,9 +149,41 @@ package body Fabula_Console_Tests is
       Assert (not Write_Failed, "every write succeeded");
    end Test_Put;
 
+   procedure Write_Lines is
+   begin
+      Set_Color (True);
+      Put_Line ("a", Failed);
+      Put_Line ("b");
+      Set_Color (False);
+      Put_Line ("c", Error);
+   end Write_Lines;
+
+   --  A line is its styled text, then an unstyled line feed.
+   procedure Test_Put_Line (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Was : constant Boolean := Color;
+      Got : constant String :=
+        Fabula_Shell_Scratch.Capture (Write_Lines'Access);
+   begin
+      Set_Color (Was);
+      Assert_Text
+        (Got,
+         ESC
+         & "[31ma"
+         & ESC
+         & "[0m"
+         & ASCII.LF
+         & "b"
+         & ASCII.LF
+         & "c"
+         & ASCII.LF,
+         "the captured lines");
+   end Test_Put_Line;
+
    overriding
    procedure Register_Tests (T : in out Test) is
    begin
+      Register_Routine (T, Test_Put_Line'Access, "Put_Line ends a line");
       Register_Routine (T, Test_Codes'Access, "the probed style codes");
       Register_Routine (T, Test_Styled'Access, "styling on and off");
       Register_Routine (T, Test_No_Color'Access, "the NO_COLOR rule");

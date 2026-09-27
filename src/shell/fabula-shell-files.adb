@@ -5,6 +5,8 @@ with Ada.Streams.Stream_IO;
 with Ada.Strings.Fixed;
 
 with Fabula.Ast;
+with Fabula.Cli;
+with Fabula.Numbers;
 
 package body Fabula.Shell.Files
   with SPARK_Mode => Off
@@ -17,25 +19,15 @@ is
    --  Split.
    ---------------------------------------------------------------------
 
+   --  What separates a path from a line selection, and one selection
+   --  from the next.
+   Selection_Mark : constant String := ":";
+
+   --  Where Index answers that no mark is left.
+   No_Mark : constant Natural := 0;
+
    function All_Digits (S : String) return Boolean
    is (for all C of S => C in Decimal_Digit);
-
-   --  The line a group of digits names; 0 for an empty group, a zero,
-   --  or a number past Positive'Last.
-   function Line_Of (Group : String) return Natural is
-      Value : Long_Long_Integer := 0;
-   begin
-      for C of Group loop
-         Value :=
-           Value
-           * 10
-           + Long_Long_Integer (Character'Pos (C) - Character'Pos ('0'));
-         if Value > Long_Long_Integer (Positive'Last) then
-            return 0;
-         end if;
-      end loop;
-      return Natural (Value);
-   end Line_Of;
 
    --  Adds Line unless it is there already.
    procedure Add
@@ -53,34 +45,60 @@ is
       end if;
    end Add;
 
-   function Split (Argument : String) return Target is
-      Result : Target;
-      Last   : Natural := Argument'Last;
-      Colon  : Natural;
+   --  One group of digits as a selected line: a number from 1 up to
+   --  Positive'Last, else Bad_Line_Number (an empty group or a zero,
+   --  or a number past Positive'Last).
+   procedure Add_Group (Result : in out Target; Group : String) is
+      Read : constant Numbers.Integer_Reads.Read :=
+        Numbers.Parse_Integer (Group);
+   begin
+      if Read.Ok and then Read.Value in Positive then
+         Add (Result.Lines, Source_Line (Read.Value), Result.Status);
+      else
+         Result.Status := Bad_Line_Number;
+      end if;
+   end Add_Group;
+
+   --  Takes Argument's line selections, each group of digits after the
+   --  last ':' up to Last, from the right, until a group holds anything
+   --  but digits or a selection is refused.  Last ends at the path.
+   procedure Take_Lines
+     (Argument : String; Result : in out Target; Last : in out Natural)
+   is
+      Colon : Natural;
    begin
       loop
          Colon :=
            Ada.Strings.Fixed.Index
-             (Argument (Argument'First .. Last), ":", Ada.Strings.Backward);
+             (Argument (Argument'First .. Last),
+              Selection_Mark,
+              Ada.Strings.Backward);
          exit when
-           Colon = 0 or else not All_Digits (Argument (Colon + 1 .. Last));
-         if Line_Of (Argument (Colon + 1 .. Last)) = 0 then
-            Result.Status := Bad_Line_Number;
-            return Result;
-         end if;
-         Add
-           (Result.Lines,
-            Source_Line (Line_Of (Argument (Colon + 1 .. Last))),
-            Result.Status);
+           Colon = No_Mark
+           or else not All_Digits (Argument (Colon + 1 .. Last));
+         Add_Group (Result, Argument (Colon + 1 .. Last));
          exit when Result.Status /= Found;
          Last := Colon - 1;
       end loop;
+   end Take_Lines;
+
+   --  The path part of an argument, when it fits.
+   procedure Set_Path (Result : in out Target; Path : String) is
+   begin
+      if Path'Length > Limits.Max_Path_Length then
+         Result.Status := Path_Too_Long;
+      else
+         Result.Path := Frames.To_Path (Path);
+      end if;
+   end Set_Path;
+
+   function Split (Argument : String) return Target is
+      Result : Target;
+      Last   : Natural := Argument'Last;
+   begin
+      Take_Lines (Argument, Result, Last);
       if Result.Status = Found then
-         if Last - Argument'First + 1 > Limits.Max_Path_Length then
-            Result.Status := Path_Too_Long;
-         else
-            Result.Path := Frames.To_Path (Argument (Argument'First .. Last));
-         end if;
+         Set_Path (Result, Argument (Argument'First .. Last));
       end if;
       return Result;
    end Split;
@@ -93,7 +111,14 @@ is
      Ada.Containers.Indefinite_Vectors (Positive, String);
    package Name_Sorting is new Name_Lists.Generic_Sorting;
 
-   Suffix : constant String := ".feature";
+   Suffix : String renames Fabula.Cli.Feature_Suffix;
+
+   --  The two entries every directory lists: itself and its parent.
+   This_Directory   : constant String := ".";
+   Parent_Directory : constant String := "..";
+
+   --  The argument itself is the first level of a search.
+   Top_Level : constant Positive := 1;
 
    --  A name with a stem before ".feature": the file ".feature" alone
    --  has no extension, as the reference interpreter reads names.
@@ -124,7 +149,7 @@ is
          declare
             Name : constant String := Ada.Directories.Simple_Name (Item);
          begin
-            if Name /= "." and then Name /= ".." then
+            if Name /= This_Directory and then Name /= Parent_Directory then
                Result.Append (Name);
             end if;
          end;
@@ -152,31 +177,45 @@ is
       end if;
    end Append;
 
+   procedure Walk
+     (Dir    : String;
+      Depth  : Positive;
+      List   : in out File_List;
+      Status : out Search_Status);
+
+   --  One entry Name of Dir, which sits Depth levels down: a directory
+   --  is walked, a feature file is kept, anything else is passed over.
+   procedure Visit
+     (Dir    : String;
+      Name   : String;
+      Depth  : Positive;
+      List   : in out File_List;
+      Status : in out Search_Status)
+   is
+      Path : constant String := Ada.Directories.Compose (Dir, Name);
+   begin
+      if Is_Directory (Path) then
+         Walk (Path, Depth + 1, List, Status);
+      elsif Is_Feature_Name (Name) then
+         Append (List, Path, (others => <>), Status);
+      end if;
+   end Visit;
+
    --  Every feature file beneath Dir, which sits Depth levels down from
-   --  the argument (the argument itself is level 1).
+   --  the argument (the argument itself is Top_Level).
    procedure Walk
      (Dir    : String;
       Depth  : Positive;
       List   : in out File_List;
       Status : out Search_Status) is
    begin
-      Status := Found;
-      if Depth > Limits.Max_Search_Depth then
-         Status := Too_Deep;
-         return;
+      Status := (if Depth > Limits.Max_Search_Depth then Too_Deep else Found);
+      if Status = Found then
+         for Name of Entries (Dir) loop
+            Visit (Dir, Name, Depth, List, Status);
+            exit when Status /= Found;
+         end loop;
       end if;
-      for Name of Entries (Dir) loop
-         declare
-            Path : constant String := Ada.Directories.Compose (Dir, Name);
-         begin
-            if Is_Directory (Path) then
-               Walk (Path, Depth + 1, List, Status);
-            elsif Is_Feature_Name (Name) then
-               Append (List, Path, (others => <>), Status);
-            end if;
-         end;
-         exit when Status /= Found;
-      end loop;
    end Walk;
 
    --  One argument's path: a directory is walked, a file passes through.
@@ -189,7 +228,7 @@ is
       if not Ada.Directories.Exists (Path) then
          Status := Missing;
       elsif Is_Directory (Path) then
-         Walk (Path, 1, List, Status);
+         Walk (Path, Top_Level, List, Status);
       elsif Is_Feature_Name (Ada.Directories.Simple_Name (Path)) then
          Append (List, Path, Lines, Status);
       else
@@ -212,9 +251,7 @@ is
       Status := Parts.Status;
       if Status = Found then
          Search (Frames.Value (Parts.Path), Parts.Lines, List, Status);
-      end if;
-      if Status /= Found then
-         List.Count := Kept;
+         List.Count := (if Status = Found then List.Count else Kept);
       end if;
    end Discover;
 
@@ -227,24 +264,31 @@ is
 
    Chunk_Bytes : constant := 4_096;
 
+   --  A chunk's first byte, and the last byte of a chunk not yet read.
+   First_Byte : constant Stream_Element_Offset := 1;
+   No_Bytes   : constant Stream_Element_Offset := 0;
+
    --  A file read line by line; its bytes arrive a chunk at a time.
+   --  Next past Last means the chunk is used up.
    type Reader is limited record
       File  : Stream_IO.File_Type;
-      Chunk : Stream_Element_Array (1 .. Chunk_Bytes);
-      Next  : Stream_Element_Offset := 1;
-      Last  : Stream_Element_Offset := 0;
+      Chunk : Stream_Element_Array (First_Byte .. Chunk_Bytes);
+      Next  : Stream_Element_Offset := First_Byte;
+      Last  : Stream_Element_Offset := No_Bytes;
    end record;
 
    type Line_Kind is (Whole, Overlong, Past_End);
 
    subtype Buffer_Length is Natural range 0 .. Limits.Max_Line_Length + 1;
 
+   No_Characters : constant Buffer_Length := 0;
+
    --  One line, Text (1 .. Len), without its LF or the CR that ends it.
    --  An Overlong line keeps its first characters; Past_End has none.
    type Line_Buffer is record
       Kind : Line_Kind := Past_End;
       Text : String (1 .. Limits.Max_Line_Length + 1);
-      Len  : Buffer_Length := 0;
+      Len  : Buffer_Length := No_Characters;
    end record;
 
    --  The next byte as a character; Got is False at the end of the file.
@@ -257,17 +301,22 @@ is
       end if;
       Got := R.Next <= R.Last;
       C := (if Got then Character'Val (R.Chunk (R.Next)) else ASCII.NUL);
-      if Got then
-         R.Next := R.Next + 1;
-      end if;
+      R.Next := (if Got then R.Next + 1 else R.Next);
    end Next_Byte;
+
+   --  Drops the CR that ends Line, so a CRLF file reads as its LF copy.
+   procedure Strip_Trailing_CR (Line : in out Line_Buffer) is
+   begin
+      if Line.Len > 0 and then Line.Text (Line.Len) = ASCII.CR then
+         Line.Len := Line.Len - 1;
+      end if;
+   end Strip_Trailing_CR;
 
    procedure Read_Line (R : in out Reader; Line : out Line_Buffer) is
       C       : Character;
       Got     : Boolean;
       Started : Boolean := False;
    begin
-      Line.Kind := Whole;
       Line.Len := 0;
       loop
          Next_Byte (R, C, Got);
@@ -280,50 +329,57 @@ is
          Line.Len := Line.Len + 1;
          Line.Text (Line.Len) := C;
       end loop;
-      if not Got and then not Started then
-         Line.Kind := Past_End;
-      elsif Line.Len > 0 and then Line.Text (Line.Len) = ASCII.CR then
-         Line.Len := Line.Len - 1;
-      end if;
-      if Line.Len > Limits.Max_Line_Length then
-         Line.Kind := Overlong;
-      end if;
+      Strip_Trailing_CR (Line);
+      Line.Kind :=
+        (if not Got and then not Started
+         then Past_End
+         elsif Line.Len > Limits.Max_Line_Length
+         then Overlong
+         else Whole);
    end Read_Line;
 
    procedure Keep_Text (Result : in out Load_Result; Line : Line_Buffer) is
-      Len : constant Natural := Natural'Min (Line.Len, Limits.Max_Line_Length);
    begin
-      Result.Text (1 .. Len) := Line.Text (1 .. Len);
-      Result.Len := Len;
+      Result.Text :=
+        Texts.Truncated (Line.Text (1 .. Line.Len), Limits.Max_Line_Length);
    end Keep_Text;
 
+   Too_Many_Lines_Message : constant String := "more lines than it counts";
+
    --  Feeds R's lines to the parser until the end of the file, a
-   --  refusal, or a line too long to feed; Lines counts the lines read.
+   --  refusal, or a line too long to feed; Line_Count counts the lines
+   --  read.
    procedure Feed_Lines
-     (R : in out Reader; Result : in out Load_Result; Lines : out Natural)
+     (R : in out Reader; Result : in out Load_Result; Line_Count : out Natural)
    is
       Line : Line_Buffer;
    begin
-      Lines := 0;
+      Line_Count := 0;
       loop
          Read_Line (R, Line);
          exit when Line.Kind = Past_End;
-         if Lines = Positive'Last then
-            raise Ada.IO_Exceptions.Data_Error
-              with "more lines than it counts";
+         if Line_Count = Positive'Last then
+            raise Ada.IO_Exceptions.Data_Error with Too_Many_Lines_Message;
          end if;
-         Lines := Lines + 1;
+         Line_Count := Line_Count + 1;
          if Line.Kind = Overlong then
             Result.Status := Too_Long;
-            Result.Line := Line_Number (Lines);
+            Result.Line := Line_Number (Line_Count);
             Keep_Text (Result, Line);
             return;
          end if;
          Parse.Feed
-           (Parser, Doc, Line.Text (1 .. Line.Len), Source_Line (Lines));
+           (Parser, Doc, Line.Text (1 .. Line.Len), Source_Line (Line_Count));
          exit when Parse.Failed (Parser);
       end loop;
    end Feed_Lines;
+
+   procedure Close_If_Open (R : in out Reader) is
+   begin
+      if Stream_IO.Is_Open (R.File) then
+         Stream_IO.Close (R.File);
+      end if;
+   end Close_If_Open;
 
    --  Keeps line Result.Line of the file at Path as Result's text; the
    --  text stays empty when the file no longer reads.
@@ -332,7 +388,7 @@ is
       Line : Line_Buffer;
    begin
       Stream_IO.Open (R.File, Stream_IO.In_File, Path);
-      for Number in 1 .. Result.Line loop
+      for Number in First_Line .. Result.Line loop
          Read_Line (R, Line);
          exit when Line.Kind = Past_End;
          if Number = Result.Line then
@@ -347,24 +403,16 @@ is
         | Ada.IO_Exceptions.Device_Error
         | Ada.IO_Exceptions.End_Error
       =>
-         if Stream_IO.Is_Open (R.File) then
-            Stream_IO.Close (R.File);
-         end if;
+         Close_If_Open (R);
    end Fetch_Line;
 
-   --  The verdict once every line is read: Finish, then keep the refused
-   --  line's text.  A refusal already standing before Finish runs came
-   --  from Feed; one that appears only after it came from Finish itself,
-   --  at end of input with no next line to quote a token from.
-   procedure Conclude
-     (Path : String; Lines : Natural; Result : in out Load_Result)
-   is
+   --  Finish, then, on a refusal, the refused line's text.  A refusal
+   --  already standing before Finish runs came from Feed; one that
+   --  appears only after it came from Finish itself, at end of input
+   --  with no next line to quote a token from.
+   procedure Finish_Parse (Path : String; Result : in out Load_Result) is
       Failed_Before_Finish : constant Boolean := Parse.Failed (Parser);
    begin
-      if Lines = 0 then
-         Result.Status := Empty;
-         return;
-      end if;
       Parse.Finish (Parser, Doc);
       if Parse.Failed (Parser) then
          Result.Status := Refused;
@@ -375,19 +423,30 @@ is
       else
          Result.Status := Loaded;
       end if;
+   end Finish_Parse;
+
+   --  The verdict once every line is read: a file with no line is Empty.
+   procedure Conclude
+     (Path : String; Line_Count : Natural; Result : in out Load_Result) is
+   begin
+      if Line_Count = 0 then
+         Result.Status := Empty;
+      else
+         Finish_Parse (Path, Result);
+      end if;
    end Conclude;
 
    procedure Load (Path : String; Result : out Load_Result) is
-      R     : Reader;
-      Lines : Natural;
+      R          : Reader;
+      Line_Count : Natural;
    begin
       Result := (others => <>);
       Parse.Start (Parser, Doc);
       Stream_IO.Open (R.File, Stream_IO.In_File, Path);
-      Feed_Lines (R, Result, Lines);
+      Feed_Lines (R, Result, Line_Count);
       Stream_IO.Close (R.File);
       if Result.Status /= Too_Long then
-         Conclude (Path, Lines, Result);
+         Conclude (Path, Line_Count, Result);
       end if;
    exception
       when
@@ -397,9 +456,7 @@ is
         | Ada.IO_Exceptions.Data_Error
         | Ada.IO_Exceptions.End_Error
       =>
-         if Stream_IO.Is_Open (R.File) then
-            Stream_IO.Close (R.File);
-         end if;
+         Close_If_Open (R);
          Result := (others => <>);
    end Load;
 

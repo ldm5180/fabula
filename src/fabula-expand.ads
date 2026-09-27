@@ -140,6 +140,20 @@ is
        and then (Next_Example'Result.Status /= Row_Due
                  or else Usable (Doc, Next_Example'Result));
 
+   --  The due row of S's Examples block that holds Data_Row, with that
+   --  block's header row; No_Example for a plain scenario's step (no
+   --  data row), a stale handle, or a row no block of S holds.  The
+   --  reporters ask this of a notice, which names only the data row.
+   function Locate_Row
+     (Doc      : Ast.Document;
+      S        : Ast.Scenario_Handle;
+      Data_Row : Ast.Examples_Row_Handle) return Example_Ref
+   with
+     Post =>
+       Locate_Row'Result = No_Example
+       or else (Usable (Doc, Locate_Row'Result)
+                and then Locate_Row'Result.Data_Row = Data_Row);
+
    --  The outline's name as the reference interpreter prints it for one
    --  concrete scenario: substituted from the data row.
    function Concrete_Name

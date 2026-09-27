@@ -17,17 +17,13 @@ package body Fabula_Cli_Tests is
       Result : Arg_List (1 .. Tokens'Length);
    begin
       for I in Tokens'Range loop
-         Set (Result (I - Tokens'First + 1), To_String (Tokens (I)));
+         Result (I - Tokens'First + 1) := To_Arg (To_String (Tokens (I)));
       end loop;
       return Result;
    end Args;
 
-   function Parsed (Tokens : Lines) return Options_Result is
-      Result : Options_Result;
-   begin
-      Parse (Args (Tokens), Result);
-      return Result;
-   end Parsed;
+   function Parsed (Tokens : Lines) return Options_Result
+   is (Parse (Args (Tokens)));
 
    ---------------------------------------------------------------------
    --  Help triggers.
@@ -36,9 +32,8 @@ package body Fabula_Cli_Tests is
    procedure Test_No_Args (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
       Empty : constant Arg_List (1 .. 0) := [others => <>];
-      R     : Options_Result;
+      R     : constant Options_Result := Parse (Empty);
    begin
-      Parse (Empty, R);
       Assert (Help (R), "no arguments means help");
       Assert (not Refused (R), "not a refusal");
    end Test_No_Args;
@@ -49,7 +44,90 @@ package body Fabula_Cli_Tests is
       Assert (Help (Parsed ([+"-h"])), "-h");
       Assert (Help (Parsed ([+"--help"])), "--help");
       Assert (not Help (Parsed ([+"a.feature"])), "a plain run asks no help");
+      Assert
+        (Help (Parsed ([+"--bogus", +"-t", +"-h"])),
+         "-h anywhere wins, even as a value after a refusal");
    end Test_Help_Flags;
+
+   --  The help screen, byte for byte.
+   procedure Test_Help_Text (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      LF   : constant Character := ASCII.LF;
+      Want : constant String :=
+        "fabula: a Cucumber/Gherkin test runner"
+        & LF
+        & "usage: <binary> [<file>.feature | <file>.feature:LINE... | <dir>]... "
+        & "[options]"
+        & LF
+        & LF
+        & "options:"
+        & LF
+        & "  -h, --help                   print this help and exit"
+        & LF
+        & "  -q, --quiet                  print only errors and the summary"
+        & LF
+        & "  -v, --verbose                print extra detail as a scenario runs"
+        & LF
+        & "  -d, --dry-run                check steps are defined; run none "
+        & "of them"
+        & LF
+        & "  -c, --continue-on-failure    keep running a scenario's steps "
+        & "after one fails"
+        & LF
+        & "  -t, --tags <EXPRESSION>      run only scenarios the tag "
+        & "expression selects"
+        & LF
+        & "  -n, --name <PATTERN>         run only scenarios whose name "
+        & "matches; ':' separates"
+        & LF
+        & "                               several patterns, '*' and '?' wildcard"
+        & LF
+        & "  --exclude-file <SUFFIX>      skip a discovered file whose path "
+        & "ends in SUFFIX"
+        & LF
+        & "  --report-json [FILE]         write a JSON report to FILE, or to "
+        & "stdout";
+   begin
+      Assert (Help_Text = Want, "the help screen: " & LF & Help_Text);
+   end Test_Help_Text;
+
+   ---------------------------------------------------------------------
+   --  The flag table: one spelling per flag, one kind per token.
+   ---------------------------------------------------------------------
+
+   procedure Test_Spellings (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+   begin
+      Assert (Short_Of (Help_Flag) = "-h", "-h");
+      Assert (Long_Of (Help_Flag) = "--help", "--help");
+      Assert (Short_Of (Name_Flag) = "-n", "-n");
+      Assert (Long_Of (Continue_Flag) = "--continue-on-failure", "longest");
+      Assert
+        (Short_Of (Exclude_Flag) = "", "--exclude-file has no short form");
+      Assert (Long_Of (Exclude_Flag) = "--exclude-file", "--exclude-file");
+      Assert (Short_Of (Report_Json_Flag) = "", "nor has --report-json");
+      Assert (Long_Of (Report_Json_Flag) = "--report-json", "--report-json");
+      Assert (Report_Json_Prefix = "--report-json=", "the merged form");
+      Assert (Feature_Suffix = ".feature", "a feature file's suffix");
+   end Test_Spellings;
+
+   procedure Test_Classify (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+   begin
+      for F in Spelled_Flag loop
+         Assert (Classify (Long_Of (F)) = F, "long " & F'Image);
+         if Short_Of (F) /= "" then
+            Assert (Classify (Short_Of (F)) = F, "short " & F'Image);
+         end if;
+      end loop;
+      Assert (Classify ("--report-json=a") = Report_File_Flag, "merged");
+      Assert (Classify ("--report-json=") = Report_File_Flag, "merged empty");
+      Assert (Classify ("--help=") = Unknown_Flag, "no other merged form");
+      Assert (Classify ("-") = Unknown_Flag, "a bare dash");
+      Assert (Classify ("-hq") = Unknown_Flag, "no bundled flags");
+      Assert (Classify ("a.feature") = Not_A_Flag, "a path");
+      Assert (Classify ("") = Not_A_Flag, "an empty token");
+   end Test_Classify;
 
    ---------------------------------------------------------------------
    --  Every boolean flag, short and long.
@@ -59,10 +137,11 @@ package body Fabula_Cli_Tests is
    is
       pragma Unreferenced (T);
    begin
-      Assert (Quiet (Parsed ([+"-q"])), "-q");
-      Assert (Quiet (Parsed ([+"--quiet"])), "--quiet");
-      Assert (Verbose (Parsed ([+"-v"])), "-v");
-      Assert (Verbose (Parsed ([+"--verbose"])), "--verbose");
+      Assert (Log_Level_Of (Parsed ([+"a.feature"])) = Normal, "no -q, no -v");
+      Assert (Log_Level_Of (Parsed ([+"-q"])) = Quiet, "-q");
+      Assert (Log_Level_Of (Parsed ([+"--quiet"])) = Quiet, "--quiet");
+      Assert (Log_Level_Of (Parsed ([+"-v"])) = Verbose, "-v");
+      Assert (Log_Level_Of (Parsed ([+"--verbose"])) = Verbose, "--verbose");
       Assert (Dry_Run (Parsed ([+"-d"])), "-d");
       Assert (Dry_Run (Parsed ([+"--dry-run"])), "--dry-run");
       Assert (Continue_On_Failure (Parsed ([+"-c"])), "-c");
@@ -77,7 +156,10 @@ package body Fabula_Cli_Tests is
       R : constant Options_Result :=
         Parsed ([+"-q", +"-v", +"-d", +"-c", +"a.feature"]);
    begin
-      Assert (Quiet (R) and then Verbose (R), "quiet and verbose together");
+      Assert (Log_Level_Of (R) = Verbose, "-v wins over an earlier -q");
+      Assert
+        (Log_Level_Of (Parsed ([+"-v", +"-q"])) = Verbose,
+         "-v wins over a later -q too");
       Assert (Dry_Run (R) and then Continue_On_Failure (R), "and the rest");
       Assert (Positionals_Count (R) = 1, "the file still lands");
       Assert (Positional_Text (R, 1) = "a.feature", "as itself");
@@ -128,7 +210,7 @@ package body Fabula_Cli_Tests is
       R : constant Options_Result := Parsed ([+"-t", +"-q"]);
    begin
       Assert (Tag_Expr_Text (R) = "-q", "the next token, whatever it is");
-      Assert (not Quiet (R), "it never reached the flag dispatch");
+      Assert (Log_Level_Of (R) = Normal, "it never reached the flag dispatch");
    end Test_Value_Takes_Anything;
 
    ---------------------------------------------------------------------
@@ -142,8 +224,10 @@ package body Fabula_Cli_Tests is
       pragma Unreferenced (T);
       R : constant Options_Result := Parsed ([+"--report-json"]);
    begin
-      Assert (Report_Json (R), "the flag fires");
-      Assert (not Report_Json_Has_File (R), "no file: stdout");
+      Assert (Report_Target_Of (R) = Json_Stdout, "no file: stdout");
+      Assert
+        (Report_Target_Of (Parsed ([+"a.feature"])) = Console,
+         "no flag: the console report");
    end Test_Report_Json_Console;
 
    procedure Test_Report_Json_File
@@ -153,13 +237,25 @@ package body Fabula_Cli_Tests is
       R : constant Options_Result :=
         Parsed ([+"--report-json=out.json", +"a.feature"]);
    begin
-      Assert (Report_Json (R), "the flag fires");
-      Assert (Report_Json_Has_File (R), "a merged value is a file");
+      Assert (Report_Target_Of (R) = Json_File, "a merged value is a file");
       Assert (Report_Json_File_Text (R) = "out.json", "its name");
       Assert
         (Positionals_Count (R) = 1
          and then Positional_Text (R, 1) = "a.feature",
          "the merged token consumes no other argument");
+      Assert
+        (Report_Target_Of (Parsed ([+"--report-json=a", +"--report-json"]))
+         = Json_File,
+         "a later bare flag keeps the file");
+      Assert
+        (Report_Json_File_Text
+           (Parsed ([+"--report-json=a", +"--report-json=b"]))
+         = "b",
+         "the last file wins");
+      Assert
+        (Report_Target_Of (Parsed ([+"--report-json="])) = Json_File
+         and then Report_Json_File_Text (Parsed ([+"--report-json="])) = "",
+         "an empty merged value is still the file form");
    end Test_Report_Json_File;
 
    ---------------------------------------------------------------------
@@ -179,15 +275,30 @@ package body Fabula_Cli_Tests is
 
    ---------------------------------------------------------------------
    --  Refusals: an unknown flag, a missing value, each naming its token.
+   --  Each test asserts Refused itself before it reads the refusal, so
+   --  a Refused that misses a kind fails in every build mode, not only
+   --  where Refusal_Of's precondition is checked.
    ---------------------------------------------------------------------
+
+   procedure Assert_Refused
+     (R : Options_Result; Kind : Refusal_Kind; What : String) is
+   begin
+      Assert (Refused (R), What & ": refused");
+      Assert
+        (Kind_Of (Refusal_Of (R)) = Kind,
+         What
+         & ": as "
+         & Kind'Image
+         & ", got "
+         & Kind_Of (Refusal_Of (R))'Image);
+   end Assert_Refused;
 
    procedure Test_Unknown_Option (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
       R : constant Options_Result := Parsed ([+"a.feature", +"--bogus"]);
    begin
-      Assert (Refused (R), "an unrecognized '-' token refuses");
-      Assert (Kind_Of (Refusal_Of (R)) = Unknown_Option, "as Unknown_Option");
+      Assert_Refused (R, Unknown_Option, "an unrecognized '-' token");
       Assert (Token_Of (Refusal_Of (R)) = "--bogus", "naming the token");
       Assert
         (Refusal_Text (Refusal_Of (R)) = "Unknown option: '--bogus'",
@@ -200,13 +311,10 @@ package body Fabula_Cli_Tests is
    is
       pragma Unreferenced (T);
    begin
-      Assert
-        (Kind_Of (Refusal_Of (Parsed ([+"-t"]))) = Missing_Value, "-t alone");
-      Assert
-        (Kind_Of (Refusal_Of (Parsed ([+"-n"]))) = Missing_Value, "-n alone");
-      Assert
-        (Kind_Of (Refusal_Of (Parsed ([+"--exclude-file"]))) = Missing_Value,
-         "--exclude-file alone");
+      Assert_Refused (Parsed ([+"-t"]), Missing_Value, "-t alone");
+      Assert_Refused (Parsed ([+"-n"]), Missing_Value, "-n alone");
+      Assert_Refused
+        (Parsed ([+"--exclude-file"]), Missing_Value, "--exclude-file alone");
       Assert
         (Refusal_Text (Refusal_Of (Parsed ([+"-t"])))
          = "Missing value for '-t'",
@@ -221,6 +329,7 @@ package body Fabula_Cli_Tests is
       R : constant Options_Result :=
         Parsed ([+"--first-bogus", +"--second-bogus"]);
    begin
+      Assert_Refused (R, Unknown_Option, "two unknown flags");
       Assert
         (Token_Of (Refusal_Of (R)) = "--first-bogus", "the earlier token");
    end Test_First_Refusal_Sticks;
@@ -240,9 +349,7 @@ package body Fabula_Cli_Tests is
       R       : constant Options_Result := Parsed ([+"-t", +Over]);
    begin
       Assert (not Refused (Parsed ([+"-t", +Longest])), "the longest fits");
-      Assert
-        (Kind_Of (Refusal_Of (R)) = Tag_Expression_Too_Long,
-         "one character more refuses");
+      Assert_Refused (R, Tag_Expression_Too_Long, "one character more");
       Assert (Token_Of (Refusal_Of (R)) = Over, "naming the over-long text");
       Assert
         (Refusal_Text (Refusal_Of (R))
@@ -256,8 +363,9 @@ package body Fabula_Cli_Tests is
         Filled (Fabula.Limits.Max_Name_Filter_Length + 1);
       R    : constant Options_Result := Parsed ([+"-n", +Over]);
    begin
-      Assert
-        (Kind_Of (Refusal_Of (R)) = Name_Patterns_Too_Long,
+      Assert_Refused
+        (R,
+         Name_Patterns_Too_Long,
          "one character past Max_Name_Filter_Length");
       Assert (Token_Of (Refusal_Of (R)) = Over, "naming the over-long text");
       Assert
@@ -273,9 +381,8 @@ package body Fabula_Cli_Tests is
       Over : constant String := Filled (Fabula.Limits.Max_Path_Length + 1);
       R    : constant Options_Result := Parsed ([+("--report-json=" & Over)]);
    begin
-      Assert
-        (Kind_Of (Refusal_Of (R)) = Report_Json_Path_Too_Long,
-         "one character past Max_Path_Length");
+      Assert_Refused
+        (R, Report_Json_Path_Too_Long, "one character past Max_Path_Length");
       Assert (Token_Of (Refusal_Of (R)) = Over, "naming the over-long text");
       Assert
         (Refusal_Text (Refusal_Of (R))
@@ -290,9 +397,8 @@ package body Fabula_Cli_Tests is
       Over : constant String := Filled (Fabula.Limits.Max_Path_Length + 1);
       R    : constant Options_Result := Parsed ([+"--exclude-file", +Over]);
    begin
-      Assert
-        (Kind_Of (Refusal_Of (R)) = Exclude_Path_Too_Long,
-         "one character past Max_Path_Length");
+      Assert_Refused
+        (R, Exclude_Path_Too_Long, "one character past Max_Path_Length");
       Assert (Token_Of (Refusal_Of (R)) = Over, "naming the over-long text");
       Assert
         (Refusal_Text (Refusal_Of (R))
@@ -317,9 +423,8 @@ package body Fabula_Cli_Tests is
       pragma Unreferenced (T);
       R : constant Options_Result := Parsed (Too_Many_Exclude_Tokens);
    begin
-      Assert
-        (Kind_Of (Refusal_Of (R)) = Too_Many_Excludes,
-         "one --exclude-file past Max_Cli_Excludes");
+      Assert_Refused
+        (R, Too_Many_Excludes, "one --exclude-file past Max_Cli_Excludes");
       Assert
         (Refusal_Text (Refusal_Of (R)) = "Too many --exclude-file flags",
          "wording: " & Refusal_Text (Refusal_Of (R)));
@@ -340,8 +445,9 @@ package body Fabula_Cli_Tests is
       pragma Unreferenced (T);
       R : constant Options_Result := Parsed (Too_Many_Positional_Tokens);
    begin
-      Assert
-        (Kind_Of (Refusal_Of (R)) = Too_Many_Positionals,
+      Assert_Refused
+        (R,
+         Too_Many_Positionals,
          "one file argument past Max_Cli_Positionals");
       Assert
         (Refusal_Text (Refusal_Of (R))
@@ -349,11 +455,55 @@ package body Fabula_Cli_Tests is
          "wording: " & Refusal_Text (Refusal_Of (R)));
    end Test_Too_Many_Positionals;
 
+   --  One argv per refusal kind, and one that refuses nothing: Refused
+   --  holds exactly when the kind is not None.
+   procedure Test_Refused_Is_Kind (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Path_Over : constant String :=
+        Filled (Fabula.Limits.Max_Path_Length + 1);
+
+      function Argv (Kind : Refusal_Kind) return Options_Result
+      is (case Kind is
+            when None                      => Parsed ([+"a.feature"]),
+            when Unknown_Option            => Parsed ([+"--bogus"]),
+            when Missing_Value             => Parsed ([+"-t"]),
+            when Tag_Expression_Too_Long   =>
+              Parsed
+                ([+"-t", +Filled (Fabula.Limits.Max_Tag_Expr_Length + 1)]),
+            when Name_Patterns_Too_Long    =>
+              Parsed
+                ([+"-n", +Filled (Fabula.Limits.Max_Name_Filter_Length + 1)]),
+            when Report_Json_Path_Too_Long =>
+              Parsed ([+("--report-json=" & Path_Over)]),
+            when Exclude_Path_Too_Long     =>
+              Parsed ([+"--exclude-file", +Path_Over]),
+            when Too_Many_Excludes         => Parsed (Too_Many_Exclude_Tokens),
+            when Too_Many_Positionals      =>
+              Parsed (Too_Many_Positional_Tokens));
+   begin
+      for Kind in Refusal_Kind loop
+         declare
+            R : constant Options_Result := Argv (Kind);
+         begin
+            Assert (Refused (R) = (Kind /= None), Kind'Image & ": Refused");
+            if Kind /= None then
+               Assert_Refused (R, Kind, Kind'Image);
+            end if;
+         end;
+      end loop;
+   end Test_Refused_Is_Kind;
+
    overriding
    procedure Register_Tests (T : in out Test) is
    begin
+      Register_Routine
+        (T, Test_Refused_Is_Kind'Access, "Refused exactly when a kind is set");
       Register_Routine (T, Test_No_Args'Access, "no arguments means help");
       Register_Routine (T, Test_Help_Flags'Access, "-h and --help");
+      Register_Routine (T, Test_Help_Text'Access, "the help screen");
+      Register_Routine (T, Test_Spellings'Access, "one spelling per flag");
+      Register_Routine (T, Test_Classify'Access, "one kind per token");
       Register_Routine (T, Test_Boolean_Flags'Access, "every boolean flag");
       Register_Routine
         (T, Test_Combined_Flags'Access, "several flags and a file together");

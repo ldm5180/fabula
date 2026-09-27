@@ -2,114 +2,129 @@ package body Fabula.Cli
   with SPARK_Mode
 is
 
-   procedure Set (A : out Arg_Text; Text : String) is
+   ---------------------------------------------------------------------
+   --  Classifying one token.
+   ---------------------------------------------------------------------
+
+   --  What every flag, known or not, starts with.
+   Flag_Mark : constant Character := '-';
+
+   function Starts_With (Text, Prefix : String) return Boolean
+   is (Text'Length >= Prefix'Length
+       and then Text (Text'First .. Text'First - 1 + Prefix'Length) = Prefix)
+   with Pre => Text'First = Positive'First;
+
+   --  Token spells F, in its short or its long form.
+   function Spells (F : Spelled_Flag; Token : String) return Boolean
+   is (Token = Long_Of (F)
+       or else (Short_Of (F) /= "" and then Token = Short_Of (F)));
+
+   --  The kind of a token that spells no flag.
+   function Unspelled_Kind (Token : String) return Flag_Kind
+   is (if Starts_With (Token, Report_Json_Prefix)
+       then Report_File_Flag
+       elsif Token'Length > 0 and then Token (Token'First) = Flag_Mark
+       then Unknown_Flag
+       else Not_A_Flag)
+   with Pre => Token'First = Positive'First;
+
+   function Classify (Token : String) return Flag_Kind is
    begin
-      A := (others => <>);
-      for C of Text loop
-         exit when A.Len = Limits.Max_Line_Length;
-         A.Len := A.Len + 1;
-         A.Data (A.Len) := C;
+      for F in Spelled_Flag loop
+         if Spells (F, Token) then
+            return F;
+         end if;
       end loop;
-   end Set;
+      return Unspelled_Kind (Token);
+   end Classify;
 
    ---------------------------------------------------------------------
-   --  Refusals.  The first one sticks; the caller stops scanning there.
+   --  Refusals.  The first one sticks.
    ---------------------------------------------------------------------
 
    procedure Refuse
      (Result : in out Options_Result; Kind : Refusal_Kind; Token : String)
-   with
-     Pre  =>
-       Kind /= None
-       and then (if Refused (Result)
-                 then Kind_Of (Refusal_Of (Result)) /= None),
-     Post => Refused (Result) and then Kind_Of (Refusal_Of (Result)) /= None
+   with Pre => Kind /= None, Post => Refused (Result)
    is
    begin
-      if Result.Is_Refused then
+      if Refused (Result) then
          return;
       end if;
-      Result.Is_Refused := True;
-      Result.Refusal_Info.Kind := Kind;
-      Result.Refusal_Info.Token_Len := 0;
-      for C of Token loop
-         exit when Result.Refusal_Info.Token_Len = Token_Length;
-         Result.Refusal_Info.Token_Len := Result.Refusal_Info.Token_Len + 1;
-         Result.Refusal_Info.Token (Result.Refusal_Info.Token_Len) := C;
-      end loop;
+      Result.Refusal_Info :=
+        (Kind => Kind, Token => Texts.Truncated (Token, Token_Length));
    end Refuse;
 
+   Quote_Mark : constant Character := ''';
+
+   Unknown_Option_Lead       : constant String := "Unknown option: ";
+   Missing_Value_Lead        : constant String := "Missing value for ";
+   Tag_Expression_Lead       : constant String := "Tag expression too long: ";
+   Name_Patterns_Lead        : constant String :=
+     Short_Of (Name_Flag) & " patterns too long: ";
+   Report_Path_Lead          : constant String :=
+     Long_Of (Report_Json_Flag) & " path too long: ";
+   Exclude_Path_Lead         : constant String :=
+     Long_Of (Exclude_Flag) & " path too long: ";
+   Too_Many_Excludes_Text    : constant String :=
+     "Too many " & Long_Of (Exclude_Flag) & " flags";
+   Too_Many_Positionals_Text : constant String :=
+     "Too many file or directory arguments";
+
+   --  Room for the longest lead below.
+   Lead_Room : constant := 64;
+
+   --  Each refusal's text up to the token it names; the whole text for
+   --  the two count refusals, which name none.
+   function Refusal_Lead (Kind : Refusal_Kind) return String
+   is (case Kind is
+         when None                      => "",
+         when Unknown_Option            => Unknown_Option_Lead,
+         when Missing_Value             => Missing_Value_Lead,
+         when Tag_Expression_Too_Long   => Tag_Expression_Lead,
+         when Name_Patterns_Too_Long    => Name_Patterns_Lead,
+         when Report_Json_Path_Too_Long => Report_Path_Lead,
+         when Exclude_Path_Too_Long     => Exclude_Path_Lead,
+         when Too_Many_Excludes         => Too_Many_Excludes_Text,
+         when Too_Many_Positionals      => Too_Many_Positionals_Text)
+   with Post => Refusal_Lead'Result'Length <= Lead_Room;
+
+   subtype Count_Refusal is
+     Refusal_Kind range Too_Many_Excludes .. Too_Many_Positionals;
+
    function Refusal_Text (R : Refusal) return String is
-      Token : constant String := Token_Of (R);
+      Lead  : constant String := Refusal_Lead (Kind_Of (R));
+      Token : constant String := Texts.Value (R.Token);
    begin
-      case Kind_Of (R) is
-         when None                      =>
-            return "";
-
-         when Unknown_Option            =>
-            return "Unknown option: '" & Token & "'";
-
-         when Missing_Value             =>
-            return "Missing value for '" & Token & "'";
-
-         when Tag_Expression_Too_Long   =>
-            return "Tag expression too long: '" & Token & "'";
-
-         when Name_Patterns_Too_Long    =>
-            return "-n patterns too long: '" & Token & "'";
-
-         when Report_Json_Path_Too_Long =>
-            return "--report-json path too long: '" & Token & "'";
-
-         when Exclude_Path_Too_Long     =>
-            return "--exclude-file path too long: '" & Token & "'";
-
-         when Too_Many_Excludes         =>
-            return "Too many --exclude-file flags";
-
-         when Too_Many_Positionals      =>
-            return "Too many file or directory arguments";
-      end case;
+      pragma Assert (Token'Length <= Token_Length);
+      return
+        (if Kind_Of (R) in Count_Refusal
+         then Lead
+         else Lead & Quote_Mark & Token & Quote_Mark);
    end Refusal_Text;
 
    ---------------------------------------------------------------------
    --  Bounded stores: one flag's value, one exclude suffix, one path.
    ---------------------------------------------------------------------
 
-   procedure Set_Tag_Expr (Result : in out Options_Result; Text : String)
-   with
-     Pre  => (if Refused (Result) then Kind_Of (Refusal_Of (Result)) /= None),
-     Post => (if Refused (Result) then Kind_Of (Refusal_Of (Result)) /= None)
-   is
+   procedure Store_Tag_Expr (Result : in out Options_Result; Text : String) is
    begin
       if Text'Length > Limits.Max_Tag_Expr_Length then
          Refuse (Result, Tag_Expression_Too_Long, Text);
       else
-         Result.Tag_Expr (1 .. Text'Length) := Text;
-         Result.Tag_Expr_Len := Text'Length;
+         Result.Tag_Expr := Texts.Truncated (Text, Limits.Max_Tag_Expr_Length);
       end if;
-   end Set_Tag_Expr;
+   end Store_Tag_Expr;
 
-   procedure Set_Names (Result : in out Options_Result; Text : String)
-   with
-     Pre  => (if Refused (Result) then Kind_Of (Refusal_Of (Result)) /= None),
-     Post => (if Refused (Result) then Kind_Of (Refusal_Of (Result)) /= None)
-   is
+   procedure Store_Names (Result : in out Options_Result; Text : String) is
    begin
       if Text'Length > Limits.Max_Name_Filter_Length then
          Refuse (Result, Name_Patterns_Too_Long, Text);
       else
-         Result.Names (1 .. Text'Length) := Text;
-         Result.Names_Len := Text'Length;
+         Result.Names := Texts.Truncated (Text, Limits.Max_Name_Filter_Length);
       end if;
-   end Set_Names;
+   end Store_Names;
 
-   procedure Add_Exclude (Result : in out Options_Result; Text : String)
-   with
-     Pre  => (if Refused (Result) then Kind_Of (Refusal_Of (Result)) /= None),
-     Post => (if Refused (Result) then Kind_Of (Refusal_Of (Result)) /= None)
-   is
-      Index : Positive;
+   procedure Add_Exclude (Result : in out Options_Result; Text : String) is
    begin
       if Text'Length > Limits.Max_Path_Length then
          Refuse (Result, Exclude_Path_Too_Long, Text);
@@ -117,238 +132,288 @@ is
          Refuse (Result, Too_Many_Excludes, Text);
       else
          Result.Exclude_List_Count := Result.Exclude_List_Count + 1;
-         Index := Result.Exclude_List_Count;
-         Result.Exclude_List (Index).Data (1 .. Text'Length) := Text;
-         Result.Exclude_List (Index).Len := Text'Length;
+         Result.Exclude_List (Result.Exclude_List_Count) :=
+           Texts.Truncated (Text, Limits.Max_Path_Length);
       end if;
    end Add_Exclude;
 
-   procedure Add_Positional (Result : in out Options_Result; Text : String)
-   with
-     Pre  => (if Refused (Result) then Kind_Of (Refusal_Of (Result)) /= None),
-     Post => (if Refused (Result) then Kind_Of (Refusal_Of (Result)) /= None)
-   is
+   procedure Add_Positional (Result : in out Options_Result; Text : String) is
    begin
       if Result.Positional_List_Count = Limits.Max_Cli_Positionals then
          Refuse (Result, Too_Many_Positionals, Text);
       else
          Result.Positional_List_Count := Result.Positional_List_Count + 1;
-         Set (Result.Positional_List (Result.Positional_List_Count), Text);
+         Result.Positional_List (Result.Positional_List_Count) :=
+           To_Arg (Text);
       end if;
    end Add_Positional;
 
-   procedure Handle_Report_Json_Value
-     (Result : in out Options_Result; Text : String)
-   with
-     Pre  => (if Refused (Result) then Kind_Of (Refusal_Of (Result)) /= None),
-     Post => (if Refused (Result) then Kind_Of (Refusal_Of (Result)) /= None)
+   procedure Store_Report_File (Result : in out Options_Result; Text : String)
    is
    begin
-      Result.Is_Report_Json := True;
+      Result.Target := Json_File;
       if Text'Length > Limits.Max_Path_Length then
          Refuse (Result, Report_Json_Path_Too_Long, Text);
       else
-         Result.Report_Json_File_Set := True;
-         Result.Report_Json_File (1 .. Text'Length) := Text;
-         Result.Report_Json_File_Len := Text'Length;
+         Result.Report_Json_File :=
+           Texts.Truncated (Text, Limits.Max_Path_Length);
       end if;
-   end Handle_Report_Json_Value;
+   end Store_Report_File;
 
    ---------------------------------------------------------------------
    --  Value-taking flags: the next argv token is the value, whatever it
-   --  looks like -- the frozen matrix takes it unconditionally.
+   --  looks like -- the frozen matrix takes it unconditionally.  I moves
+   --  to the value, or stays on a flag with nothing after it.
    ---------------------------------------------------------------------
 
+   generic
+      with procedure Store (Result : in out Options_Result; Text : String);
    procedure Take_Value
-     (Args   : Arg_List;
-      I      : in out Positive;
-      Flag   : String;
-      Result : in out Options_Result;
-      Text   : out Arg_Text)
+     (Args : Arg_List; I : in out Positive; Result : in out Options_Result)
    with
-     Pre  =>
-       I in Args'Range
-       and then Args'Last < Positive'Last
-       and then not Result.Is_Refused,
-     Post =>
-       I >= I'Old
-       and then I <= Args'Last
-       and then (if Refused (Result)
-                 then Kind_Of (Refusal_Of (Result)) /= None)
-   is
+     Pre  => I in Args'Range and then Args'Last < Positive'Last,
+     Post => I in I'Old .. Args'Last;
+
+   procedure Take_Value
+     (Args : Arg_List; I : in out Positive; Result : in out Options_Result) is
    begin
-      Text := (others => <>);
       if I = Args'Last then
-         Refuse (Result, Missing_Value, Flag);
+         Refuse (Result, Missing_Value, Texts.Value (Args (I)));
       else
-         Text := Args (I + 1);
          I := I + 1;
+         Store (Result, Texts.Value (Args (I)));
       end if;
    end Take_Value;
 
-   procedure Handle_Tag_Expr
-     (Args : Arg_List; I : in out Positive; Result : in out Options_Result)
-   with
-     Pre  =>
-       I in Args'Range
-       and then Args'Last < Positive'Last
-       and then not Result.Is_Refused,
-     Post =>
-       I > I'Old
-       and then I <= Args'Last + 1
-       and then (if Refused (Result)
-                 then Kind_Of (Refusal_Of (Result)) /= None)
-   is
-      Flag : constant String := Value (Args (I));
-      Text : Arg_Text;
-   begin
-      Take_Value (Args, I, Flag, Result, Text);
-      if not Result.Is_Refused then
-         Set_Tag_Expr (Result, Value (Text));
-      end if;
-      I := I + 1;
-   end Handle_Tag_Expr;
-
-   procedure Handle_Names
-     (Args : Arg_List; I : in out Positive; Result : in out Options_Result)
-   with
-     Pre  =>
-       I in Args'Range
-       and then Args'Last < Positive'Last
-       and then not Result.Is_Refused,
-     Post =>
-       I > I'Old
-       and then I <= Args'Last + 1
-       and then (if Refused (Result)
-                 then Kind_Of (Refusal_Of (Result)) /= None)
-   is
-      Flag : constant String := Value (Args (I));
-      Text : Arg_Text;
-   begin
-      Take_Value (Args, I, Flag, Result, Text);
-      if not Result.Is_Refused then
-         Set_Names (Result, Value (Text));
-      end if;
-      I := I + 1;
-   end Handle_Names;
-
-   procedure Handle_Exclude
-     (Args : Arg_List; I : in out Positive; Result : in out Options_Result)
-   with
-     Pre  =>
-       I in Args'Range
-       and then Args'Last < Positive'Last
-       and then not Result.Is_Refused,
-     Post =>
-       I > I'Old
-       and then I <= Args'Last + 1
-       and then (if Refused (Result)
-                 then Kind_Of (Refusal_Of (Result)) /= None)
-   is
-      Flag : constant String := Value (Args (I));
-      Text : Arg_Text;
-   begin
-      Take_Value (Args, I, Flag, Result, Text);
-      if not Result.Is_Refused then
-         Add_Exclude (Result, Value (Text));
-      end if;
-      I := I + 1;
-   end Handle_Exclude;
+   procedure Take_Tag_Expr is new Take_Value (Store_Tag_Expr);
+   procedure Take_Names is new Take_Value (Store_Names);
+   procedure Take_Exclude is new Take_Value (Add_Exclude);
 
    ---------------------------------------------------------------------
-   --  One token, of any shape.
+   --  One token, of any shape, then the whole list.
    ---------------------------------------------------------------------
-
-   Report_Json_Prefix : constant String := "--report-json=";
-
-   function Starts_With (Text, Prefix : String) return Boolean
-   is (Text'Length >= Prefix'Length
-       and then Text (Text'First .. Text'First + Prefix'Length - 1) = Prefix)
-   with
-     Pre =>
-       Text'First = 1
-       and then Prefix'First = 1
-       and then Prefix'Length <= Limits.Max_Line_Length;
 
    procedure Handle_Token
      (Args : Arg_List; I : in out Positive; Result : in out Options_Result)
    with
-     Pre  =>
-       I in Args'Range
-       and then Args'Last < Positive'Last
-       and then not Result.Is_Refused,
-     Post =>
-       I > I'Old
-       and then I <= Args'Last + 1
-       and then (if Refused (Result)
-                 then Kind_Of (Refusal_Of (Result)) /= None)
+     Pre  => I in Args'Range and then Args'Last < Positive'Last,
+     Post => I > I'Old and then I <= Args'Last + 1
    is
-      Text : constant String := Value (Args (I));
+      Token : constant String := Texts.Value (Args (I));
    begin
-      if Text = "-h" or else Text = "--help" then
-         Result.Is_Help := True;
-         I := I + 1;
-      elsif Text = "-q" or else Text = "--quiet" then
-         Result.Is_Quiet := True;
-         I := I + 1;
-      elsif Text = "-v" or else Text = "--verbose" then
-         Result.Is_Verbose := True;
-         I := I + 1;
-      elsif Text = "-d" or else Text = "--dry-run" then
-         Result.Is_Dry_Run := True;
-         I := I + 1;
-      elsif Text = "-c" or else Text = "--continue-on-failure" then
-         Result.Is_Continue := True;
-         I := I + 1;
-      elsif Text = "-t" or else Text = "--tags" then
-         Handle_Tag_Expr (Args, I, Result);
-      elsif Text = "-n" or else Text = "--name" then
-         Handle_Names (Args, I, Result);
-      elsif Text = "--exclude-file" then
-         Handle_Exclude (Args, I, Result);
-      elsif Text = "--report-json" then
-         Result.Is_Report_Json := True;
-         I := I + 1;
-      elsif Starts_With (Text, Report_Json_Prefix) then
-         Handle_Report_Json_Value
-           (Result,
-            Text (Text'First + Report_Json_Prefix'Length .. Text'Last));
-         I := I + 1;
-      elsif Text'Length > 0 and then Text (Text'First) = '-' then
-         Refuse (Result, Unknown_Option, Text);
-         I := I + 1;
-      else
-         Add_Positional (Result, Text);
-         I := I + 1;
-      end if;
+      case Classify (Token) is
+         when Help_Flag        =>
+            Result.Is_Help := True;
+
+         when Quiet_Flag       =>
+            Result.Log := Log_Level'Max (Result.Log, Quiet);
+
+         when Verbose_Flag     =>
+            Result.Log := Verbose;
+
+         when Dry_Run_Flag     =>
+            Result.Is_Dry_Run := True;
+
+         when Continue_Flag    =>
+            Result.Is_Continue := True;
+
+         when Tags_Flag        =>
+            Take_Tag_Expr (Args, I, Result);
+
+         when Name_Flag        =>
+            Take_Names (Args, I, Result);
+
+         when Exclude_Flag     =>
+            Take_Exclude (Args, I, Result);
+
+         when Report_Json_Flag =>
+            Result.Target := Report_Target'Max (Result.Target, Json_Stdout);
+
+         when Report_File_Flag =>
+            Store_Report_File
+              (Result, Token (Report_Json_Prefix'Length + 1 .. Token'Last));
+
+         when Unknown_Flag     =>
+            Refuse (Result, Unknown_Option, Token);
+
+         when Not_A_Flag       =>
+            Add_Positional (Result, Token);
+      end case;
+      I := I + 1;
    end Handle_Token;
 
-   procedure Parse (Args : Arg_List; Result : out Options_Result) is
-      I : Positive := Args'First;
+   --  Every token in turn, until one refuses.
+   function Scanned (Args : Arg_List) return Options_Result
+   with Pre => Args'First = Positive'First and then Args'Last < Positive'Last
+   is
+      Result : Options_Result;
+      I      : Positive := Args'First;
    begin
-      Result := (others => <>);
-      if Args'Length = 0 then
-         Result.Is_Help := True;
-         return;
-      end if;
-      --  -h/--help wins over any other argument, a refusal included,
-      --  wherever it sits in argv -- the reference interpreter checks
-      --  it before parsing anything else, so a bad flag earlier in the
-      --  line never hides it.
-      for J in Args'Range loop
-         if Value (Args (J)) in "-h" | "--help" then
-            Result.Is_Help := True;
-            return;
-         end if;
-      end loop;
-      while I <= Args'Last loop
-         pragma
-           Loop_Invariant
-             (I in Args'First .. Args'Last + 1 and then not Result.Is_Refused);
+      while I <= Args'Last and then not Refused (Result) loop
+         pragma Loop_Invariant (I in Args'Range);
          pragma Loop_Variant (Increases => I);
          Handle_Token (Args, I, Result);
-         exit when Result.Is_Refused;
       end loop;
-   end Parse;
+      return Result;
+   end Scanned;
+
+   function Help_Requested (Args : Arg_List) return Boolean
+   is (for some A of Args => Spells (Help_Flag, Texts.Value (A)));
+
+   Help_Only : constant Options_Result := (Is_Help => True, others => <>);
+
+   function Parse (Args : Arg_List) return Options_Result
+   is (if Args'Length = 0 or else Help_Requested (Args)
+       then Help_Only
+       else Scanned (Args));
+
+   ---------------------------------------------------------------------
+   --  The help screen: a title, the usage line, then one line per flag
+   --  from its row of the table, and a second one when its description
+   --  continues.  A flag's line starts with its lead, padded to
+   --  Help_Column, where its description starts.  The screen's capacity
+   --  is the room these lines can take at most, so every piece fits:
+   --  the proof shows Ok stays True.
+   ---------------------------------------------------------------------
+
+   Blank : constant Character := ' ';
+   LF    : constant Character := ASCII.LF;
+
+   Title_Line   : constant String := "fabula: a Cucumber/Gherkin test runner";
+   Usage_Line   : constant String :=
+     "usage: <binary> [<file>"
+     & Feature_Suffix
+     & " | <file>"
+     & Feature_Suffix
+     & ":LINE... | <dir>]... [options]";
+   Options_Line : constant String := "options:";
+
+   --  The line end each line after the title starts with.
+   Line_End_Length : constant := 1;
+
+   --  The most one help line takes: its line end, its lead padded to
+   --  Help_Column, and its description.
+   Help_Line_Room : constant :=
+     Line_End_Length + Help_Column + Longest_Description;
+
+   --  A flag's help line and the line that continues its description.
+   Lines_Per_Flag : constant := 2;
+   Flag_Room      : constant := Lines_Per_Flag * Help_Line_Room;
+
+   Flag_Count : constant :=
+     Spelled_Flag'Pos (Spelled_Flag'Last)
+     - Spelled_Flag'Pos (Spelled_Flag'First)
+     + 1;
+
+   --  The title, the usage line, an empty line and the options line.
+   Head_Length : constant Natural :=
+     Title_Line'Length
+     + Line_End_Length
+     + Usage_Line'Length
+     + Line_End_Length
+     + Line_End_Length
+     + Options_Line'Length;
+
+   Help_Capacity : constant Positive := Head_Length + Flag_Count * Flag_Room;
+
+   subtype Screen_Text is Texts.Bounded_Text (Help_Capacity);
+
+   --  F's lead: its spellings and its value hint.
+   function Option_Lead (F : Spelled_Flag) return String
+   is (Option_Indent
+       & (if Short_Of (F) = "" then "" else Short_Of (F) & Short_Separator)
+       & Long_Of (F)
+       & Texts.Value (Flags (F).Hint))
+   with Post => Option_Lead'Result'Length <= Help_Column;
+
+   --  Starts a new line of Screen with Text; Ok stays True when it fits.
+   procedure Add_Text
+     (Screen : in out Screen_Text; Ok : in out Boolean; Text : String)
+   with
+     Pre  => Text'Length <= Help_Capacity,
+     Post =>
+       Texts.Length (Screen)
+       <= Texts.Length (Screen'Old) + Line_End_Length + Text'Length
+       and then (if Ok'Old
+                   and then Texts.Length (Screen'Old)
+                            <= Help_Capacity - Line_End_Length - Text'Length
+                 then Ok)
+   is
+   begin
+      Texts.Append (Screen, [LF], Ok);
+      Texts.Append (Screen, Text, Ok);
+   end Add_Text;
+
+   --  Starts a new line of Screen with Lead, then blanks up to
+   --  Help_Column, then Description.
+   procedure Add_Help_Line
+     (Screen      : in out Screen_Text;
+      Ok          : in out Boolean;
+      Lead        : String;
+      Description : String)
+   with
+     Pre  =>
+       Lead'Length <= Help_Column
+       and then Description'Length <= Longest_Description,
+     Post =>
+       Texts.Length (Screen) <= Texts.Length (Screen'Old) + Help_Line_Room
+       and then (if Ok'Old
+                   and then Texts.Length (Screen'Old)
+                            <= Help_Capacity - Help_Line_Room
+                 then Ok)
+   is
+   begin
+      Add_Text (Screen, Ok, Lead);
+      Texts.Append (Screen, [1 .. Help_Column - Lead'Length => Blank], Ok);
+      Texts.Append (Screen, Description, Ok);
+   end Add_Help_Line;
+
+   --  F's help line, and the line that continues its description.
+   procedure Add_Flag
+     (Screen : in out Screen_Text; Ok : in out Boolean; F : Spelled_Flag)
+   with
+     Post =>
+       Texts.Length (Screen) <= Texts.Length (Screen'Old) + Flag_Room
+       and then (if Ok'Old
+                   and then Texts.Length (Screen'Old)
+                            <= Help_Capacity - Flag_Room
+                 then Ok)
+   is
+      Continued : constant String := Texts.Value (Flags (F).Continued);
+   begin
+      Add_Help_Line
+        (Screen, Ok, Option_Lead (F), Texts.Value (Flags (F).Description));
+      if Continued /= "" then
+         Add_Help_Line (Screen, Ok, "", Continued);
+      end if;
+   end Add_Flag;
+
+   function Built_Screen return Screen_Text with Global => null is
+      Screen : Screen_Text;
+      Ok     : Boolean := True;
+   begin
+      Texts.Append (Screen, Title_Line, Ok);
+      Add_Text (Screen, Ok, Usage_Line);
+      Add_Text (Screen, Ok, "");
+      Add_Text (Screen, Ok, Options_Line);
+      for F in Spelled_Flag loop
+         pragma
+           Loop_Invariant
+             (Ok
+                and then Texts.Length (Screen)
+                         <= Head_Length
+                            + (Spelled_Flag'Pos (F)
+                               - Spelled_Flag'Pos (Spelled_Flag'First))
+                              * Flag_Room);
+         Add_Flag (Screen, Ok, F);
+      end loop;
+      pragma Assert (Ok);
+      return Screen;
+   end Built_Screen;
+
+   Help_Screen : constant Screen_Text := Built_Screen;
+
+   function Help_Text return String
+   is (Texts.Value (Help_Screen));
 
 end Fabula.Cli;

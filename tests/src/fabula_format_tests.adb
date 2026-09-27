@@ -203,6 +203,39 @@ package body Fabula_Format_Tests is
       end;
    end Test_Table_Row_Rendering;
 
+   --  The document queries both reporters share: a scenario's keyword as
+   --  written, a step's keyword as the reference interpreter spells it,
+   --  and an outline row's header row.
+   procedure Test_Document_Queries
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Block : Examples_Node;
+   begin
+      Load ("2_scenario_outline.feature");
+      Assert (Scenario_Keyword (Doc, 1) = "Scenario Outline", "an outline's");
+      Assert (Scenario_Keyword (Doc, 2) = "Scenario Template", "as written");
+      Assert (Scenario_Keyword (Doc, No_Scenario) = "", "no scenario");
+      Assert (Scenario_Keyword (Doc, 3) = "", "a stale scenario");
+      Assert
+        (Step_Keyword (Doc, Scenario (Doc, 1).Steps.First) = "Given",
+         "a step's");
+      Assert
+        (Step_Keyword (Doc, Scenario (Doc, 1).Steps.Last) = "Then",
+         "the last step's");
+      Assert (Step_Keyword (Doc, No_Step) = "", "no step");
+      Block := Examples (Doc, 2);
+      Assert
+        (Header_Row_For (Doc, 2, Block.Rows.Last) = Block.Header_Row,
+         "a data row's header row");
+      Assert
+        (Header_Row_For (Doc, 1, Block.Rows.Last) = No_Examples_Row,
+         "not another outline's block");
+      Assert
+        (Header_Row_For (Doc, 2, No_Examples_Row) = No_Examples_Row,
+         "a plain step has none");
+   end Test_Document_Queries;
+
    procedure Test_Stale_Table_Row (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
@@ -525,6 +558,8 @@ package body Fabula_Format_Tests is
          Test_Table_Row_Rendering'Access,
          "a table's rows, oracle byte-exact");
       Register_Routine (T, Test_Stale_Table_Row'Access, "a null table row");
+      Register_Routine
+        (T, Test_Document_Queries'Access, "the reporters' document queries");
       Register_Routine
         (T,
          Test_Doc_String_Rendering'Access,

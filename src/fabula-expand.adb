@@ -397,6 +397,65 @@ is
       end;
    end Next_Example;
 
+   --  Block E is in the pool, its header row too, and its data rows
+   --  hold Data_Row, which is in the pool.
+   function Holds_Row
+     (Doc      : Ast.Document;
+      E        : Ast.Examples_Index;
+      Data_Row : Ast.Examples_Row_Index) return Boolean
+   is (E <= Ast.Examples_Count (Doc)
+       and then Ast.Examples_Row_Pool.Is_Live
+                  (Ast.Examples (Doc, E).Header_Row,
+                   Ast.Examples_Row_Count (Doc))
+       and then Data_Row <= Ast.Examples_Row_Count (Doc)
+       and then Data_Row
+                in Ast.Examples (Doc, E).Rows.First
+                 .. Ast.Examples (Doc, E).Rows.Last);
+
+   --  The due row of the first of Blocks that holds Data_Row.
+   function Row_In_Blocks
+     (Doc      : Ast.Document;
+      Blocks   : Ast.Examples_Range;
+      Data_Row : Ast.Examples_Row_Index) return Example_Ref
+   with
+     Post =>
+       Row_In_Blocks'Result = No_Example
+       or else (Usable (Doc, Row_In_Blocks'Result)
+                and then Row_In_Blocks'Result.Data_Row = Data_Row)
+   is
+      function Holds (I : Positive) return Boolean
+      is (I <= Natural (Ast.Examples_Index'Last)
+          and then Holds_Row (Doc, Ast.Examples_Index (I), Data_Row));
+
+      function First_Holder is new Searches.Find_First (Holds);
+
+      Found : constant Natural :=
+        First_Holder (Positive (Blocks.First), Integer (Blocks.Last));
+   begin
+      return
+        (if Found = Searches.Not_Found
+         then No_Example
+         else
+           (Status     => Row_Due,
+            Block      => Ast.Examples_Index (Found),
+            Header_Row =>
+              Ast.Examples (Doc, Ast.Examples_Index (Found)).Header_Row,
+            Data_Row   => Data_Row));
+   end Row_In_Blocks;
+
+   function Locate_Row
+     (Doc      : Ast.Document;
+      S        : Ast.Scenario_Handle;
+      Data_Row : Ast.Examples_Row_Handle) return Example_Ref is
+   begin
+      if S not in 1 .. Ast.Scenario_Count (Doc)
+        or else Data_Row = Ast.No_Examples_Row
+      then
+         return No_Example;
+      end if;
+      return Row_In_Blocks (Doc, Ast.Scenario (Doc, S).Examples, Data_Row);
+   end Locate_Row;
+
    function Concrete_Name
      (Doc        : Ast.Document;
       S          : Ast.Scenario_Index;

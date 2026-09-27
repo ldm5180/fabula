@@ -1,6 +1,9 @@
+with Ada.Characters.Handling;
+
 with Fabula.Check;
 with Fabula.Expand;
 with Fabula.Scan;
+with Fabula.Searches;
 
 package body Fabula.Format
   with SPARK_Mode
@@ -10,8 +13,11 @@ is
    use type Ast.Doc_Handle;
    use type Ast.Doc_Line_Handle;
    use type Ast.Row_Handle;
+   use type Ast.Scenario_Handle;
+   use type Ast.Step_Handle;
 
    Quote : constant Character := '"';
+   Blank : constant Character := ' ';
 
    --  A bounded text accumulator: Put appends what fits; once one piece
    --  does not, Ok drops and every later piece is dropped too, so a
@@ -20,53 +26,27 @@ is
    --  ever builds (an escaped JSON field); every smaller use leaves
    --  the rest unused.
    type Builder is record
-      Ok  : Boolean := True;
-      Buf : String (1 .. Limits.Max_Escaped_Text_Length) := [others => ' '];
-      Len : Natural := 0;
+      Ok   : Boolean := True;
+      Text : Texts.Bounded_Text (Limits.Max_Escaped_Text_Length);
    end record;
 
-   procedure Put (B : in out Builder; Piece : String)
-   with Pre => B.Len <= B.Buf'Length, Post => B.Len <= B.Buf'Length
-   is
+   procedure Put (B : in out Builder; Piece : String) is
    begin
-      if not B.Ok then
-         return;
-      elsif Piece'Length <= B.Buf'Length - B.Len then
-         B.Buf
-           (B.Buf'First + B.Len .. B.Buf'First + B.Len + Piece'Length - 1) :=
-           Piece;
-         B.Len := B.Len + Piece'Length;
-      else
-         B.Ok := False;
-      end if;
+      Texts.Append (B.Text, Piece, B.Ok);
    end Put;
 
-   procedure Put (B : in out Builder; Ch : Character)
-   with Pre => B.Len <= B.Buf'Length, Post => B.Len <= B.Buf'Length
-   is
+   procedure Put (B : in out Builder; Ch : Character) is
    begin
-      Put (B, [1 => Ch]);
+      Put (B, [Ch]);
    end Put;
 
    function Text_Of (B : Builder) return String
-   is (B.Buf (1 .. B.Len))
-   with Pre => B.Len <= B.Buf'Length;
+   is (Texts.Value (B.Text))
+   with Post => Text_Of'Result'Length <= Limits.Max_Escaped_Text_Length;
 
-   --  J.Len's own subtype (0 .. Limits.Max_Line_Length, matching
-   --  J.Val's length) already guarantees it never runs past J.Val, so
-   --  this needs no Pre or Post beyond that subtype.
    procedure Put (J : in out Joined_Text; Piece : String) is
    begin
-      if not J.Ok then
-         return;
-      elsif Piece'Length <= J.Val'Length - J.Len then
-         J.Val
-           (J.Val'First + J.Len .. J.Val'First + J.Len + Piece'Length - 1) :=
-           Piece;
-         J.Len := J.Len + Piece'Length;
-      else
-         J.Ok := False;
-      end if;
+      Texts.Append (J.Text, Piece, J.Ok);
    end Put;
 
    ---------------------------------------------------------------------
@@ -90,11 +70,24 @@ is
       end case;
    end Status_Word;
 
+   function Status_Name (S : Results.Status) return String
+   is (Ada.Characters.Handling.To_Lower (Status_Word (S)));
+
+   Label_Open  : constant String := "[   ";
+   Label_Close : constant String := "] ";
+
+   --  The room a status word has inside the label, padding included.
+   Label_Word_Width : constant Natural :=
+     Bracket_Label_Length - Label_Open'Length - Label_Close'Length;
+
    function Bracket_Label (S : Results.Status) return String is
       Word : constant String := Status_Word (S);
-      Pad  : constant String (1 .. 10 - Word'Length) := [others => ' '];
    begin
-      return "[   " & Word & Pad & "] ";
+      return
+        Label_Open
+        & Word
+        & [1 .. Label_Word_Width - Word'Length => Blank]
+        & Label_Close;
    end Bracket_Label;
 
    ---------------------------------------------------------------------
@@ -105,7 +98,7 @@ is
       B : Builder;
    begin
       Put (B, Keyword);
-      Put (B, ": ");
+      Put (B, Header_Separator);
       Put (B, Name);
       return Text_Of (B);
    end Header_Text;
@@ -114,7 +107,7 @@ is
       B : Builder;
    begin
       Put (B, Keyword);
-      Put (B, ' ');
+      Put (B, Step_Separator);
       Put (B, Text);
       return Text_Of (B);
    end Step_Text;
@@ -123,52 +116,81 @@ is
    function Line_Image (Line_No : Line_Number) return String
    is (Check.Integer_Image (Integer (Line_No)));
 
+   Location_Lead : constant String := "  ";
+   Line_Mark     : constant Character := ':';
+
    function Location_Text (File : String; Line_No : Line_Number) return String
    is
       B : Builder;
    begin
-      Put (B, "  ");
+      Put (B, Location_Lead);
       Put (B, File);
-      Put (B, ':');
+      Put (B, Line_Mark);
       Put (B, Line_Image (Line_No));
       return Text_Of (B);
    end Location_Text;
 
    ---------------------------------------------------------------------
+   --  The document queries both reporters make.
+   ---------------------------------------------------------------------
+
+   function Scenario_Keyword
+     (Doc : Ast.Document; S : Ast.Scenario_Handle) return String
+   is (if S in 1 .. Ast.Scenario_Count (Doc)
+       then Ast.Text (Doc, Ast.Scenario (Doc, S).Head.Keyword)
+       else "");
+
+   function Step_Keyword
+     (Doc : Ast.Document; Step : Ast.Step_Handle) return String
+   is (if Step in 1 .. Ast.Step_Count (Doc)
+       then Scan.Spelling (Ast.Step (Doc, Step).Keyword)
+       else "");
+
+   function Header_Row_For
+     (Doc      : Ast.Document;
+      S        : Ast.Scenario_Handle;
+      Data_Row : Ast.Examples_Row_Handle) return Ast.Examples_Row_Handle
+   is (Expand.Header_Row_Of (Expand.Locate_Row (Doc, S, Data_Row)));
+
+   ---------------------------------------------------------------------
    --  Tables.
    ---------------------------------------------------------------------
 
-   --  The two Examples-row handles a resolution needs; both 0 for a
-   --  plain scenario's step. Bundled so a helper stays within R5's
-   --  five-parameter limit once it also carries a cell or a widths
-   --  array.
+   --  A column's width before any cell widens it.
+   No_Width : constant Natural := 0;
+
+   --  The two Examples-row handles a resolution needs; both
+   --  No_Examples_Row for a plain scenario's step. Bundled so a helper
+   --  stays within R5's five-parameter limit once it also carries a cell
+   --  or a widths array.
    type Substitution is record
-      Header_Row : Ast.Examples_Row_Handle := 0;
-      Data_Row   : Ast.Examples_Row_Handle := 0;
+      Header_Row : Ast.Examples_Row_Handle := Ast.No_Examples_Row;
+      Data_Row   : Ast.Examples_Row_Handle := Ast.No_Examples_Row;
    end record;
 
-   --  Widens Widths by one cell; a stale cell (past the Document's
-   --  current pool) counts as width 0, never read.
+   --  C's resolved text; "" for a stale cell (past the Document's
+   --  current pool), which is never read.
+   function Cell_Text
+     (Doc : Ast.Document; C : Ast.Cell_Handle; Sub : Substitution)
+      return String
+   is (if C in 1 .. Ast.Cell_Count (Doc)
+       then
+         Expand.Value
+           (Expand.Resolved
+              (Doc, Ast.Cell (Doc, C), Sub.Header_Row, Sub.Data_Row))
+       else "");
+
+   --  Widens Widths by one cell.
    procedure Widen_Column
      (Doc    : Ast.Document;
       C      : Ast.Cell_Handle;
       Col    : Positive;
       Sub    : Substitution;
-      Widths : in out Column_Widths)
-   is
-      Len : constant Natural :=
-        (if C = 0 or else C > Ast.Cell_Count (Doc)
-         then 0
-         else
-           Expand.Value
-             (Expand.Resolved
-                (Doc,
-                 Ast.Cell (Doc, C),
-                 Sub.Header_Row,
-                 Sub.Data_Row))'Length);
+      Widths : in out Column_Widths) is
    begin
       if Col <= Limits.Max_Table_Columns then
-         Widths (Col) := Natural'Max (Widths (Col), Len);
+         Widths (Col) :=
+           Natural'Max (Widths (Col), Cell_Text (Doc, C, Sub)'Length);
       end if;
    end Widen_Column;
 
@@ -180,7 +202,7 @@ is
       Sub    : Substitution;
       Widths : in out Column_Widths) is
    begin
-      if Row = 0 or else Row > Ast.Table_Row_Count (Doc) then
+      if Row not in 1 .. Ast.Table_Row_Count (Doc) then
          return;
       end if;
       declare
@@ -198,9 +220,9 @@ is
       Header_Row : Ast.Examples_Row_Handle;
       Data_Row   : Ast.Examples_Row_Handle) return Column_Widths
    is
-      Result : Column_Widths := [others => 0];
+      Result : Column_Widths := [others => No_Width];
    begin
-      if T = 0 or else T > Ast.Table_Count (Doc) then
+      if T not in 1 .. Ast.Table_Count (Doc) then
          return Result;
       end if;
       declare
@@ -219,8 +241,12 @@ is
    --  so this bundles only the substitution row pair and the widths.
    type Cell_Context is record
       Sub    : Substitution;
-      Widths : Column_Widths := [others => 0];
+      Widths : Column_Widths := [others => No_Width];
    end record;
+
+   Row_Open   : constant String := "  |";
+   Cell_Lead  : constant String := " ";
+   Cell_Close : constant String := " |";
 
    procedure Put_Cell
      (Doc : Ast.Document;
@@ -228,42 +254,28 @@ is
       Col : Positive;
       Ctx : Cell_Context;
       B   : in out Builder)
-   with Pre => B.Len <= B.Buf'Length, Post => B.Len <= B.Buf'Length
    is
-      Text  : constant String :=
-        (if C = 0 or else C > Ast.Cell_Count (Doc)
-         then ""
-         else
-           Expand.Value
-             (Expand.Resolved
-                (Doc,
-                 Ast.Cell (Doc, C),
-                 Ctx.Sub.Header_Row,
-                 Ctx.Sub.Data_Row)));
+      Text  : constant String := Cell_Text (Doc, C, Ctx.Sub);
       Width : constant Natural :=
         (if Col <= Limits.Max_Table_Columns
          then Ctx.Widths (Col)
          else Text'Length);
    begin
-      Put (B, " ");
+      Put (B, Cell_Lead);
       Put (B, Text);
       for I in Text'Length + 1 .. Width loop
-         pragma Loop_Invariant (B.Len <= B.Buf'Length);
-         Put (B, " ");
+         Put (B, Blank);
       end loop;
-      Put (B, " |");
+      Put (B, Cell_Close);
    end Put_Cell;
 
    procedure Put_Cells
      (Doc   : Ast.Document;
       Cells : Ast.Cell_Range;
       Ctx   : Cell_Context;
-      B     : in out Builder)
-   with Pre => B.Len <= B.Buf'Length, Post => B.Len <= B.Buf'Length
-   is
+      B     : in out Builder) is
    begin
       for C in Cells.First .. Cells.Last loop
-         pragma Loop_Invariant (B.Len <= B.Buf'Length);
          Put_Cell (Doc, C, Natural (C - Cells.First) + 1, Ctx, B);
       end loop;
    end Put_Cells;
@@ -277,8 +289,8 @@ is
    is
       B : Builder;
    begin
-      Put (B, "  |");
-      if Row /= 0 and then Row <= Ast.Table_Row_Count (Doc) then
+      Put (B, Row_Open);
+      if Row in 1 .. Ast.Table_Row_Count (Doc) then
          Put_Cells
            (Doc,
             Ast.Table_Row (Doc, Row).Cells,
@@ -296,15 +308,15 @@ is
      (Doc        : Ast.Document;
       L          : Ast.Doc_Line_Handle;
       Header_Row : Ast.Examples_Row_Handle;
-      Data_Row   : Ast.Examples_Row_Handle) return String is
-   begin
-      if L = 0 or else L > Ast.Doc_Line_Count (Doc) then
-         return "";
-      end if;
-      return
-        Expand.Value
-          (Expand.Resolved (Doc, Ast.Doc_Line (Doc, L), Header_Row, Data_Row));
-   end Doc_Content_Text;
+      Data_Row   : Ast.Examples_Row_Handle) return String
+   is (if L in 1 .. Ast.Doc_Line_Count (Doc)
+       then
+         Expand.Value
+           (Expand.Resolved (Doc, Ast.Doc_Line (Doc, L), Header_Row, Data_Row))
+       else "");
+
+   --  What the reference interpreter joins lines with: one space.
+   Join_Separator : constant String := " ";
 
    --  Space-joins D's resolved lines into J; a stale line (past the
    --  Document's current pool) stops the join and refuses it.
@@ -313,24 +325,19 @@ is
       Lines      : Ast.Doc_Line_Range;
       Header_Row : Ast.Examples_Row_Handle;
       Data_Row   : Ast.Examples_Row_Handle;
-      J          : in out Joined_Text)
-   is
-      Seen : Boolean := False;
+      J          : in out Joined_Text) is
    begin
       for L in Lines.First .. Lines.Last loop
          if L > Ast.Doc_Line_Count (Doc) then
             J.Ok := False;
             return;
          end if;
-         if Seen then
-            Put (J, " ");
-         end if;
+         Put (J, (if L = Lines.First then "" else Join_Separator));
          Put
            (J,
             Expand.Value
               (Expand.Resolved
                  (Doc, Ast.Doc_Line (Doc, L), Header_Row, Data_Row)));
-         Seen := True;
       end loop;
    end Join_Lines;
 
@@ -340,12 +347,11 @@ is
       Header_Row : Ast.Examples_Row_Handle;
       Data_Row   : Ast.Examples_Row_Handle) return Joined_Text
    is
-      Result : Joined_Text := (Ok => False, others => <>);
+      Result : Joined_Text := (Ok => True, others => <>);
    begin
-      if D = 0 or else D > Ast.Doc_String_Count (Doc) then
-         return Result;
+      if D not in 1 .. Ast.Doc_String_Count (Doc) then
+         return (Ok => False, others => <>);
       end if;
-      Result.Ok := True;
       Join_Lines
         (Doc, Ast.Doc_String (Doc, D).Lines, Header_Row, Data_Row, Result);
       return Result;
@@ -361,12 +367,8 @@ is
       for I in Raw'Range loop
          pragma Loop_Invariant (Start in Raw'First .. I + 1);
          if Raw (I) = ASCII.LF then
-            declare
-               Stop : constant Natural := I - 1;
-            begin
-               Put (Result, Raw (Start .. Stop));
-            end;
-            Put (Result, " ");
+            Put (Result, Raw (Start .. I - 1));
+            Put (Result, Join_Separator);
             Start := I + 1;
          end if;
       end loop;
@@ -378,6 +380,28 @@ is
    --  Count summaries.
    ---------------------------------------------------------------------
 
+   --  The categories each summary prints, in the reference interpreter's
+   --  order.
+   type Status_Order is array (Positive range <>) of Results.Status;
+
+   Scenario_Categories : constant Status_Order :=
+     [Results.Failed, Results.Skipped, Results.Passed];
+   Step_Categories     : constant Status_Order :=
+     [Results.Failed, Results.Undefined, Results.Skipped, Results.Passed];
+
+   --  One thing counted takes the singular noun; any other count the
+   --  plural.
+   Singular_Count : constant Natural := 1;
+
+   Scenario_Noun      : constant String := " Scenario";
+   Scenarios_Noun     : constant String := " Scenarios";
+   Step_Noun          : constant String := " Step";
+   Steps_Noun         : constant String := " Steps";
+   Categories_Open    : constant String := " (";
+   Categories_Close   : constant String := ")";
+   Category_Separator : constant String := ", ";
+   Count_Separator    : constant String := " ";
+
    --  Appends "<n> <label>" to B, with a leading ", " once a prior
    --  category has already printed; Count = 0 prints nothing. Seen
    --  reports forward to the next category in the same summary.
@@ -385,67 +409,45 @@ is
      (Count : Natural;
       Label : String;
       Seen  : in out Boolean;
-      B     : in out Builder)
-   with Pre => B.Len <= B.Buf'Length, Post => B.Len <= B.Buf'Length
-   is
+      B     : in out Builder) is
    begin
-      if Count > 0 then
-         if Seen then
-            Put (B, ", ");
-         end if;
+      if Results.Counted (Count) then
+         Put (B, (if Seen then Category_Separator else ""));
          Put (B, Check.Integer_Image (Count));
-         Put (B, " ");
+         Put (B, Count_Separator);
          Put (B, Label);
          Seen := True;
       end if;
    end Put_Category;
 
-   --  The same, for a summary's last category: nothing follows, so
-   --  Seen only looks back (whether a comma is needed) and the
-   --  procedure has nothing left to report forward.
-   procedure Put_Last_Category
-     (Count : Natural; Label : String; Seen : Boolean; B : in out Builder)
-   with Pre => B.Len <= B.Buf'Length, Post => B.Len <= B.Buf'Length
+   --  "<total><noun> (<category>, ...)", the noun Singular for a total
+   --  of one and Plural otherwise.
+   function Summary
+     (Counts   : Results.Status_Counts;
+      Singular : String;
+      Plural   : String;
+      Order    : Status_Order) return String
    is
-   begin
-      if Count > 0 then
-         if Seen then
-            Put (B, ", ");
-         end if;
-         Put (B, Check.Integer_Image (Count));
-         Put (B, " ");
-         Put (B, Label);
-      end if;
-   end Put_Last_Category;
-
-   function Scenarios_Summary (C : Results.Counts) return String is
-      Total : constant Natural := Results.Total (C.Scenarios);
+      Total : constant Natural := Results.Total (Counts);
       B     : Builder;
       Seen  : Boolean := False;
    begin
       Put (B, Check.Integer_Image (Total));
-      Put (B, (if Total > 1 then " Scenarios (" else " Scenario ("));
-      Put_Category (C.Scenarios (Results.Failed), "failed", Seen, B);
-      Put_Category (C.Scenarios (Results.Skipped), "skipped", Seen, B);
-      Put_Last_Category (C.Scenarios (Results.Passed), "passed", Seen, B);
-      Put (B, ")");
+      Put (B, (if Total > Singular_Count then Plural else Singular));
+      Put (B, Categories_Open);
+      for S of Order loop
+         Put_Category (Counts (S), Status_Name (S), Seen, B);
+      end loop;
+      Put (B, Categories_Close);
       return Text_Of (B);
-   end Scenarios_Summary;
+   end Summary;
 
-   function Steps_Summary (C : Results.Counts) return String is
-      Total : constant Natural := Results.Total (C.Steps);
-      B     : Builder;
-      Seen  : Boolean := False;
-   begin
-      Put (B, Check.Integer_Image (Total));
-      Put (B, (if Total > 1 then " Steps (" else " Step ("));
-      Put_Category (C.Steps (Results.Failed), "failed", Seen, B);
-      Put_Category (C.Steps (Results.Undefined), "undefined", Seen, B);
-      Put_Category (C.Steps (Results.Skipped), "skipped", Seen, B);
-      Put_Last_Category (C.Steps (Results.Passed), "passed", Seen, B);
-      Put (B, ")");
-      return Text_Of (B);
-   end Steps_Summary;
+   function Scenarios_Summary (C : Results.Counts) return String
+   is (Summary
+         (C.Scenarios, Scenario_Noun, Scenarios_Noun, Scenario_Categories));
+
+   function Steps_Summary (C : Results.Counts) return String
+   is (Summary (C.Steps, Step_Noun, Steps_Noun, Step_Categories));
 
    ---------------------------------------------------------------------
    --  The failed-scenarios store.
@@ -461,18 +463,17 @@ is
          return;
       end if;
       Store.Count := Store.Count + 1;
-      Store.Items (Store.Count).Name (1 .. Name'Length) := Name;
-      Store.Items (Store.Count).Name_Len := Name'Length;
-      Store.Items (Store.Count).File (1 .. File'Length) := File;
-      Store.Items (Store.Count).File_Len := File'Length;
-      Store.Items (Store.Count).Line := Line_No;
+      Store.Items (Store.Count) :=
+        (Name => Texts.Truncated (Name, Limits.Max_Name_Length),
+         File => Texts.Truncated (File, Limits.Max_Path_Length),
+         Line => Line_No);
    end Add_Failed;
 
    function Failed_Name (Store : Failed_Store; I : Positive) return String
-   is (Store.Items (I).Name (1 .. Store.Items (I).Name_Len));
+   is (Texts.Value (Store.Items (I).Name));
 
    function Failed_File (Store : Failed_Store; I : Positive) return String
-   is (Store.Items (I).File (1 .. Store.Items (I).File_Len));
+   is (Texts.Value (Store.Items (I).File));
 
    function Failed_Line (Store : Failed_Store; I : Positive) return Line_Number
    is (Store.Items (I).Line);
@@ -481,37 +482,44 @@ is
    --  -v's non-hook lines.
    ---------------------------------------------------------------------
 
+   Scenario_Start_Lead : constant String := "[   VERBOSE   ] Scenario Start '";
+   Scenario_File_Lead  : constant String := "' - File: ";
+
    function Verbose_Scenario_Start
      (Name : String; File : String; Line_No : Line_Number) return String
    is
       B : Builder;
    begin
-      Put (B, "[   VERBOSE   ] Scenario Start '");
+      Put (B, Scenario_Start_Lead);
       Put (B, Name);
-      Put (B, "' - File: ");
+      Put (B, Scenario_File_Lead);
       Put (B, File);
-      Put (B, ':');
+      Put (B, Line_Mark);
       Put (B, Line_Image (Line_No));
       return Text_Of (B);
    end Verbose_Scenario_Start;
+
+   Tags_Lead        : constant String := "[   VERBOSE   ] Scenario tags '";
+   Tags_Close       : constant String := "'";
+   Expression_Lead  : constant String :=
+     "                checked against tag expression '";
+   Expression_Close : constant String := "' -> ";
+   Tags_Passed      : constant String := "'True', continuing with scenario";
+   Tags_Failed      : constant String := "'False', stopping scenario";
 
    function Verbose_Tag_Check
      (Tags : String; Expression : String; Passed : Boolean) return String
    is
       B : Builder;
    begin
-      Put (B, "[   VERBOSE   ] Scenario tags '");
+      Put (B, Tags_Lead);
       Put (B, Tags);
-      Put (B, "'");
+      Put (B, Tags_Close);
       Put (B, ASCII.LF);
-      Put (B, "                checked against tag expression '");
+      Put (B, Expression_Lead);
       Put (B, Expression);
-      Put (B, "' -> ");
-      Put
-        (B,
-         (if Passed
-          then "'True', continuing with scenario"
-          else "'False', stopping scenario"));
+      Put (B, Expression_Close);
+      Put (B, (if Passed then Tags_Passed else Tags_Failed));
       return Text_Of (B);
    end Verbose_Tag_Check;
 
@@ -552,27 +560,30 @@ is
    end Parse_Message;
 
    function First_Token (Text : String) return String is
-      Start : Natural := 0;
+      function Is_Word_Char (I : Positive) return Boolean
+      is (I in Text'Range and then Text (I) not in Space_Or_Tab);
+
+      function Is_Blank_Char (I : Positive) return Boolean
+      is (I in Text'Range and then Text (I) in Space_Or_Tab);
+
+      function First_Word_Char is new Searches.Find_First (Is_Word_Char);
+      function First_Blank_Char is new Searches.Find_First (Is_Blank_Char);
+
+      --  An empty Text may have any bounds; a search from Positive'First
+      --  finds nothing in it all the same.
+      Start : constant Natural :=
+        First_Word_Char (Integer'Max (Text'First, Positive'First), Text'Last);
    begin
-      for I in Text'Range loop
-         if Text (I) /= ' ' and then Text (I) /= ASCII.HT then
-            Start := I;
-            exit;
-         end if;
-      end loop;
-      if Start = 0 then
+      if Start = Searches.Not_Found then
          return "";
       end if;
-      declare
-         Last : Natural := Start;
-      begin
-         for I in Start .. Text'Last loop
-            pragma Loop_Invariant (Last in Start .. Text'Last);
-            exit when Text (I) = ' ' or else Text (I) = ASCII.HT;
-            Last := I;
-         end loop;
-         return Text (Start .. Last);
-      end;
+      return
+        (declare
+           Stop : constant Natural := First_Blank_Char (Start, Text'Last);
+         begin
+           Text
+             (Start
+              .. (if Stop = Searches.Not_Found then Text'Last else Stop - 1)));
    end First_Token;
 
    --  One pass, one flag: In_Tag is True while stepping through a "@..."
@@ -583,7 +594,7 @@ is
       In_Tag : Boolean := False;
    begin
       for I in Text'Range loop
-         if Text (I) = ' ' or else Text (I) = ASCII.HT then
+         if Text (I) in Space_Or_Tab then
             In_Tag := False;
          elsif In_Tag then
             null;
@@ -602,6 +613,36 @@ is
    is (Kind = Parse.Unterminated_Doc_String
        or else Kind = Parse.Pool_Exhausted);
 
+   Error_Word    : constant String := ": Error";
+   No_Token_Lead : constant String := " : ";
+   At_End_Lead   : constant String := " at end: ";
+   Token_Lead    : constant String := " at '";
+   Token_Close   : constant String := "': ";
+
+   --  The part of a parse-error line between "Error" and the message.
+   procedure Put_Error_Place
+     (B      : in out Builder;
+      Kind   : Parse.Error_Kind;
+      At_End : Boolean;
+      Token  : String)
+   with Pre => Token'Length <= Limits.Max_Line_Length
+   is
+   begin
+      if No_Token_Kind (Kind) then
+         Put (B, No_Token_Lead);
+      elsif At_End then
+         Put (B, At_End_Lead);
+      else
+         Put (B, Token_Lead);
+         Put
+           (B,
+            (if Kind = Parse.Tag_Line_Malformed
+             then First_Bad_Tag_Token (Token)
+             else First_Token (Token)));
+         Put (B, Token_Close);
+      end if;
+   end Put_Error_Place;
+
    function Parse_Error_Text
      (File    : String;
       Line_No : Line_Number;
@@ -612,22 +653,10 @@ is
       B : Builder;
    begin
       Put (B, File);
-      Put (B, ':');
+      Put (B, Line_Mark);
       Put (B, Line_Image (Line_No));
-      Put (B, ": Error");
-      if No_Token_Kind (Kind) then
-         Put (B, " : ");
-      elsif At_End then
-         Put (B, " at end: ");
-      elsif Kind = Parse.Tag_Line_Malformed then
-         Put (B, " at '");
-         Put (B, First_Bad_Tag_Token (Token));
-         Put (B, "': ");
-      else
-         Put (B, " at '");
-         Put (B, First_Token (Token));
-         Put (B, "': ");
-      end if;
+      Put (B, Error_Word);
+      Put_Error_Place (B, Kind, At_End, Token);
       Put (B, Parse_Message (Kind));
       return Text_Of (B);
    end Parse_Error_Text;
@@ -636,63 +665,80 @@ is
    --  JSON.
    ---------------------------------------------------------------------
 
-   function Hex_Digit (N : Natural) return Character
-   is (if N < 10
-       then Character'Val (Character'Pos ('0') + N)
-       else Character'Val (Character'Pos ('a') + N - 10))
-   with Pre => N <= 15;
+   --  The escape of each character JSON names by a letter, and the
+   --  mark that opens every escape; No_Escape for every other one.
+   Escape_Mark : constant Character := '\';
+   No_Escape   : constant Character := ASCII.NUL;
 
-   function Unicode_Escape (Ch : Character) return String with Pre => Ch < ' '
-   is
-      Code : constant Natural := Character'Pos (Ch);
+   Named_Escapes : constant array (Character) of Character :=
+     [Quote       => Quote,
+      Escape_Mark => Escape_Mark,
+      ASCII.LF    => 'n',
+      ASCII.CR    => 'r',
+      ASCII.HT    => 't',
+      ASCII.BS    => 'b',
+      ASCII.FF    => 'f',
+      others      => No_Escape];
+
+   --  The characters below the blank, which JSON writes as "\u00XX".
+   subtype Control_Character is Character range ASCII.NUL .. ASCII.US;
+
+   Unicode_Lead : constant String := "\u00";
+   Hex_Digits   : constant String := "0123456789abcdef";
+   Hex_Radix    : constant := 16;
+
+   subtype Hex_Value is Natural range 0 .. Hex_Radix - 1;
+
+   function Hex_Digit (N : Hex_Value) return Character
+   is (Hex_Digits (Hex_Digits'First + N));
+
+   function Unicode_Escape (Ch : Control_Character) return String
+   is (Unicode_Lead
+       & Hex_Digit (Character'Pos (Ch) / Hex_Radix)
+       & Hex_Digit (Character'Pos (Ch) mod Hex_Radix));
+
+   procedure Escape_Char (Ch : Character; B : in out Builder) is
    begin
-      return "\u00" & Hex_Digit (Code / 16) & Hex_Digit (Code mod 16);
-   end Unicode_Escape;
-
-   procedure Escape_Char (Ch : Character; B : in out Builder)
-   with Pre => B.Len <= B.Buf'Length, Post => B.Len <= B.Buf'Length
-   is
-   begin
-      case Ch is
-         when '"'      =>
-            Put (B, "\""");
-
-         when '\'      =>
-            Put (B, "\\");
-
-         when ASCII.LF =>
-            Put (B, "\n");
-
-         when ASCII.CR =>
-            Put (B, "\r");
-
-         when ASCII.HT =>
-            Put (B, "\t");
-
-         when ASCII.BS =>
-            Put (B, "\b");
-
-         when ASCII.FF =>
-            Put (B, "\f");
-
-         when others   =>
-            if Ch < ' ' then
-               Put (B, Unicode_Escape (Ch));
-            else
-               Put (B, [1 => Ch]);
-            end if;
-      end case;
+      if Named_Escapes (Ch) /= No_Escape then
+         Put (B, [Escape_Mark, Named_Escapes (Ch)]);
+      elsif Ch in Control_Character then
+         Put (B, Unicode_Escape (Ch));
+      else
+         Put (B, Ch);
+      end if;
    end Escape_Char;
 
    function Escape_Json (Source : String) return String is
       B : Builder;
    begin
-      for I in Source'Range loop
-         pragma Loop_Invariant (B.Len <= B.Buf'Length);
-         Escape_Char (Source (I), B);
+      for Ch of Source loop
+         Escape_Char (Ch, B);
       end loop;
       return Text_Of (B);
    end Escape_Json;
+
+   Occurrence_Open  : constant Character := '(';
+   Occurrence_Close : constant String := ") ";
+   Id_Separator     : constant Character := ';';
+
+   --  "(N) " for an outline's concrete scenario; nothing for a plain one.
+   procedure Put_Occurrence (B : in out Builder; Occurrence : Natural) is
+   begin
+      if Occurrence /= No_Occurrence then
+         Put (B, Occurrence_Open);
+         Put (B, Check.Integer_Image (Occurrence));
+         Put (B, Occurrence_Close);
+      end if;
+   end Put_Occurrence;
+
+   --  "<Rule_Name>;" under a Rule; nothing outside one.
+   procedure Put_Rule (B : in out Builder; Rule_Name : String) is
+   begin
+      if Rule_Name'Length /= 0 then
+         Put (B, Rule_Name);
+         Put (B, Id_Separator);
+      end if;
+   end Put_Rule;
 
    function Scenario_Id
      (Feature_Name  : String;
@@ -702,48 +748,45 @@ is
    is
       B : Builder;
    begin
-      if Occurrence /= 0 then
-         Put (B, '(');
-         Put (B, Check.Integer_Image (Occurrence));
-         Put (B, ") ");
-      end if;
+      Put_Occurrence (B, Occurrence);
       Put (B, Feature_Name);
-      Put (B, ';');
-      if Rule_Name'Length /= 0 then
-         Put (B, Rule_Name);
-         Put (B, ';');
-      end if;
+      Put (B, Id_Separator);
+      Put_Rule (B, Rule_Name);
       Put (B, Scenario_Name);
       return Text_Of (B);
    end Scenario_Id;
 
+   Key_Close        : constant String := ": ";
+   Named_Array_Open : constant String := ": [";
+   Named_Open       : constant String := ": {";
+   Empty_Array      : constant String := ": []";
+
    function Indent (Depth : Depth_Value) return String
-   is ([1 .. 2 * Depth => ' '])
-   with Post => Indent'Result'Length = 2 * Depth;
+   is ([1 .. Indent_Per_Depth * Depth => Blank])
+   with Post => Indent'Result'Length = Indent_Per_Depth * Depth;
+
+   --  The comma a field or an item ends with when a sibling follows.
+   function Comma (More : Boolean) return String
+   is (if More then Element_Separator else "");
 
    function Open_Object (Depth : Depth_Value) return String
-   is (Indent (Depth) & "{");
+   is (Indent (Depth) & Object_Open);
 
    function Open_Named_Object (Key : String; Depth : Depth_Value) return String
-   is (Indent (Depth) & Quote & Key & Quote & ": {");
+   is (Indent (Depth) & Quote & Key & Quote & Named_Open);
 
    function Close_Object (Depth : Depth_Value; More : Boolean) return String
-   is (Indent (Depth) & (if More then "}," else "}"));
+   is (Indent (Depth) & (if More then Object_Close_More else Object_Close));
 
    function Open_Array (Key : String; Depth : Depth_Value) return String
-   is (Indent (Depth) & Quote & Key & Quote & ": [");
+   is (Indent (Depth) & Quote & Key & Quote & Named_Array_Open);
 
    function Close_Array (Depth : Depth_Value; More : Boolean) return String
-   is (Indent (Depth) & (if More then "]," else "]"));
+   is (Indent (Depth) & (if More then Array_Close_More else Array_Close));
 
    function Empty_Array_Field
      (Key : String; Depth : Depth_Value; More : Boolean) return String
-   is (Indent (Depth)
-       & Quote
-       & Key
-       & Quote
-       & ": []"
-       & (if More then "," else ""));
+   is (Indent (Depth) & Quote & Key & Quote & Empty_Array & Comma (More));
 
    function String_Field
      (Key, Escaped_Value : String; Depth : Depth_Value; More : Boolean)
@@ -752,20 +795,16 @@ is
        & Quote
        & Key
        & Quote
-       & ": "
+       & Key_Close
        & Quote
        & Escaped_Value
        & Quote
-       & (if More then "," else ""));
+       & Comma (More));
 
    function String_Item
      (Escaped_Value : String; Depth : Depth_Value; More : Boolean)
       return String
-   is (Indent (Depth)
-       & Quote
-       & Escaped_Value
-       & Quote
-       & (if More then "," else ""));
+   is (Indent (Depth) & Quote & Escaped_Value & Quote & Comma (More));
 
    function Number_Field
      (Key : String; Value : Natural; Depth : Depth_Value; More : Boolean)
@@ -777,11 +816,9 @@ is
       Put (B, Quote);
       Put (B, Key);
       Put (B, Quote);
-      Put (B, ": ");
+      Put (B, Key_Close);
       Put (B, Check.Integer_Image (Value));
-      if More then
-         Put (B, ',');
-      end if;
+      Put (B, Comma (More));
       return Text_Of (B);
    end Number_Field;
 
