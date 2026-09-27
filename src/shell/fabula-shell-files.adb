@@ -279,16 +279,15 @@ is
 
    type Line_Kind is (Whole, Overlong, Past_End);
 
-   subtype Buffer_Length is Natural range 0 .. Limits.Max_Line_Length + 1;
+   --  Room for one character past the longest line, so a line that ends
+   --  in CR still fits before its CR is dropped.
+   Buffer_Capacity : constant := Limits.Max_Line_Length + 1;
 
-   No_Characters : constant Buffer_Length := 0;
-
-   --  One line, Text (1 .. Len), without its LF or the CR that ends it.
-   --  An Overlong line keeps its first characters; Past_End has none.
+   --  One line, without its LF or the CR that ends it.  An Overlong line
+   --  keeps its first characters; Past_End has none.
    type Line_Buffer is record
       Kind : Line_Kind := Past_End;
-      Text : String (1 .. Limits.Max_Line_Length + 1);
-      Len  : Buffer_Length := No_Characters;
+      Text : Texts.Bounded_Text (Buffer_Capacity);
    end record;
 
    --  The next byte as a character; Got is False at the end of the file.
@@ -306,9 +305,12 @@ is
 
    --  Drops the CR that ends Line, so a CRLF file reads as its LF copy.
    procedure Strip_Trailing_CR (Line : in out Line_Buffer) is
+      Text : constant String := Texts.Value (Line.Text);
+      Last : constant Natural := Text'Length;
    begin
-      if Line.Len > 0 and then Line.Text (Line.Len) = ASCII.CR then
-         Line.Len := Line.Len - 1;
+      if Last > Texts.Empty_Length and then Text (Last) = ASCII.CR then
+         Line.Text :=
+           Texts.Truncated (Texts.Prefix (Text, Last - 1), Buffer_Capacity);
       end if;
    end Strip_Trailing_CR;
 
@@ -317,23 +319,22 @@ is
       Got     : Boolean;
       Started : Boolean := False;
    begin
-      Line.Len := 0;
+      Line.Text := Texts.Empty (Buffer_Capacity);
       loop
          Next_Byte (R, C, Got);
          exit when not Got or else C = ASCII.LF;
          Started := True;
-         if Line.Len = Line.Text'Last then
+         if Texts.Length (Line.Text) = Buffer_Capacity then
             Line.Kind := Overlong;
             return;
          end if;
-         Line.Len := Line.Len + 1;
-         Line.Text (Line.Len) := C;
+         Texts.Append_Truncated (Line.Text, [C]);
       end loop;
       Strip_Trailing_CR (Line);
       Line.Kind :=
         (if not Got and then not Started
          then Past_End
-         elsif Line.Len > Limits.Max_Line_Length
+         elsif Texts.Length (Line.Text) > Limits.Max_Line_Length
          then Overlong
          else Whole);
    end Read_Line;
@@ -341,7 +342,7 @@ is
    procedure Keep_Text (Result : in out Load_Result; Line : Line_Buffer) is
    begin
       Result.Text :=
-        Texts.Truncated (Line.Text (1 .. Line.Len), Limits.Max_Line_Length);
+        Texts.Truncated (Texts.Value (Line.Text), Limits.Max_Line_Length);
    end Keep_Text;
 
    Too_Many_Lines_Message : constant String := "more lines than it counts";
@@ -369,7 +370,7 @@ is
             return;
          end if;
          Parse.Feed
-           (Parser, Doc, Line.Text (1 .. Line.Len), Source_Line (Line_Count));
+           (Parser, Doc, Texts.Value (Line.Text), Source_Line (Line_Count));
          exit when Parse.Failed (Parser);
       end loop;
    end Feed_Lines;

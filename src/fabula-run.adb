@@ -156,9 +156,7 @@ is
 
    procedure Set_Names (Opts : in out Options; Patterns : String) is
    begin
-      Opts.Names := [others => ' '];
-      Opts.Names (1 .. Patterns'Length) := Patterns;
-      Opts.Names_Len := Patterns'Length;
+      Opts.Names := Texts.Truncated (Patterns, Limits.Max_Name_Filter_Length);
    end Set_Names;
 
    procedure Add_Line (Selection : in out Line_Selection; Line : Source_Line)
@@ -329,7 +327,7 @@ is
 
    function Line_Selected
      (Lines : Line_Selection; Line : Line_Number) return Boolean
-   is (Lines.Count = 0
+   is (Lines.Count = None_Selected
        or else (for some I in 1 .. Lines.Count => Lines.Lines (I) = Line));
 
    --  The -n patterns and the file:line selection keep the scenario.

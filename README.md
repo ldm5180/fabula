@@ -32,6 +32,10 @@ package Steps is new Fabula.Registry
    Context   => Box_Context);
 use Steps;
 
+--  Where each value sits among a step's captures, named by its role.
+Count_Capture : constant := 1;
+Item_Capture  : constant := 2;
+
 Step_Defs : constant Steps.Step_Table :=
   [Step ("An empty box")                    >= Init_Box,
    Step ("I place {int} x {string} in it")  >= Add_Item,
@@ -39,6 +43,9 @@ Step_Defs : constant Steps.Step_Table :=
 
 Hook_Defs : constant Steps.Hook_Table :=
   [After >= Close_Box];
+
+--  What a failed read of the count names.
+Count_Name : constant String := "The count";
 
 procedure Execute
   (S    : Step_Kind;
@@ -53,16 +60,17 @@ begin
       when Add_Item    =>
         declare
            N : constant Fabula.Numbers.Integer_Reads.Read :=
-             Fabula.Args.Int (A, 1);
+             Fabula.Args.Int (A, Count_Capture);
         begin
            if N.Ok then
-              Add (Ctx, Fabula.Args.Text (A, 2), N.Value);
+              Add (Ctx, Fabula.Args.Text (A, Item_Capture), N.Value);
            else
-              Fabula.Check.Ints.Fail_Read (R, N.Error, "The count");
+              Fabula.Check.Ints.Fail_Read (R, N.Error, Count_Name);
            end if;
         end;
       when Check_Count =>
-        Fabula.Check.Ints.Equal (R, Count (Ctx), Fabula.Args.Int (A, 1));
+        Fabula.Check.Ints.Equal
+          (R, Count (Ctx), Fabula.Args.Int (A, Count_Capture));
    end case;
 end Execute;
 ```
@@ -129,7 +137,7 @@ needed:
   interpreter's behavior, so check the scenario count in scripts.
 
 The proof runs at level 2 with checks and warnings as errors:
-**2,905 checks proved** across 27 core units, zero `pragma Assume`,
+**2,897 checks proved** across 27 core units, zero `pragma Assume`,
 one waiver (the decimal-to-`Long_Float` conversion, deliberately
 outside the proof; its grammar check is proved). A proof-closure
 lint fails the build if any core unit — or any generic without an
@@ -216,7 +224,8 @@ the step with the type and the reason.
   one `Reads` instance:
 
   ```ada
-  package Money_Reads is new Fabula.Numbers.Reads (Money, "Money");
+  Money_Name : constant String := "Money";
+  package Money_Reads is new Fabula.Numbers.Reads (Money, Money_Name);
   package Money_Checks is new Fabula.Check.Compare
     (Money, Image => Money_Image, Item_Reads => Money_Reads);
   ```

@@ -14,6 +14,7 @@ with Fabula.Registry;
 with Fabula.Results;
 with Fabula.Searches;
 with Fabula.Tags;
+with Fabula.Texts;
 private with Fabula.Expand;
 private with Sml.Machines;
 private with Sml.Request_Block;
@@ -27,12 +28,6 @@ package Fabula.Run with SPARK_Mode is
    use type Args.Document_Access;
    use type Tags.Compiled;
 
-   subtype Name_Filter_Length is
-     Natural range 0 .. Limits.Max_Name_Filter_Length;
-
-   --  The length of an empty -n pattern list.
-   No_Patterns : constant Name_Filter_Length := 0;
-
    --  What the command line asks of the whole run.  Names holds the -n
    --  patterns, ':'-separated; an empty list selects every scenario.
    --  Undefined steps always fail a scenario, so Strict_Undefined is
@@ -43,13 +38,11 @@ package Fabula.Run with SPARK_Mode is
       Strict_Undefined    : Boolean := True;
       Filter              : Tags.Compiled;
       Has_Filter          : Boolean := False;
-      Names               : String (1 .. Limits.Max_Name_Filter_Length) :=
-        [others => ' '];
-      Names_Len           : Name_Filter_Length := No_Patterns;
+      Names               : Texts.Bounded_Text (Limits.Max_Name_Filter_Length);
    end record;
 
    function Name_Patterns (Opts : Options) return String
-   is (Opts.Names (1 .. Opts.Names_Len));
+   is (Texts.Value (Opts.Names));
 
    --  Sets the -n patterns; the tag filter is left as it was.
    procedure Set_Names (Opts : in out Options; Patterns : String)
