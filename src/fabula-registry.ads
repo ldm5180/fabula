@@ -177,15 +177,14 @@ private
    subtype Pattern_Length is Natural range 0 .. Limits.Max_Pattern_Length;
    subtype Tag_Expr_Length is Natural range 0 .. Limits.Max_Tag_Expr_Length;
 
-   --  Compiled_Ok is Compile's verdict; Bound records that ">=" named
-   --  the kind.  Source keeps the pattern as written.
+   --  Expressions.Valid (Pattern) is Compile's verdict; Bound records
+   --  that ">=" named the kind.  Source keeps the pattern as written.
    type Step_Row is record
-      Pattern     : Expressions.Compiled;
-      Compiled_Ok : Boolean := False;
-      Bound       : Boolean := False;
-      Kind        : Step_Kind := Step_Kind'First;
-      Source      : String (1 .. Limits.Max_Pattern_Length) := [others => ' '];
-      Source_Len  : Pattern_Length := 0;
+      Pattern    : Expressions.Compiled;
+      Bound      : Boolean := False;
+      Kind       : Step_Kind := Step_Kind'First;
+      Source     : String (1 .. Limits.Max_Pattern_Length) := [others => ' '];
+      Source_Len : Pattern_Length := 0;
    end record;
 
    --  Has_Expr is False for an untagged hook, whose Expr is never
@@ -201,7 +200,7 @@ private
    end record;
 
    function Step_Status (T : Step_Table; Index : Positive) return Row_Status
-   is (if not T (Index).Compiled_Ok
+   is (if not Expressions.Valid (T (Index).Pattern)
        then Refused
        elsif not T (Index).Bound
        then Unbound

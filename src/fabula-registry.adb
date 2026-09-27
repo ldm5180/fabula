@@ -2,15 +2,8 @@ package body Fabula.Registry
   with SPARK_Mode
 is
 
-   --  The six characters the tag-expression lexer skips as blanks.
-   function Is_Whitespace (Ch : Character) return Boolean
-   is (Ch in ' ' | ASCII.HT | ASCII.CR | ASCII.LF | ASCII.VT | ASCII.FF);
-
-   function Is_Blank (Expr : String) return Boolean
-   is (for all Ch of Expr => Is_Whitespace (Ch));
-
-   --  An overlong pattern is never compiled, so Compiled_Ok stays False
-   --  and the row reads Refused.
+   --  An overlong pattern is never compiled, so the row keeps a default
+   --  pattern, which is not Valid, and reads Refused.
    function Step (Pattern : String) return Step_Row is
       Kept   : constant Pattern_Length :=
         Natural'Min (Pattern'Length, Limits.Max_Pattern_Length);
@@ -22,7 +15,7 @@ is
       end if;
       Result.Source_Len := Kept;
       if Pattern'Length <= Limits.Max_Pattern_Length then
-         Expressions.Compile (Pattern, Result.Pattern, Result.Compiled_Ok);
+         Result.Pattern := Expressions.Compile (Pattern);
       end if;
       return Result;
    end Step;
@@ -48,7 +41,7 @@ is
            Tag_Expr (Tag_Expr'First .. Tag_Expr'First + (Kept - 1));
       end if;
       Result.Source_Len := Kept;
-      if Is_Blank (Tag_Expr) then
+      if Tags.Blank (Tag_Expr) then
          return Result;
       end if;
       Result.Has_Expr := True;
@@ -112,14 +105,16 @@ is
    is (T (Index).Source (1 .. T (Index).Source_Len));
 
    function Find (T : Step_Table; Text : String) return Match_Result is
-      Captures : Expressions.Capture_List;
-      Matched  : Boolean;
    begin
       for I in T'Range loop
-         Expressions.Match (T (I).Pattern, Text, Captures, Matched);
-         if Matched then
-            return (Found => True, Index => I, Captures => Captures);
-         end if;
+         declare
+            Row : constant Expressions.Step_Match :=
+              Expressions.Match (T (I).Pattern, Text);
+         begin
+            if Row.Found then
+               return (Found => True, Index => I, Captures => Row.Captures);
+            end if;
+         end;
       end loop;
       return (Found => False, Index => 0, Captures => <>);
    end Find;

@@ -41,16 +41,14 @@ package body Fabula_Args_Tests is
 
    --  The List for Pattern matched against Text, captures only.
    function Matched (Pattern, Text : String) return List is
-      Compiled : Fabula.Expressions.Compiled;
-      Captures : Fabula.Expressions.Capture_List;
-      Ok       : Boolean;
-      Hit      : Boolean;
+      Compiled : constant Fabula.Expressions.Compiled :=
+        Fabula.Expressions.Compile (Pattern);
+      Result   : constant Fabula.Expressions.Step_Match :=
+        Fabula.Expressions.Match (Compiled, Text);
    begin
-      Fabula.Expressions.Compile (Pattern, Compiled, Ok);
-      Assert (Ok, Pattern & " must compile");
-      Fabula.Expressions.Match (Compiled, Text, Captures, Hit);
-      Assert (Hit, Pattern & " must match " & Text);
-      return Make (Text, Captures);
+      Assert (Fabula.Expressions.Valid (Compiled), Pattern & " must compile");
+      Assert (Result.Found, Pattern & " must match " & Text);
+      return Make (Text, Result.Captures);
    end Matched;
 
    --  Step N of scenario S, its doc string and table attached, and the
