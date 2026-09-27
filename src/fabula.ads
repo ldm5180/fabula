@@ -4,4 +4,9 @@
 package Fabula
   with Pure, SPARK_Mode
 is
+
+   --  The characters that spell a decimal numeral, for every grammar
+   --  that reads one: tags, step patterns, captures and line numbers.
+   subtype Decimal_Digit is Character range '0' .. '9';
+
 end Fabula;

@@ -374,6 +374,20 @@ package body Fabula_Scan_Tests is
          (To_Unbounded_String ("```md"),
           Backticks,
           To_Unbounded_String ("md"),
+          0),
+         --  A fourth fence character opens the content type.
+         (To_Unbounded_String ("````"),
+          Backticks,
+          To_Unbounded_String ("`"),
+          0),
+         --  Blanks and a carriage return after the fence are trimmed.
+         (To_Unbounded_String (Triple_Quote & "  "),
+          Quotes,
+          To_Unbounded_String (""),
+          0),
+         (To_Unbounded_String (Triple_Quote & "json" & ASCII.CR),
+          Quotes,
+          To_Unbounded_String ("json"),
           0)];
    begin
       for C of Cases loop
@@ -440,13 +454,23 @@ package body Fabula_Scan_Tests is
 
    procedure Test_Descriptions (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
-      Two_Quotes : constant String := [1 .. 2 => '"'];
+      Two_Quotes   : constant String := [1 .. 2 => '"'];
+      Unindented   : constant Natural := 0;
+      Mixed_Fences : constant array (Positive range <>) of Unbounded_String :=
+        [To_Unbounded_String (Two_Quotes & "`"),
+         To_Unbounded_String ("``" & '"'),
+         To_Unbounded_String ('"' & "``")];
    begin
       Check_Body ("just prose", Description, "just prose", 0);
       Check_Body ("Feature", Description, "Feature", 0);
       Check_Body ("Feature :", Description, "Feature :", 0);
       --  Fewer than three identical fence characters is not a fence.
       Check_Body (Two_Quotes, Description, Two_Quotes, 0);
+      --  Nor are three fence characters that are not all the same.
+      for Text of Mixed_Fences loop
+         Check_Body
+           (To_String (Text), Description, To_String (Text), Unindented);
+      end loop;
    end Test_Descriptions;
 
    procedure Test_Comments (T : in out AUnit.Test_Cases.Test_Case'Class) is

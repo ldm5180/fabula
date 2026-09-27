@@ -1,3 +1,5 @@
+with Fabula.Scan;
+
 package body Fabula.Tags
   with SPARK_Mode
 is
@@ -99,7 +101,7 @@ is
          return Kw_Or;
       elsif Expr (First .. Last) = "xor" then
          return Kw_Xor;
-      elsif Expr (First) = '@' and then Last > First then
+      elsif Expr (First) = Scan.Tag_Mark and then Last > First then
          return Run_Tag;
       else
          return Run_Bad;

@@ -212,7 +212,7 @@ make build      # the library (Alire)
 make test       # AUnit suite, -O0 and -O3   (275 tests)
 make prove      # gnatprove, checks+warnings as errors, closure lint
 make format     # gnatformat --check
-make shape      # subprogram-shape lint + selftests
+make shape      # shape, literal and block lint + selftests
 make example    # the box binary, both modes
 make gate       # byte-compare the example against committed goldens
 make demo       # run the whole example/features/ suite (exit 1 by design),

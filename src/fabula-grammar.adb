@@ -260,7 +260,8 @@ is
    function Clean_One_Liner (Evt : Event) return Boolean
    is (Evt.Class.Class = Scan.Doc_Fence
        and then Closing_Run (Evt) /= 0
-       and then Closing_Run (Evt) + 2 = Evt.Class.Type_Last);
+       and then Closing_Run (Evt) + (Scan.Fence_Length - 1)
+                = Evt.Class.Type_Last);
 
    function Shape (Evt : Event) return Parts.Row_Shape
    is (if Evt.Class.Class = Scan.Table_Row
@@ -277,7 +278,8 @@ is
            Parts.Fence_Run (Line_Of (Evt), 1, Evt.Length);
        begin
          Run /= 0
-         and then Parts.Only_Blank (Line_Of (Evt), Run + 3, Evt.Length));
+         and then Parts.Only_Blank
+                    (Line_Of (Evt), Run + Scan.Fence_Length, Evt.Length));
 
    function Evaluate (G : Guard_Kind; Ctx : Work; Evt : Event) return Boolean
    is (case G is

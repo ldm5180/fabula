@@ -18,7 +18,7 @@ is
    ---------------------------------------------------------------------
 
    function All_Digits (S : String) return Boolean
-   is (for all C of S => C in '0' .. '9');
+   is (for all C of S => C in Decimal_Digit);
 
    --  The line a group of digits names; 0 for an empty group, a zero,
    --  or a number past Positive'Last.

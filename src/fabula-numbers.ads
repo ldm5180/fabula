@@ -74,7 +74,7 @@ is
    ---------------------------------------------------------------------
 
    function Is_Digit (C : Character) return Boolean
-   is (C in '0' .. '9');
+   is (C in Decimal_Digit);
 
    --  -?[0-9]+ : an optional minus sign, then one or more digits.
    function Is_Integer_Text (Text : String) return Boolean
