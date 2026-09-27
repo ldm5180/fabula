@@ -218,10 +218,11 @@ the step with the type and the reason.
   `Text_Equal` for strings), plus `Is_True`/`Is_False`, each with an
   optional message; and the controls `Skip`, `Ignore`, `Fail`,
   `Fail_Step`. A comparison also takes a read result on either side;
-  a failed read fails it with the type and the reason, in place of
-  the optional message. `Fail_Read` fails a step the same way from a
-  body that tests `Ok` itself. `Compare` for a type of your own takes
-  one `Reads` instance:
+  a failed read fails it with the type and the reason, after the
+  optional message when there is one (`boxes must match: Value is not
+  a valid Integer: malformed text`). `Fail_Read` fails a step the same
+  way from a body that tests `Ok` itself. `Compare` for a type of your
+  own takes one `Reads` instance:
 
   ```ada
   Money_Name : constant String := "Money";
@@ -243,7 +244,7 @@ the step with the type and the reason.
 
 ```console
 make build      # the library (Alire)
-make test       # AUnit suite, -O0 and -O3   (301 tests)
+make test       # AUnit suite, -O0 and -O3   (303 tests)
 make prove      # gnatprove, checks+warnings as errors, closure lint
 make format     # gnatformat --check
 make shape      # shape, literal and block lint + selftests

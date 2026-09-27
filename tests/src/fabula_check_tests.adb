@@ -447,7 +447,7 @@ package body Fabula_Check_Tests is
    end Expect;
 
    --  A failed read fails the check with the target type and the reason,
-   --  on every comparison, on either side, and over a custom message.
+   --  on every comparison and on either side.
    procedure Test_Failed_Reads (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
       Bad_Int : constant String :=
@@ -486,8 +486,6 @@ package body Fabula_Check_Tests is
       Expect (R, Big_Int, "an out-of-range read");
       Fabula.Check.Ints.Less (R, Parse_Integer ("99999999999"), 7);
       Expect (R, Big_Int, "an out-of-range Got read");
-      Fabula.Check.Ints.Equal (R, 7, Seven, "boxes must match");
-      Expect (R, Bad_Int, "a failed read over a custom message");
       Fabula.Check.Longs.Less (R, Parse_Long ("x"), 5);
       Expect
         (R,
@@ -499,6 +497,77 @@ package body Fabula_Check_Tests is
          "Value is not a valid Long_Float: malformed text",
          "Reals names its type");
    end Test_Failed_Reads;
+
+   --  A failed read under a caller's Message puts the Message first, then
+   --  ": ", then the read failure; with no Message the read failure
+   --  stands alone.  A good read keeps the Message alone.
+   procedure Test_Failed_Read_Context
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Bad_Int : constant String :=
+        "Value is not a valid Integer: malformed text";
+      Big_Int : constant String :=
+        "Value is not a valid Integer: out of range";
+      Seven   : constant Integer_Reads.Read := Parse_Integer ("seven");
+      Huge    : constant Integer_Reads.Read := Parse_Integer ("99999999999");
+      Context : constant String := "boxes must match";
+      R       : Outcome;
+   begin
+      Fabula.Check.Ints.Equal (R, 7, Seven, Context);
+      Expect (R, Context & ": " & Bad_Int, "a malformed Want read, Message");
+      Fabula.Check.Ints.Greater (R, Seven, 7, Context);
+      Expect (R, Context & ": " & Bad_Int, "a malformed Got read, Message");
+      Fabula.Check.Ints.Less_Or_Equal (R, 7, Huge, Context);
+      Expect (R, Context & ": " & Big_Int, "an out-of-range Want, Message");
+      Fabula.Check.Ints.Not_Equal (R, Huge, 7, Context);
+      Expect (R, Context & ": " & Big_Int, "an out-of-range Got, Message");
+      Fabula.Check.Reals.Greater (R, 1.0, Parse_Real ("1e3"), Context);
+      Expect
+        (R,
+         Context & ": Value is not a valid Long_Float: malformed text",
+         "Reals, Message");
+
+      Fabula.Check.Ints.Equal (R, 7, Seven);
+      Expect (R, Bad_Int, "a failed Want read, no Message");
+      Fabula.Check.Ints.Less (R, Huge, 7, "");
+      Expect (R, Big_Int, "a failed Got read, empty Message");
+
+      Fabula.Check.Ints.Equal (R, 1, Parse_Integer ("2"), Context);
+      Expect (R, Context, "a good Want read that mismatches, Message");
+      Fabula.Check.Ints.Greater (R, Parse_Integer ("1"), 2, Context);
+      Expect (R, Context, "a good Got read that mismatches, Message");
+   end Test_Failed_Read_Context;
+
+   --  A Message and a failed read that together pass the cap truncate
+   --  there, keeping the exact prefix of the combined text.
+   procedure Test_Failed_Read_Truncation
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Cap     : constant Positive := Fabula.Limits.Max_Message_Length;
+      Context : constant String := (Cap - 5) * 'm';
+      Full    : constant String :=
+        Context & ": Value is not a valid Integer: malformed text";
+      Longer  : constant String := 2 * Context;
+      R       : Outcome;
+   begin
+      Fabula.Check.Ints.Equal (R, Parse_Integer ("seven"), 7, Context);
+      Assert (not R.Passing, "a failed read under a long Message must fail");
+      Assert
+        (Msg (R)'Length = Cap,
+         "the combined message truncates to the cap, got"
+         & Msg (R)'Length'Image);
+      Assert
+        (Msg (R) = Full (Full'First .. Full'First + Cap - 1),
+         "the truncated message keeps the exact prefix of the combined text");
+
+      Reset (R);
+      Fabula.Check.Ints.Equal (R, 7, Parse_Integer ("seven"), Longer);
+      Assert
+        (Msg (R) = Longer (Longer'First .. Longer'First + Cap - 1),
+         "a Message over the cap alone keeps its first Cap characters");
+   end Test_Failed_Read_Truncation;
 
    --  A step body that tests Ok itself fails the step on the same message
    --  path, naming what did not read; the instance supplies the type.
@@ -534,8 +603,9 @@ package body Fabula_Check_Tests is
       Assert (Msg (R) = "", "Reset clears the message");
    end Test_Reset;
 
-   overriding
-   procedure Register_Tests (T : in out Test) is
+   ---------------------------------------------------------------------
+
+   procedure Add_Comparison_Tests (T : in out Test) is
    begin
       Register_Routine (T, Test_Equal'Access, "Equal both directions");
       Register_Routine (T, Test_Not_Equal'Access, "Not_Equal both directions");
@@ -564,19 +634,45 @@ package body Fabula_Check_Tests is
       Register_Routine
         (T, Test_Text_Not_Equal'Access, "Text_Not_Equal on String");
       Register_Routine
+        (T, Test_Lazy_Image'Access, "Image runs only for a default message");
+   end Add_Comparison_Tests;
+
+   procedure Add_Control_Tests (T : in out Test) is
+   begin
+      Register_Routine
         (T, Test_Skip_Ignore'Access, "Skip and Ignore keep Passing True");
       Register_Routine (T, Test_Fail'Access, "Fail sets Order Fail_Scenario");
       Register_Routine
         (T, Test_Fail_Step'Access, "Fail_Step leaves Order at Continue");
+      Register_Routine (T, Test_Reset'Access, "Reset restores defaults");
+   end Add_Control_Tests;
+
+   procedure Add_Read_Tests (T : in out Test) is
+   begin
       Register_Routine
         (T, Test_Good_Reads'Access, "a good read compares like its value");
       Register_Routine
         (T, Test_Failed_Reads'Access, "a failed read names type and reason");
       Register_Routine
-        (T, Test_Fail_Read'Access, "Fail_Read: one message for a bad read");
-      Register_Routine (T, Test_Reset'Access, "Reset restores defaults");
+        (T,
+         Test_Failed_Read_Context'Access,
+         "a failed read follows the caller's Message");
       Register_Routine
-        (T, Test_Lazy_Image'Access, "Image runs only for a default message");
+        (T,
+         Test_Failed_Read_Truncation'Access,
+         "a Message and a failed read truncate at the cap");
+      Register_Routine
+        (T, Test_Fail_Read'Access, "Fail_Read: one message for a bad read");
+   end Add_Read_Tests;
+
+   ---------------------------------------------------------------------
+
+   overriding
+   procedure Register_Tests (T : in out Test) is
+   begin
+      Add_Comparison_Tests (T);
+      Add_Control_Tests (T);
+      Add_Read_Tests (T);
    end Register_Tests;
 
    overriding
