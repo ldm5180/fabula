@@ -25,7 +25,8 @@ is
       Last  : Arena_Count := No_Characters;
    end record;
 
-   Empty_Slice : constant Slice := (First => 1, Last => 0);
+   Empty_Slice : constant Slice :=
+     (First => Arena_Index'First, Last => No_Characters);
 
    function Is_Empty (S : Slice) return Boolean
    is (S.Last < S.First);
@@ -432,20 +433,20 @@ private
    is (Doc.Used);
 
    function Is_Empty (Doc : Document) return Boolean
-   is (Doc.Used = 0
+   is (Doc.Used = No_Characters
        and then not Doc.The_Feature.Present
        and then not Doc.The_Feature.Has_Background
-       and then Doc.Rules_Used = 0
-       and then Doc.Scenarios_Used = 0
-       and then Doc.Steps_Used = 0
-       and then Doc.Tags_Used = 0
-       and then Doc.Tables_Used = 0
-       and then Doc.Rows_Used = 0
-       and then Doc.Cells_Used = 0
-       and then Doc.Docs_Used = 0
-       and then Doc.Doc_Lines_Used = 0
-       and then Doc.Blocks_Used = 0
-       and then Doc.Example_Rows_Used = 0);
+       and then Doc.Rules_Used = Rule_Pool.None
+       and then Doc.Scenarios_Used = Scenario_Pool.None
+       and then Doc.Steps_Used = Step_Pool.None
+       and then Doc.Tags_Used = Tag_Pool.None
+       and then Doc.Tables_Used = Table_Pool.None
+       and then Doc.Rows_Used = Row_Pool.None
+       and then Doc.Cells_Used = Cell_Pool.None
+       and then Doc.Docs_Used = Doc_Pool.None
+       and then Doc.Doc_Lines_Used = Doc_Line_Pool.None
+       and then Doc.Blocks_Used = Examples_Pool.None
+       and then Doc.Example_Rows_Used = Examples_Row_Pool.None);
 
    function Feature (Doc : Document) return Feature_Node
    is (Doc.The_Feature);

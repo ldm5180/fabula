@@ -11,20 +11,20 @@ is
 
    procedure Clear (Doc : in out Document) is
    begin
-      Doc.Used := 0;
+      Doc.Used := No_Characters;
       Doc.The_Feature := (others => <>);
       Doc.The_Background := (others => <>);
-      Doc.Rules_Used := 0;
-      Doc.Scenarios_Used := 0;
-      Doc.Steps_Used := 0;
-      Doc.Tags_Used := 0;
-      Doc.Tables_Used := 0;
-      Doc.Rows_Used := 0;
-      Doc.Cells_Used := 0;
-      Doc.Docs_Used := 0;
-      Doc.Doc_Lines_Used := 0;
-      Doc.Blocks_Used := 0;
-      Doc.Example_Rows_Used := 0;
+      Doc.Rules_Used := Rule_Pool.None;
+      Doc.Scenarios_Used := Scenario_Pool.None;
+      Doc.Steps_Used := Step_Pool.None;
+      Doc.Tags_Used := Tag_Pool.None;
+      Doc.Tables_Used := Table_Pool.None;
+      Doc.Rows_Used := Row_Pool.None;
+      Doc.Cells_Used := Cell_Pool.None;
+      Doc.Docs_Used := Doc_Pool.None;
+      Doc.Doc_Lines_Used := Doc_Line_Pool.None;
+      Doc.Blocks_Used := Examples_Pool.None;
+      Doc.Example_Rows_Used := Examples_Row_Pool.None;
    end Clear;
 
    procedure Append_Text
