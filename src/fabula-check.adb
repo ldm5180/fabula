@@ -27,7 +27,9 @@ is
    Not_Less_Phrase     : constant String := " is not less than ";
    Not_At_Most_Phrase  : constant String := " is not less than or equal to ";
 
-   --  A failed read: "<What> is not a valid <type>: <reason>".
+   --  A failed read: "<What> is not a valid <type>: <reason>".  Under a
+   --  comparison's own Message the same separator puts the Message
+   --  first: "<Message>: <What> is not a valid <type>: <reason>".
    Not_Valid_Phrase : constant String := " is not a valid ";
    Reason_Separator : constant String := ": ";
 
@@ -182,18 +184,40 @@ is
          end if;
       end Less_Or_Equal;
 
+      --  Appends "<What> is not a valid <type>: <reason>" to whatever the
+      --  message already holds.
+      procedure Append_Read_Failure
+        (R : in out Outcome; Error : Numbers.Read_Error; What : String) is
+      begin
+         Append_Message (R, (if What'Length > 0 then What else Unnamed_Value));
+         Append_Message (R, Not_Valid_Phrase);
+         Append_Message (R, Item_Reads.Name);
+         Append_Message (R, Reason_Separator);
+         Append_Message (R, Numbers.Reason (Error));
+      end Append_Read_Failure;
+
       procedure Fail_Read
         (R     : in out Outcome;
          Error : Numbers.Read_Error;
          What  : String := Unnamed_Value) is
       begin
          Begin_Failure (R);
-         Append_Message (R, (if What'Length > 0 then What else Unnamed_Value));
-         Append_Message (R, Not_Valid_Phrase);
-         Append_Message (R, Item_Reads.Name);
-         Append_Message (R, Reason_Separator);
-         Append_Message (R, Numbers.Reason (Error));
+         Append_Read_Failure (R, Error, What);
       end Fail_Read;
+
+      --  A comparison's failed read: the caller's Message first when it
+      --  gives one, then the read failure, so the context of the check
+      --  stays with the reason it could not take place.
+      procedure Fail_Read_Under
+        (R : in out Outcome; Error : Numbers.Read_Error; Message : String) is
+      begin
+         Begin_Failure (R);
+         if Message'Length > 0 then
+            Append_Message (R, Message);
+            Append_Message (R, Reason_Separator);
+         end if;
+         Append_Read_Failure (R, Error, Unnamed_Value);
+      end Fail_Read_Under;
 
       --  A comparison with a read on one side: a good read goes through
       --  Plain, the plain comparison, so both share one message path.
@@ -210,7 +234,7 @@ is
          if Want.Ok then
             Plain (R, Got, Want.Value, Message);
          else
-            Fail_Read (R, Want.Error);
+            Fail_Read_Under (R, Want.Error, Message);
          end if;
       end Want_Read;
 
@@ -227,7 +251,7 @@ is
          if Got.Ok then
             Plain (R, Got.Value, Want, Message);
          else
-            Fail_Read (R, Got.Error);
+            Fail_Read_Under (R, Got.Error, Message);
          end if;
       end Got_Read;
 
