@@ -847,6 +847,69 @@ package body Fabula_Run_Tests is
       Assert_Trace (Log, Args_Trace);
    end Test_Args;
 
+   ---------------------------------------------------------------------
+   --  A scenario with no steps and no Background runs, and passes,
+   --  before the next one and at the end of the file alike.
+   ---------------------------------------------------------------------
+
+   Empty_First_Doc : constant Lines :=
+     [+"Feature: empty",
+      +"  Scenario: empty",
+      +"",
+      +"  Scenario: full",
+      +"    Given a passing step"];
+
+   Empty_Last_Doc : constant Lines :=
+     [+"Feature: empty",
+      +"  Scenario: full",
+      +"    Given a passing step",
+      +"",
+      +"  Scenario: empty"];
+
+   Empty_First_Trace : constant Lines :=
+     [+"open empty",
+      +"enter empty",
+      +"close passed empty",
+      +"open full",
+      +"enter full",
+      +"step pass",
+      +"passed a passing step",
+      +"close passed full"];
+
+   Empty_Last_Trace : constant Lines :=
+     [+"open full",
+      +"enter full",
+      +"step pass",
+      +"passed a passing step",
+      +"close passed full",
+      +"open empty",
+      +"enter empty",
+      +"close passed empty"];
+
+   Empty_Counts : constant Fabula.Results.Counts :=
+     (Scenarios => [Passed => 2, others => 0],
+      Steps     => [Passed => 1, others => 0],
+      others    => 0);
+
+   procedure Test_Empty_Scenario (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Log : Trace;
+      R   : Bare_Run.Runner;
+   begin
+      Bare.Run_One
+        (Empty_Last_Doc, (others => <>), Bare_Run.All_Lines, Log, R);
+      Assert_Trace (Log, Empty_Last_Trace);
+      Assert_Counts (Bare_Run.Counts_Of (R), Empty_Counts);
+      Bare.Run_One
+        (Empty_First_Doc, (others => <>), Bare_Run.All_Lines, Log, R);
+      Assert_Trace (Log, Empty_First_Trace);
+      Assert_Counts (Bare_Run.Counts_Of (R), Empty_Counts);
+      Assert
+        (not Fabula.Results.Run_Failed (Bare_Run.Counts_Of (R)),
+         "an empty scenario does not fail the run");
+   end Test_Empty_Scenario;
+
    --  A table that refuses to compile makes the tables invalid, which
    --  Start_Run's precondition rejects.
    procedure Test_Tables_Valid (T : in out AUnit.Test_Cases.Test_Case'Class) is
@@ -893,6 +956,8 @@ package body Fabula_Run_Tests is
         (T, Test_Long_Name'Access, "a name too long keeps its raw text");
       Register_Routine
         (T, Test_Args'Access, "a request's arguments, substituted");
+      Register_Routine
+        (T, Test_Empty_Scenario'Access, "a scenario with no steps passes");
       Register_Routine
         (T, Test_Tables_Valid'Access, "invalid tables are refused up front");
    end Register_Tests;

@@ -283,15 +283,13 @@ package body Fabula_Parse_Tests is
       Assert_Refuses (Expected_Scenario, 4, "prose between steps");
    end Test_Descriptions;
 
-   --  The reference interpreter's description rule: a background,
-   --  scenario or outline description runs until its first step.
+   --  Header lines a description keeps: a rule's description runs to
+   --  its first scenario, so a rule background is description; a
+   --  Feature or Background line after a step-less header is
+   --  description, as in the official Gherkin grammar.
    procedure Test_Swallowing (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
    begin
-      Run ([+"Feature: f", +"Scenario: a", +"Scenario: b", +"Given x"]);
-      Assert_Parses ("a stepless scenario");
-      Assert (Scenario_Count (Doc) = 1, "the second header is prose");
-      Assert (Str (Scenario (Doc, 1).Head.Name) = "a", "the first survives");
       Run
         ([+"Feature: f",
           +"Rule: r",
@@ -305,17 +303,40 @@ package body Fabula_Parse_Tests is
       Assert (Scenario (Doc, 1).Rule = 1, "the scenario joins the rule");
       Run
         ([+"Feature: f",
-          +"Scenario Outline: o",
-          +"Examples:",
-          +"| a |",
-          +"| 1 |"]);
-      Assert_Parses ("an outline with no steps");
-      Assert (Examples_Count (Doc) = 0, "its Examples are description");
+          +"Scenario: a",
+          +"Background: late",
+          +"Feature: again",
+          +"Given x"]);
+      Assert_Parses ("header lines after a step-less scenario");
+      Assert (Scenario_Count (Doc) = 1, "one scenario");
+      Assert
+        (Str (Scenario (Doc, 1).Head.Description)
+         = "Background: late" & ASCII.LF & "Feature: again",
+         "both lines are its description");
+      Assert
+        (Step_Pool.Width (Scenario (Doc, 1).Steps) = 1, "the step is its own");
+      Run
+        ([+"Feature: f",
+          +"Background: b",
+          +"Background: again",
+          +"Given x",
+          +"Scenario: s",
+          +"Given y"]);
+      Assert_Parses ("a Background line after a step-less background");
+      Assert
+        (Str (Background (Doc).Head.Description) = "Background: again",
+         "the second header is description");
+      Assert
+        (Step_Pool.Width (Background (Doc).Steps) = 1, "the step is its own");
    end Test_Swallowing;
 
    --  A doc string inside each of the six descriptions.  After each one
-   --  a "told" line follows that only the right resumed state swallows
-   --  as description: resuming any other state changes the document.
+   --  a "told" line follows that the resumed state swallows as
+   --  description, then a line it reads as the document expects: a
+   --  resumed state with other rows changes the document.  The
+   --  background's told line is an Examples line: a scenario or
+   --  outline head refuses it, and a feature head then describes the
+   --  step after it.
    Swallowed_Docs : constant Lines :=
      [+"Feature: f",
       +("  " & Q3),
@@ -326,7 +347,7 @@ package body Fabula_Parse_Tests is
       +("    " & Q3),
       +"    in the background head",
       +("    " & B3),
-      +"    Scenario: told background",
+      +"    Examples: told background",
       +"    Given a",
       +"  Rule: r",
       +("    " & Q3),
@@ -337,13 +358,13 @@ package body Fabula_Parse_Tests is
       +("    " & B3),
       +"    in the scenario head",
       +("    " & B3),
-      +"    Rule: told scenario",
+      +"    | told scenario |",
       +"    Given b",
       +"  Scenario Outline: o",
       +("    " & Q3),
       +"    in the outline head",
       +("    " & Q3),
-      +"    Examples: told outline",
+      +"    | told outline |",
       +"    Given <x>",
       +"    Examples:",
       +("      " & Q3),
@@ -365,18 +386,21 @@ package body Fabula_Parse_Tests is
         (Str (Feature (Doc).Head.Description) = "Given told feature",
          "the feature description resumed");
       Assert
-        (Str (Background (Doc).Head.Description) = "Scenario: told background",
-         "the background head resumed");
+        (Str (Background (Doc).Head.Description) = "Examples: told background",
+         "the background head resumed: its Examples line is description");
+      Assert
+        (Step_Pool.Width (Background (Doc).Steps) = 1,
+         "the background step after it");
       Assert (Rule_Count (Doc) = 1, "one rule");
       Assert
         (Str (Rule (Doc, 1).Head.Description) = "Background: told rule",
          "the rule head resumed");
       Assert (Scenario_Count (Doc) = 2, "one scenario and one outline");
       Assert
-        (Str (Scenario (Doc, 1).Head.Description) = "Rule: told scenario",
+        (Str (Scenario (Doc, 1).Head.Description) = "| told scenario |",
          "the scenario head resumed");
       Assert
-        (Str (Scenario (Doc, 2).Head.Description) = "Examples: told outline",
+        (Str (Scenario (Doc, 2).Head.Description) = "| told outline |",
          "the outline head resumed");
       Assert (Examples_Count (Doc) = 1, "one Examples block");
       Assert
@@ -422,7 +446,7 @@ package body Fabula_Parse_Tests is
    end Test_Stickiness;
 
    --  The smallest pool (rules), overflowed by a generated file: each
-   --  rule needs a scenario and a step, or the next Rule is prose.
+   --  rule needs a scenario, or the next Rule is its description.
    function Many_Rules return Lines is
       Count  : constant := Fabula.Limits.Max_Rules + 1;
       Result : Lines (1 .. 1 + 3 * Count);
@@ -571,7 +595,7 @@ package body Fabula_Parse_Tests is
       Register_Routine (T, Test_Tag_Refusals'Access, "tag refusals");
       Register_Routine (T, Test_Descriptions'Access, "description lines");
       Register_Routine
-        (T, Test_Swallowing'Access, "descriptions run to their first step");
+        (T, Test_Swallowing'Access, "header lines a description keeps");
       Register_Routine
         (T, Test_Swallowed_Docs'Access, "doc strings inside descriptions");
       Register_Routine

@@ -25,6 +25,7 @@ with Fabula_Run_Table_Tests;
 with Fabula_Run_Tests;
 with Fabula_Scan_Tests;
 with Fabula_Searches_Tests;
+with Fabula_Stepless_Tests;
 with Fabula_Tags_Tests;
 with Fabula_Texts_Tests;
 
@@ -53,6 +54,8 @@ package body Fabula_Suite is
         new Fabula_Ast_Tests.Test;
       Parse_Test       : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Parse_Tests.Test;
+      Stepless_Test    : constant AUnit.Test_Cases.Test_Case_Access :=
+        new Fabula_Stepless_Tests.Test;
       Corpus_Test      : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Corpus_Tests.Test;
    begin
@@ -64,6 +67,7 @@ package body Fabula_Suite is
       AUnit.Test_Suites.Add_Test (Result, Tags_Test);
       AUnit.Test_Suites.Add_Test (Result, Ast_Test);
       AUnit.Test_Suites.Add_Test (Result, Parse_Test);
+      AUnit.Test_Suites.Add_Test (Result, Stepless_Test);
       AUnit.Test_Suites.Add_Test (Result, Corpus_Test);
    end Add_Parsing;
 

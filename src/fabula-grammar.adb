@@ -77,52 +77,64 @@ is
       Rule_Head + Fence (Opens_Block) / Absorb_Doc    >= In_Doc,
       Rule_Head + Fence                               >= Rule_Head,
 
-      --  Background, scenario and outline descriptions end only at
-      --  the first step.
-      --  Writes: Takes_Argument, Owner, Doc_Line.
-      Background_Head + Step                / Add_Step   >= In_Steps,
-      Background_Head + Tags                / Describe   >= Background_Head,
-      Background_Head + Feature             / Describe   >= Background_Head,
-      Background_Head + Rule                / Describe   >= Background_Head,
-      Background_Head + Background          / Describe   >= Background_Head,
-      Background_Head + Scenario            / Describe   >= Background_Head,
-      Background_Head + Outline             / Describe   >= Background_Head,
-      Background_Head + Examples            / Describe   >= Background_Head,
-      Background_Head + Row                 / Describe   >= Background_Head,
-      Background_Head + Prose               / Describe   >= Background_Head,
-      Background_Head + Fence (Opens_Block) / Absorb_Doc >= In_Doc,
-      Background_Head + Fence                            >= Background_Head,
-      Background_Head + End_Of_Input                     >= Done,
+      --  A background, scenario or outline description ends at its
+      --  first step, or at a tag, scenario, outline or rule line (an
+      --  outline's also at an Examples line).  Each of those lines
+      --  takes the row it takes after a step, so a block with no steps
+      --  stays a block.  A Feature or Background line extends the
+      --  description, as in the official Gherkin grammar, and so does
+      --  an Examples line under a background.
+      --  Writes: Takes_Argument, Owner, Doc_Line, Pending, Described,
+      --  Last_Is_Outline.
+      Background_Head + Step                / Add_Step      >= In_Steps,
+      Background_Head + Tags (Well_Formed)  / Collect_Tags  >= Block_Tags,
+      Background_Head + Tags                / Refuse_Tags   >= Failed,
+      Background_Head + Scenario            / Open_Scenario >= Scenario_Head,
+      Background_Head + Outline             / Open_Outline  >= Outline_Head,
+      Background_Head + Rule                / Open_Rule     >= Rule_Head,
+      Background_Head + Feature             / Describe      >= Background_Head,
+      Background_Head + Background          / Describe      >= Background_Head,
+      Background_Head + Examples            / Describe      >= Background_Head,
+      Background_Head + Row                 / Describe      >= Background_Head,
+      Background_Head + Prose               / Describe      >= Background_Head,
+      Background_Head + Fence (Opens_Block) / Absorb_Doc    >= In_Doc,
+      Background_Head + Fence                               >= Background_Head,
+      Background_Head + End_Of_Input                        >= Done,
 
-      --  Writes: Takes_Argument, Owner, Doc_Line.
-      Scenario_Head + Step                / Add_Step   >= In_Steps,
-      Scenario_Head + Tags                / Describe   >= Scenario_Head,
-      Scenario_Head + Feature             / Describe   >= Scenario_Head,
-      Scenario_Head + Rule                / Describe   >= Scenario_Head,
-      Scenario_Head + Background          / Describe   >= Scenario_Head,
-      Scenario_Head + Scenario            / Describe   >= Scenario_Head,
-      Scenario_Head + Outline             / Describe   >= Scenario_Head,
-      Scenario_Head + Examples            / Describe   >= Scenario_Head,
-      Scenario_Head + Row                 / Describe   >= Scenario_Head,
-      Scenario_Head + Prose               / Describe   >= Scenario_Head,
-      Scenario_Head + Fence (Opens_Block) / Absorb_Doc >= In_Doc,
-      Scenario_Head + Fence                            >= Scenario_Head,
-      Scenario_Head + End_Of_Input                     >= Done,
+      --  An Examples line under a plain scenario is refused, as after
+      --  a step.
+      --  Writes: Takes_Argument, Owner, Doc_Line, Pending, Described,
+      --  Last_Is_Outline.
+      Scenario_Head + Step                / Add_Step      >= In_Steps,
+      Scenario_Head + Tags (Well_Formed)  / Collect_Tags  >= Block_Tags,
+      Scenario_Head + Tags                / Refuse_Tags   >= Failed,
+      Scenario_Head + Scenario            / Open_Scenario >= Scenario_Head,
+      Scenario_Head + Outline             / Open_Outline  >= Outline_Head,
+      Scenario_Head + Rule                / Open_Rule     >= Rule_Head,
+      Scenario_Head + Feature             / Describe      >= Scenario_Head,
+      Scenario_Head + Background          / Describe      >= Scenario_Head,
+      Scenario_Head + Row                 / Describe      >= Scenario_Head,
+      Scenario_Head + Prose               / Describe      >= Scenario_Head,
+      Scenario_Head + Fence (Opens_Block) / Absorb_Doc    >= In_Doc,
+      Scenario_Head + Fence                               >= Scenario_Head,
+      Scenario_Head + End_Of_Input                        >= Done,
 
-      --  Writes: Takes_Argument, Owner, Doc_Line.
-      Outline_Head + Step                / Add_Step   >= In_Steps,
-      Outline_Head + Tags                / Describe   >= Outline_Head,
-      Outline_Head + Feature             / Describe   >= Outline_Head,
-      Outline_Head + Rule                / Describe   >= Outline_Head,
-      Outline_Head + Background          / Describe   >= Outline_Head,
-      Outline_Head + Scenario            / Describe   >= Outline_Head,
-      Outline_Head + Outline             / Describe   >= Outline_Head,
-      Outline_Head + Examples            / Describe   >= Outline_Head,
-      Outline_Head + Row                 / Describe   >= Outline_Head,
-      Outline_Head + Prose               / Describe   >= Outline_Head,
-      Outline_Head + Fence (Opens_Block) / Absorb_Doc >= In_Doc,
-      Outline_Head + Fence                            >= Outline_Head,
-      Outline_Head + End_Of_Input                     >= Done,
+      --  Writes: Takes_Argument, Owner, Doc_Line, Pending, Described,
+      --  Last_Is_Outline.
+      Outline_Head + Step                     / Add_Step      >= In_Steps,
+      Outline_Head + Tags (Well_Formed)       / Collect_Tags  >= Block_Tags,
+      Outline_Head + Tags                     / Refuse_Tags   >= Failed,
+      Outline_Head + Scenario                 / Open_Scenario >= Scenario_Head,
+      Outline_Head + Outline                  / Open_Outline  >= Outline_Head,
+      Outline_Head + Rule                     / Open_Rule     >= Rule_Head,
+      Outline_Head + Examples (After_Outline) / Open_Examples >= Examples_Head,
+      Outline_Head + Feature                  / Describe      >= Outline_Head,
+      Outline_Head + Background               / Describe      >= Outline_Head,
+      Outline_Head + Row                      / Describe      >= Outline_Head,
+      Outline_Head + Prose                    / Describe      >= Outline_Head,
+      Outline_Head + Fence (Opens_Block)      / Absorb_Doc    >= In_Doc,
+      Outline_Head + Fence                                    >= Outline_Head,
+      Outline_Head + End_Of_Input                             >= Done,
 
       --  After a step: more steps, one argument for the last step (a
       --  doc string or a table), or the next block.
@@ -165,17 +177,23 @@ is
       Block_Tags + Examples (After_Outline) / Open_Examples  >= Examples_Head,
       Block_Tags + Fence (Opens_Block)      / Open_Stray_Doc >= In_Doc,
 
-      --  An Examples description ends only at the table's first row.
-      --  Writes: Width, Owner, Doc_Line.
+      --  An Examples description ends at the table's first row, or at
+      --  a tag, Examples, scenario, outline or rule line.  Each of
+      --  those lines takes the row it takes after a data row, so a
+      --  block with no rows stays a block.  A Feature, Background or
+      --  step line extends the description.
+      --  Writes: Width, Owner, Doc_Line, Pending, Described,
+      --  Last_Is_Outline.
       Examples_Head + Row (Closed_Row)    / Add_Header_Row  >= Examples_Rows,
       Examples_Head + Row                 / Refuse_Open_Row >= Failed,
-      Examples_Head + Tags                / Describe        >= Examples_Head,
+      Examples_Head + Tags (Well_Formed)  / Collect_Tags    >= Block_Tags,
+      Examples_Head + Tags                / Refuse_Tags     >= Failed,
+      Examples_Head + Examples            / Open_Examples   >= Examples_Head,
+      Examples_Head + Scenario            / Open_Scenario   >= Scenario_Head,
+      Examples_Head + Outline             / Open_Outline    >= Outline_Head,
+      Examples_Head + Rule                / Open_Rule       >= Rule_Head,
       Examples_Head + Feature             / Describe        >= Examples_Head,
-      Examples_Head + Rule                / Describe        >= Examples_Head,
       Examples_Head + Background          / Describe        >= Examples_Head,
-      Examples_Head + Scenario            / Describe        >= Examples_Head,
-      Examples_Head + Outline             / Describe        >= Examples_Head,
-      Examples_Head + Examples            / Describe        >= Examples_Head,
       Examples_Head + Step                / Describe        >= Examples_Head,
       Examples_Head + Prose               / Describe        >= Examples_Head,
       Examples_Head + Fence (Opens_Block) / Absorb_Doc      >= In_Doc,

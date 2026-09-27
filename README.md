@@ -173,6 +173,7 @@ over time.
 | Scenario controls: skip / ignore / fail, fail-step | ✓ (flags can leak across scenarios) | ✓ (strictly scoped per scenario) |
 | Cucumber expressions: `{int}` `{string}` `{word}` `{float}` `{}` … | ✓ | ✓ (unknown `{key}` = refused row, not a crash) |
 | A capture or table cell that is not a number | logs a C++ error, reads as `0` / `0.0`, the step still runs | fails the step with a named reason (`Malformed`, `Out_Of_Range`); strict grammar (`-?[0-9]+`, `-?[0-9]*\.?[0-9]+`) |
+| A block with no steps yet (or Examples with no rows), then a scenario, outline, rule or tag line | the line and its tags become the first block's description: the next block's steps run under the first block's name, without the next block's tags | the line opens the next block, with its own name, steps and tags, as in the official Gherkin parser and behave; the step-less block stays its own block with no steps of its own |
 | Custom parameter types | ✓ | planned (v2) |
 | CLI: `-t -n -q -v -d -c`, `file:LINE`, `--exclude-file`, `--report-json` | ✓ | ✓ |
 | JSON report | ✓ | ✓ (same keys, order, escaping; `match.location` and Rule-in-id differ, on purpose) |
@@ -201,6 +202,27 @@ fabula's numeric grammars are strict (`-?[0-9]+` and
 or an exponent that a C++ conversion would accept here reads as
 `Malformed`), and a capture or table cell that does not read fails
 the step with the type and the reason.
+
+One grammar change is stated too: a step-less block ends at the next
+header. The official Gherkin grammar and behave read these lines so:
+
+- A background, scenario, outline or Examples block with no steps
+  (or rows) yet ends at a scenario, outline, rule or tag line. An
+  outline or Examples block also ends at an Examples line.
+- The step-less block stays its own block. A step-less scenario has
+  no steps of its own: it runs the Background steps, if there are
+  any, and can fail through them; with none it passes. The next
+  block keeps its name, steps and tags.
+- cwt reads that line, and its tags, as the first block's
+  description. The next block's steps then run under the first
+  block's name, without the next block's tags, so tag filters and
+  tagged hooks do not apply to them.
+- As after a step, some lines are refused there: an Examples line
+  under a plain scenario, a description line that starts with `@`,
+  and a tag line between a header and its first step. The official
+  parser and behave refuse the last two as well.
+- A `Feature:` or `Background:` line, and an `Examples:` line under a
+  background, stay description, as in the official grammar.
 
 ## The API in brief
 
@@ -244,7 +266,7 @@ the step with the type and the reason.
 
 ```console
 make build      # the library (Alire)
-make test       # AUnit suite, -O0 and -O3   (303 tests)
+make test       # AUnit suite, -O0 and -O3   (311 tests)
 make prove      # gnatprove, checks+warnings as errors, closure lint
 make format     # gnatformat --check
 make shape      # shape, literal and block lint + selftests
