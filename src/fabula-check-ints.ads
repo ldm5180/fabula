@@ -4,5 +4,10 @@
 --  child unit as Off rather than analyzing it.
 pragma SPARK_Mode;
 
+with Fabula.Numbers;
+
 package Fabula.Check.Ints is new
-  Fabula.Check.Compare (Item => Integer, Image => Fabula.Check.Integer_Image);
+  Fabula.Check.Compare
+    (Item       => Integer,
+     Image      => Fabula.Check.Integer_Image,
+     Item_Reads => Fabula.Numbers.Integer_Reads);

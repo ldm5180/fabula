@@ -18,7 +18,7 @@ package Fabula_Dispatch_Fixture is
       Count,            --  adds one to the context and traces the sum
       Raise_Message,    --  raises Constraint_Error with "boom"
       Raise_Bare,       --  raises Bare_Error with an empty message
-      Misread,          --  reads a word capture as an Int
+      Read_Number,      --  reads a word capture as an Int into the context
       Fail_And_Raise,   --  fails the scenario, then raises
       Count_And_Raise); --  adds one to the context, traces it, then raises
 
@@ -52,7 +52,7 @@ package Fabula_Dispatch_Fixture is
       Step ("I count") >= Count,
       Step ("it raises with a message") >= Raise_Message,
       Step ("it raises bare") >= Raise_Bare,
-      Step ("I read {word} as a number") >= Misread,
+      Step ("I read {word} as a number") >= Read_Number,
       Step ("it fails the scenario and raises") >= Fail_And_Raise,
       Step ("I count and raise") >= Count_And_Raise];
 

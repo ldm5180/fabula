@@ -1,11 +1,12 @@
 with AUnit.Assertions;  use AUnit.Assertions;
 with Ada.Strings.Fixed; use Ada.Strings.Fixed;
 
-with Fabula.Check; use Fabula.Check;
+with Fabula.Check;   use Fabula.Check;
 with Fabula.Check.Ints;
 with Fabula.Check.Longs;
 with Fabula.Check.Reals;
 with Fabula.Limits;
+with Fabula.Numbers; use Fabula.Numbers;
 
 package body Fabula_Check_Tests is
 
@@ -354,6 +355,124 @@ package body Fabula_Check_Tests is
         (R.Order = Continue, "Fail_Step with a message still keeps Continue");
    end Test_Fail_Step;
 
+   --  A good read compares like its value; the read may stand on either
+   --  side.
+   procedure Test_Good_Reads (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      R : Outcome;
+   begin
+      Fabula.Check.Ints.Equal (R, 3, Parse_Integer ("3"));
+      Fabula.Check.Ints.Equal (R, Parse_Integer ("3"), 3);
+      Fabula.Check.Longs.Less
+        (R, Parse_Long ("9000000000"), Long_Long_Integer'Last);
+      Fabula.Check.Reals.Greater (R, 2.0, Parse_Real ("1.5"));
+      Assert (R.Passing, "good reads that compare true must pass");
+
+      Fabula.Check.Ints.Equal (R, 3, Parse_Integer ("4"));
+      Assert
+        (Msg (R) = "Value 3 is not equal to 4",
+         "a good read keeps the plain message, got """ & Msg (R) & """");
+
+      Reset (R);
+      Fabula.Check.Ints.Greater (R, Parse_Integer ("2"), 5);
+      Assert
+        (Msg (R) = "Value 2 is not greater than 5",
+         "a good Got read keeps its place, got """ & Msg (R) & """");
+
+      Reset (R);
+      Fabula.Check.Ints.Equal (R, 1, Parse_Integer ("2"), "boxes must match");
+      Assert
+        (Msg (R) = "boxes must match",
+         "a good read keeps the custom message, got """ & Msg (R) & """");
+   end Test_Good_Reads;
+
+   --  R failed with message Want and kept Order at Continue; What names
+   --  the check.  Resets R for the next one.
+   procedure Expect (R : in out Outcome; Want : String; What : String) is
+   begin
+      Assert (not R.Passing, What & " must fail");
+      Assert (Msg (R) = Want, What & ": got """ & Msg (R) & """");
+      Assert (R.Order = Continue, What & " leaves Order at Continue");
+      Reset (R);
+   end Expect;
+
+   --  A failed read fails the check with the target type and the reason,
+   --  on every comparison, on either side, and over a custom message.
+   procedure Test_Failed_Reads (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Bad_Int : constant String :=
+        "Value is not a valid Integer: malformed text";
+      Big_Int : constant String :=
+        "Value is not a valid Integer: out of range";
+      Seven   : constant Integer_Reads.Read := Parse_Integer ("seven");
+      R       : Outcome;
+   begin
+      Fabula.Check.Ints.Equal (R, 7, Seven);
+      Expect (R, Bad_Int, "Equal, Want read");
+      Fabula.Check.Ints.Equal (R, Seven, 7);
+      Expect (R, Bad_Int, "Equal, Got read");
+      Fabula.Check.Ints.Not_Equal (R, 7, Seven);
+      Expect (R, Bad_Int, "Not_Equal, Want read");
+      Fabula.Check.Ints.Not_Equal (R, Seven, 7);
+      Expect (R, Bad_Int, "Not_Equal, Got read");
+      Fabula.Check.Ints.Greater (R, 7, Seven);
+      Expect (R, Bad_Int, "Greater, Want read");
+      Fabula.Check.Ints.Greater (R, Seven, 7);
+      Expect (R, Bad_Int, "Greater, Got read");
+      Fabula.Check.Ints.Greater_Or_Equal (R, 7, Seven);
+      Expect (R, Bad_Int, "Greater_Or_Equal, Want read");
+      Fabula.Check.Ints.Greater_Or_Equal (R, Seven, 7);
+      Expect (R, Bad_Int, "Greater_Or_Equal, Got read");
+      Fabula.Check.Ints.Less (R, 7, Seven);
+      Expect (R, Bad_Int, "Less, Want read");
+      Fabula.Check.Ints.Less (R, Seven, 7);
+      Expect (R, Bad_Int, "Less, Got read");
+      Fabula.Check.Ints.Less_Or_Equal (R, 7, Seven);
+      Expect (R, Bad_Int, "Less_Or_Equal, Want read");
+      Fabula.Check.Ints.Less_Or_Equal (R, Seven, 7);
+      Expect (R, Bad_Int, "Less_Or_Equal, Got read");
+
+      Fabula.Check.Ints.Equal (R, 7, Parse_Integer ("99999999999"));
+      Expect (R, Big_Int, "an out-of-range read");
+      Fabula.Check.Ints.Less (R, Parse_Integer ("99999999999"), 7);
+      Expect (R, Big_Int, "an out-of-range Got read");
+      Fabula.Check.Ints.Equal (R, 7, Seven, "boxes must match");
+      Expect (R, Bad_Int, "a failed read over a custom message");
+      Fabula.Check.Longs.Less (R, Parse_Long ("x"), 5);
+      Expect
+        (R,
+         "Value is not a valid Long_Long_Integer: malformed text",
+         "Longs names its type");
+      Fabula.Check.Reals.Greater (R, 1.0, Parse_Real ("1e3"));
+      Expect
+        (R,
+         "Value is not a valid Long_Float: malformed text",
+         "Reals names its type");
+   end Test_Failed_Reads;
+
+   --  A step body that tests Ok itself fails the step on the same message
+   --  path, naming what did not read; the instance supplies the type.
+   procedure Test_Fail_Read (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      R : Outcome;
+   begin
+      Fabula.Check.Ints.Fail_Read (R, Out_Of_Range, "The item count");
+      Expect
+        (R,
+         "The item count is not a valid Integer: out of range",
+         "Fail_Read names what did not read");
+      Fabula.Check.Reals.Fail_Read (R, Malformed);
+      Expect
+        (R,
+         "Value is not a valid Long_Float: malformed text",
+         "Fail_Read says Value by default");
+      Fabula.Check.Ints.Fail_Read (R, Malformed, "");
+      Expect
+        (R,
+         "Value is not a valid Integer: malformed text",
+         "an empty What says Value");
+   end Test_Fail_Read;
+
    procedure Test_Reset (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
       R : Outcome;
@@ -399,6 +518,12 @@ package body Fabula_Check_Tests is
       Register_Routine (T, Test_Fail'Access, "Fail sets Order Fail_Scenario");
       Register_Routine
         (T, Test_Fail_Step'Access, "Fail_Step leaves Order at Continue");
+      Register_Routine
+        (T, Test_Good_Reads'Access, "a good read compares like its value");
+      Register_Routine
+        (T, Test_Failed_Reads'Access, "a failed read names type and reason");
+      Register_Routine
+        (T, Test_Fail_Read'Access, "Fail_Read: one message for a bad read");
       Register_Routine (T, Test_Reset'Access, "Reset restores defaults");
    end Register_Tests;
 

@@ -1,6 +1,8 @@
 with Ada.Characters.Handling;
 with Ada.Strings.Fixed;
 
+with Fabula.Numbers;
+
 package body Fabula_Run_Fixture is
 
    use Fabula.Check;
@@ -78,8 +80,11 @@ package body Fabula_Run_Fixture is
       return Result;
    end Step_Outcome;
 
-   function Trimmed (N : Natural) return String
+   function Trimmed (N : Integer) return String
    is (Ada.Strings.Fixed.Trim (N'Image, Ada.Strings.Left));
+
+   --  Marks a count that did not read as an Integer.
+   Unread : constant Integer := -1;
 
    function Step_Note
      (Kind : Box_Step; A : Fabula.Args.List; F : Fabula.Frames.Frame)
@@ -88,7 +93,9 @@ package body Fabula_Run_Fixture is
       case Kind is
          when Place      =>
             return
-              Trimmed (Fabula.Args.Int (A, 1))
+              Trimmed
+                (Fabula.Numbers.Integer_Reads.Value_Or
+                   (Fabula.Args.Int (A, 1), Unread))
               & " "
               & Fabula.Args.Word (A, 2)
               & " @"

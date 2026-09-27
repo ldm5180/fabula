@@ -51,7 +51,16 @@ begin
    case S is
       when Init_Box    => Ctx := (others => <>);
       when Add_Item    =>
-        Add (Ctx, Fabula.Args.Text (A, 2), Fabula.Args.Int (A, 1));
+        declare
+           N : constant Fabula.Numbers.Integer_Reads.Read :=
+             Fabula.Args.Int (A, 1);
+        begin
+           if N.Ok then
+              Add (Ctx, Fabula.Args.Text (A, 2), N.Value);
+           else
+              Fabula.Check.Ints.Fail_Read (R, N.Error, "The count");
+           end if;
+        end;
       when Check_Count =>
         Fabula.Check.Ints.Equal (R, Count (Ctx), Fabula.Args.Int (A, 1));
    end case;
@@ -108,17 +117,23 @@ needed:
   parameter-passing choice.
 - **Refusals are typed values.** Overflow, malformed input, bad
   patterns, bad flags: named results with locations, not exceptions
-  across the core boundary (the one exception: the numeric argument
-  readers raise on a cross-typed read, which the shell turns into a
-  failed step). A refusal never exits 0 — the two cases that do,
+  across the core boundary. Numeric reads are results too: a value,
+  or the reason (`Malformed`, `Out_Of_Range`) there is none, which a
+  SPARK caller must test before it reads the value. An integer is
+  `-?[0-9]+` and a real is `-?[0-9]*\.?[0-9]+`, the capture grammars;
+  blanks, `+`, `_`, based literals and exponents are `Malformed`. A
+  real too large for `Long_Float` is `Out_Of_Range`; one too small
+  reads as `0.0`, since underflow is not an error. A
+  refusal never exits 0 — the two cases that do,
   a missing path and an empty file, copy the reference
   interpreter's behavior, so check the scenario count in scripts.
 
 The proof runs at level 2 with checks and warnings as errors:
-**2,699 checks proved** across 23 core units, zero `pragma Assume`,
-one waiver (numeric text conversion, deliberately outside the
-proof). A proof-closure lint fails the build if any core unit — or
-any generic without an instance — escapes analysis.
+**2,927 checks proved** across 24 core units, zero `pragma Assume`,
+one waiver (the decimal-to-`Long_Float` conversion, deliberately
+outside the proof; its grammar check is proved). A proof-closure
+lint fails the build if any core unit — or any generic without an
+instance — escapes analysis.
 
 ## Compared to cwt-cucumber
 
@@ -161,12 +176,25 @@ skip and ignore lines name no call.
   `Doc_Line_Count` and `Doc_Type` expose a doc-string argument, and
   the table views (`Row_Count`, `Cell`, `Cell_Int`, `Hash_Value`,
   `Pair_Value`) a table. Outline placeholders are substituted on
-  read.
+  read. `Int`, `Long`, `Real` and `Cell_Int` return a read result.
+- **Numbers** — `Parse_Integer`, `Parse_Long` and `Parse_Real` turn
+  any text into a read result (`Ok`, then `Value` or `Error`), for
+  table cells and your own strings; `Value_Or` gives a default.
 - **Check** — `Equal`, `Not_Equal`, `Greater`, `Less`… as generic
   `Compare` instances (`Fabula.Check.Ints/Longs/Reals` shipped,
   `Text_Equal` for strings), plus `Is_True`/`Is_False`, each with an
   optional message; and the controls `Skip`, `Ignore`, `Fail`,
-  `Fail_Step`.
+  `Fail_Step`. A comparison also takes a read result on either side;
+  a failed read fails it with the type and the reason, in place of
+  the optional message. `Fail_Read` fails a step the same way from a
+  body that tests `Ok` itself. `Compare` for a type of your own takes
+  one `Reads` instance:
+
+  ```ada
+  package Money_Reads is new Fabula.Numbers.Reads (Money, "Money");
+  package Money_Checks is new Fabula.Check.Compare
+    (Money, Image => Money_Image, Item_Reads => Money_Reads);
+  ```
 - **Context** — one record type you declare; a fresh
   default-initialized value per scenario. Give every component a
   default. A very large context is copied once per step or hook
@@ -181,13 +209,15 @@ skip and ignore lines name no call.
 
 ```console
 make build      # the library (Alire)
-make test       # AUnit suite, -O0 and -O3   (261 tests)
+make test       # AUnit suite, -O0 and -O3   (275 tests)
 make prove      # gnatprove, checks+warnings as errors, closure lint
 make format     # gnatformat --check
 make shape      # subprogram-shape lint + selftests
 make example    # the box binary, both modes
 make gate       # byte-compare the example against committed goldens
-make demo       # run the whole example/features/ suite (exit 1 by design)
+make demo       # run the whole example/features/ suite (exit 1 by design),
+                #   after `make fabula-only`: fabula's own bad-input checks,
+                #   not oracle output
 make ci         # all of the above, cheapest first
 ```
 

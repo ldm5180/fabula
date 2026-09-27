@@ -1,4 +1,3 @@
-with Fabula.Args.Numbers;
 with Fabula.Expand;
 
 package body Fabula.Args
@@ -70,14 +69,14 @@ is
       return Raw;
    end Unquoted;
 
-   function Int (A : List; N : Positive) return Integer
-   is (Numbers.To_Integer (Captured (A, N)));
+   function Int (A : List; N : Positive) return Numbers.Integer_Reads.Read
+   is (Numbers.Parse_Integer (Captured (A, N)));
 
-   function Long (A : List; N : Positive) return Long_Long_Integer
-   is (Numbers.To_Long (Captured (A, N)));
+   function Long (A : List; N : Positive) return Numbers.Long_Reads.Read
+   is (Numbers.Parse_Long (Captured (A, N)));
 
-   function Real (A : List; N : Positive) return Long_Float
-   is (Numbers.To_Real (Captured (A, N)));
+   function Real (A : List; N : Positive) return Numbers.Real_Reads.Read
+   is (Numbers.Parse_Real (Captured (A, N)));
 
    function Text (A : List; N : Positive) return String
    is (Unquoted (A, N));
@@ -184,8 +183,9 @@ is
       return Resolved (A, Ast.Cell (A.Doc.all, Ast.Cell_Index (Pos)));
    end Cell;
 
-   function Cell_Int (A : List; Row, Col : Positive) return Integer
-   is (Numbers.To_Integer (Cell (A, Row, Col)));
+   function Cell_Int
+     (A : List; Row, Col : Positive) return Numbers.Integer_Reads.Read
+   is (Numbers.Parse_Integer (Cell (A, Row, Col)));
 
    function Column_Of (A : List; Key : String) return Natural is
    begin

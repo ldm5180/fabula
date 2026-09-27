@@ -2,6 +2,7 @@
 --  here raises.  The runner reads the outcome as data, and the
 --  shell owns the only exception handler.
 with Fabula.Limits;
+with Fabula.Numbers;
 
 package Fabula.Check
   with SPARK_Mode
@@ -26,12 +27,37 @@ is
    procedure Is_False
      (R : in out Outcome; Condition : Boolean; Message : String := "");
 
+   --  Each comparison also takes a numeric read on either side, as
+   --  Fabula.Args and Fabula.Numbers return it.  A good read compares
+   --  exactly as its value does, Message included.  A failed read fails
+   --  the check through Fail_Read, for example "Value is not a valid
+   --  Integer: malformed text", and that message replaces Message: the
+   --  comparison Message describes never took place.
+   --
+   --  Using Compare for a type of your own takes one Reads instance:
+   --    package Money_Reads is new Fabula.Numbers.Reads (Money, "Money");
+   --    package Money_Checks is new Fabula.Check.Compare
+   --      (Money, Image => Money_Image, Item_Reads => Money_Reads);
    generic
       type Item is private;
       with function "=" (L, R : Item) return Boolean is <>;
       with function "<" (L, R : Item) return Boolean is <>;
       with function Image (I : Item) return String;
+      with package Item_Reads is new
+        Numbers.Reads (Value_Type => Item, others => <>);
    package Compare is
+      subtype Read is Item_Reads.Read;
+
+      --  Fails R for a read that did not succeed: "<What> is not a valid
+      --  <type>: <reason>", where the type is Item_Reads.Name.  An empty
+      --  What reads as "Value".  The comparisons below use it for a
+      --  failed read; a step body that tests Ok itself calls it too, so
+      --  every failed read speaks the same way.
+      procedure Fail_Read
+        (R     : in out Outcome;
+         Error : Numbers.Read_Error;
+         What  : String := "Value");
+
       procedure Equal
         (R : in out Outcome; Got, Want : Item; Message : String := "");
       procedure Not_Equal
@@ -44,6 +70,32 @@ is
         (R : in out Outcome; Got, Want : Item; Message : String := "");
       procedure Less_Or_Equal
         (R : in out Outcome; Got, Want : Item; Message : String := "");
+
+      procedure Equal
+        (R : in out Outcome; Got : Item; Want : Read; Message : String := "");
+      procedure Not_Equal
+        (R : in out Outcome; Got : Item; Want : Read; Message : String := "");
+      procedure Greater
+        (R : in out Outcome; Got : Item; Want : Read; Message : String := "");
+      procedure Greater_Or_Equal
+        (R : in out Outcome; Got : Item; Want : Read; Message : String := "");
+      procedure Less
+        (R : in out Outcome; Got : Item; Want : Read; Message : String := "");
+      procedure Less_Or_Equal
+        (R : in out Outcome; Got : Item; Want : Read; Message : String := "");
+
+      procedure Equal
+        (R : in out Outcome; Got : Read; Want : Item; Message : String := "");
+      procedure Not_Equal
+        (R : in out Outcome; Got : Read; Want : Item; Message : String := "");
+      procedure Greater
+        (R : in out Outcome; Got : Read; Want : Item; Message : String := "");
+      procedure Greater_Or_Equal
+        (R : in out Outcome; Got : Read; Want : Item; Message : String := "");
+      procedure Less
+        (R : in out Outcome; Got : Read; Want : Item; Message : String := "");
+      procedure Less_Or_Equal
+        (R : in out Outcome; Got : Read; Want : Item; Message : String := "");
    end Compare;
 
    --  Trimmed 'Image (the reference interpreter's formatter puts no
@@ -53,7 +105,7 @@ is
    function Long_Image (I : Long_Long_Integer) return String;
    function Real_Image (I : Long_Float) return String;
 
-   --  Shipped instances (child packages, one line each):
+   --  Shipped instances (child packages, one instantiation each):
    --  Fabula.Check.Ints (Integer), .Longs (Long_Long_Integer),
    --  .Reals (Long_Float), plus non-generic Text_Equal /
    --  Text_Not_Equal for String in this package.
