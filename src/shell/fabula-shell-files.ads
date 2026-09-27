@@ -89,6 +89,9 @@ is
    --  Loading.
    ---------------------------------------------------------------------
 
+   --  How many bytes Load reads from a feature file at a time.
+   Read_Chunk_Bytes : constant := 4_096;
+
    type Load_Status is
      (Loaded,       --  the Document holds the whole file
       Refused,      --  the parser refused it: Refusal says where and why

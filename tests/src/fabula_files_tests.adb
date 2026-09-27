@@ -351,6 +351,229 @@ package body Fabula_Files_Tests is
    end Test_Load_Unreadable;
 
    ---------------------------------------------------------------------
+   --  Line reading.  Load reads a file in chunks of Chunk bytes into a
+   --  line buffer of Max + 1 characters; these pin what it makes of
+   --  line lengths and line ends at both bounds.
+   ---------------------------------------------------------------------
+
+   Chunk : constant := Read_Chunk_Bytes;
+
+   --  A Rule with no scenario after it refuses at end of input and names
+   --  the file's last line, so Load counts every line and Fetch_Line
+   --  reads them all again to quote the last one.
+   Dangling : constant String := "Feature: f" & LF & "  Rule: r" & LF;
+
+   --  A comment line of N characters, or an empty line when N is 0.  Its
+   --  letters cycle, so a byte lost or read twice shows in the text.
+   function Comment (N : Natural) return String
+   is (if N = 0
+       then ""
+       else
+         "#"
+         & String'
+             [for I in 1 .. N - 1 =>
+                Character'Val (Character'Pos ('a') + I mod 26)]);
+
+   --  Comment lines of at most Width bytes each, LF included, that fill
+   --  exactly Bytes bytes.
+   Width : constant := 1_000;
+
+   function Filler (Bytes : Natural) return String is
+   begin
+      if Bytes = 0 then
+         return "";
+      elsif Bytes <= Width then
+         return Comment (Bytes - 1) & LF;
+      else
+         return Comment (Width - 1) & LF & Filler (Bytes - Width);
+      end if;
+   end Filler;
+
+   --  Dangling, then filler up to file offset At_Byte (1-based), where
+   --  the next line starts.
+   function Up_To (At_Byte : Positive) return String
+   is (Dangling & Filler (At_Byte - 1 - Dangling'Length));
+
+   --  The lines in Content as a line reader counts them: one per LF,
+   --  and one more for bytes after the last LF.
+   function Lines_In (Content : String) return Natural
+   is (Ada.Strings.Fixed.Count (Content, String'(1 => LF))
+       + (if Content'Length > 0 and then Content (Content'Last) /= LF
+          then 1
+          else 0));
+
+   --  Loads Content, which ends inside a dangling Rule, and expects the
+   --  refusal at its last line, quoted as Text.
+   procedure Expect_Last_Line (Content, Text, What : String) is
+      Path : constant String := Fresh_Dir ("lines") & "/probe.feature";
+      R    : Load_Result;
+   begin
+      Write_File (Path, Content);
+      Load (Path, R);
+      Expect (R.Status, Refused, What);
+      Assert
+        (R.At_End and then R.Line = Fabula.Line_Number (Lines_In (Content)),
+         What & ": the last line, got" & R.Line'Image);
+      Assert
+        (Line_Text (R) = Text,
+         What & ": its text, got """ & Line_Text (R) & """");
+   end Expect_Last_Line;
+
+   --  Loads Before & Long & After and expects Long, the line after
+   --  Before, to be too long, its first Max characters kept.
+   procedure Expect_Too_Long (Before, Long, After, What : String) is
+      Path : constant String := Fresh_Dir ("lines") & "/long.feature";
+      R    : Load_Result;
+   begin
+      Write_File (Path, Before & Long & After);
+      Load (Path, R);
+      Expect (R.Status, Too_Long, What);
+      Assert
+        (R.Line = Fabula.Line_Number (Lines_In (Before) + 1),
+         What & ": its line, got" & R.Line'Image);
+      Assert
+        (Line_Text (R) = Long (Long'First .. Long'First + Max - 1),
+         What & ": its first Max characters");
+   end Expect_Too_Long;
+
+   --  Lines at the buffer's bound, away from any chunk boundary.
+   procedure Test_Read_Lengths (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      After : constant String := LF & "# after" & LF;
+   begin
+      Expect_Last_Line
+        (Dangling & Comment (Max) & LF, Comment (Max), "Max characters");
+      Expect_Last_Line
+        (Dangling & Comment (Max), Comment (Max), "Max, no final LF");
+      Expect_Last_Line
+        (Dangling & Comment (Max) & CR & LF, Comment (Max), "Max and CRLF");
+      Expect_Last_Line
+        (Dangling & Comment (Max) & CR, Comment (Max), "Max and a last CR");
+      Expect_Too_Long (Dangling, Comment (Max + 1), After, "Max + 1");
+      Expect_Too_Long (Dangling, Comment (Max + 1), "", "Max + 1, no LF");
+      Expect_Too_Long
+        (Dangling, Comment (Max + 1), CR & After, "Max + 1 and CRLF");
+      Expect_Too_Long (Dangling, Comment (Max + 1), "" & CR, "Max + 1, CR");
+      Expect_Too_Long
+        (Dangling, Comment (Max) & CR & CR, After, "Max, then two CRs");
+      Expect_Too_Long
+        (Dangling, Comment (3 * Chunk), After, "a line over three chunks");
+   end Test_Read_Lengths;
+
+   --  Line ends and lines that fall on a chunk boundary: byte Chunk is
+   --  the first chunk's last byte.
+   procedure Test_Read_Chunk_Ends (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Line : constant String := Comment (100);
+      Next : constant String := "# next";
+   begin
+      Expect_Last_Line
+        (Up_To (Chunk - 100) & Line & CR & LF, Line, "CR at the chunk end");
+      Expect_Last_Line
+        (Up_To (Chunk - 100) & Line & CR, Line, "CR at the chunk end, EOF");
+      Expect_Last_Line
+        (Up_To (Chunk - 101) & Line & CR & LF, Line, "LF at the chunk end");
+      Expect_Last_Line
+        (Up_To (Chunk - 99) & Line & CR & LF, Line, "CR after the chunk");
+      Expect_Last_Line
+        (Up_To (Chunk - 100) & Line & LF & Next & LF,
+         Next,
+         "LF at the chunk end, a line after");
+      Expect_Last_Line
+        (Up_To (Chunk - 99) & Line & LF & Next & LF,
+         Next,
+         "a line that fills the chunk");
+      Expect_Last_Line
+        (Up_To (2 * Chunk - 100) & Line & CR & LF,
+         Line,
+         "CR at the second chunk's end");
+      Expect_Last_Line
+        (Up_To (Chunk - 150) & Comment (300),
+         Comment (300),
+         "a last line over two chunks");
+      Expect_Last_Line
+        (Up_To (Chunk - 150) & Comment (300) & CR & LF & Next & LF,
+         Next,
+         "a line over two chunks, a line after");
+   end Test_Read_Chunk_Ends;
+
+   --  The buffer's bound and a chunk boundary together: the line's
+   --  character Max + 1 is the first chunk's last byte, or the next.
+   procedure Test_Read_Both_Bounds
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      After : constant String := LF & "# after" & LF;
+   begin
+      Expect_Last_Line
+        (Up_To (Chunk - Max) & Comment (Max) & CR & LF,
+         Comment (Max),
+         "Max, then CR at the chunk end");
+      Expect_Last_Line
+        (Up_To (Chunk - Max + 1) & Comment (Max) & CR & LF,
+         Comment (Max),
+         "Max at the chunk end, then CR");
+      Expect_Last_Line
+        (Up_To (Chunk - Max + 1) & Comment (Max) & CR,
+         Comment (Max),
+         "Max at the chunk end, then a last CR");
+      Expect_Too_Long
+        (Up_To (Chunk - Max), Comment (Max + 1), After, "Max + 1, then LF");
+      Expect_Too_Long
+        (Up_To (Chunk - Max), Comment (Max + 2), After, "Max + 2 over it");
+      Expect_Too_Long
+        (Up_To (Chunk - Max), Comment (Max + 1), CR & After, "then CRLF");
+      Expect_Too_Long
+        (Up_To (Chunk - Max), Comment (Max + 1), "", "then end of file");
+   end Test_Read_Both_Bounds;
+
+   --  Short line ends: an empty last line, a lone CR, a CR that is not
+   --  the last character, and bytes read as they are.
+   procedure Test_Read_Line_Ends (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Raw : constant String :=
+        "# "
+        & ASCII.NUL
+        & Character'Val (16#E9#)
+        & Character'Val (16#80#)
+        & Character'Val (16#FF#);
+   begin
+      Expect_Last_Line (Dangling & "# a" & LF, "# a", "a final LF");
+      Expect_Last_Line (Dangling & "# a" & LF & LF, "", "an empty last line");
+      Expect_Last_Line (Dangling & CR, "", "a lone CR");
+      Expect_Last_Line (Dangling & CR & LF, "", "a lone CRLF");
+      Expect_Last_Line
+        (Dangling & "# a" & CR & CR & LF, "# a" & CR, "one CR dropped");
+      Expect_Last_Line
+        (Dangling & "# a" & CR & "b" & LF, "# a" & CR & "b", "a CR within");
+      Expect_Last_Line (Dangling & Raw & LF, Raw, "NUL and upper-half bytes");
+   end Test_Read_Line_Ends;
+
+   --  A file of one empty line holds a line; a file of no bytes is Empty.
+   procedure Test_Read_Tiny (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Dir  : constant String := Fresh_Dir ("tiny");
+      R    : Load_Result;
+      Kept : Load_Status;
+   begin
+      Write_File (Dir & "/lf.feature", "" & LF);
+      Load (Dir & "/lf.feature", R);
+      Kept := R.Status;
+      Assert (Kept /= Empty, "one LF is a line, got " & Kept'Image);
+      Write_File (Dir & "/cr.feature", "" & CR);
+      Load (Dir & "/cr.feature", R);
+      Expect (R.Status, Kept, "one CR reads as one LF");
+      Write_File (Dir & "/crlf.feature", CR & LF);
+      Load (Dir & "/crlf.feature", R);
+      Expect (R.Status, Kept, "one CRLF reads as one LF");
+      Write_File (Dir & "/empty.feature", "");
+      Load (Dir & "/empty.feature", R);
+      Expect (R.Status, Empty, "no bytes");
+   end Test_Read_Tiny;
+
+   ---------------------------------------------------------------------
    --  Discover.
    ---------------------------------------------------------------------
 
@@ -528,6 +751,16 @@ package body Fabula_Files_Tests is
         (T, Test_Load_At_End'Access, "At_End tells Feed and Finish apart");
       Register_Routine
         (T, Test_Load_Unreadable'Access, "empty, missing, a directory");
+      Register_Routine
+        (T, Test_Read_Lengths'Access, "line lengths at the buffer's bound");
+      Register_Routine
+        (T, Test_Read_Chunk_Ends'Access, "line ends at a chunk boundary");
+      Register_Routine
+        (T, Test_Read_Both_Bounds'Access, "the buffer's bound on a boundary");
+      Register_Routine
+        (T, Test_Read_Line_Ends'Access, "short line ends and raw bytes");
+      Register_Routine
+        (T, Test_Read_Tiny'Access, "one-byte files and an empty one");
       Register_Routine
         (T, Test_Discover_Corpus'Access, "the corpus in byte order");
       Register_Routine
