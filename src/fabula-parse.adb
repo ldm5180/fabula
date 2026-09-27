@@ -18,14 +18,15 @@ is
    is (P.Error.Kind /= None or else G.SM.State_Of (P.Machine) = G.Done);
 
    --  The first refusal sticks; later ones are dropped.
-   procedure Refuse (P : in out Parser; Kind : Error_Kind; Line : Natural) is
+   procedure Refuse (P : in out Parser; Kind : Error_Kind; Line : Line_Number)
+   is
    begin
       if P.Error.Kind = None then
          P.Error := (Kind => Kind, Line => Line);
       end if;
    end Refuse;
 
-   procedure Check (P : in out Parser; Ok : Boolean; Line : Natural) is
+   procedure Check (P : in out Parser; Ok : Boolean; Line : Line_Number) is
    begin
       if not Ok then
          Refuse (P, Pool_Exhausted, Line);
@@ -77,7 +78,7 @@ is
      (Doc     : in out Fabula.Ast.Document;
       Keyword : Fabula.Scan.Step_Keyword;
       Text    : Fabula.Ast.Slice;
-      Line    : Natural;
+      Line    : Line_Number;
       Ok      : in out Boolean)
    with Post => (if not Ok'Old then not Ok)
    is
@@ -91,7 +92,7 @@ is
      (Doc   : in out Fabula.Ast.Document;
       Kind  : Fabula.Scan.Fence_Kind;
       CType : Fabula.Ast.Slice;
-      Line  : Natural;
+      Line  : Line_Number;
       Ok    : in out Boolean)
    with Post => (if not Ok'Old then not Ok)
    is
@@ -126,7 +127,7 @@ is
    procedure Append_Row
      (Doc  : in out Fabula.Ast.Document;
       Kind : Table_Kind;
-      Line : Natural;
+      Line : Line_Number;
       Ok   : in out Boolean)
    with Post => (if not Ok'Old then not Ok)
    is
@@ -453,7 +454,8 @@ is
 
    --  A doc string opens: Owner is where the machine resumes when it
    --  closes; Line is where an unterminated one is reported.
-   procedure Set_Owner (P : in out Parser; Owner : G.State; Line : Natural) is
+   procedure Set_Owner (P : in out Parser; Owner : G.State; Line : Line_Number)
+   is
    begin
       P.Work.Owner := Owner;
       P.Work.Doc_Line := Line;
@@ -581,7 +583,7 @@ is
      (P      : in out Parser;
       Doc    : in out Fabula.Ast.Document;
       Line   : String;
-      Number : Positive) is
+      Number : Source_Line) is
    begin
       if Stopped (P) then
          return;

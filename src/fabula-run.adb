@@ -8,6 +8,7 @@ is
    use type Ast.Scenario_Handle;
    use type Ast.Scenario_Kind;
    use type Ast.Step_Handle;
+   use type Expand.Walk_Status;
    use type Reg.Hook_Phase;
    use type Results.Status;
 
@@ -160,7 +161,8 @@ is
       Opts.Names_Len := Patterns'Length;
    end Set_Names;
 
-   procedure Add_Line (Selection : in out Line_Selection; Line : Positive) is
+   procedure Add_Line (Selection : in out Line_Selection; Line : Source_Line)
+   is
    begin
       Selection.Count := Selection.Count + 1;
       Selection.Lines (Selection.Count) := Line;
@@ -203,16 +205,18 @@ is
    with
      Post => Next_Hook'Result = No_Row or else Next_Hook'Result in Hooks'Range
    is
+      function Runs_Next (I : Positive) return Boolean
+      is (I in Hooks'Range
+          and then I > R.Hook
+          and then Reg.Phase_Of (Hooks, I) = Phase
+          and then Hook_Selected (R, I));
+
+      function First_Next is new Searches.Find_First (Runs_Next);
    begin
-      for I in Hooks'Range loop
-         if I > R.Hook
-           and then Reg.Phase_Of (Hooks, I) = Phase
-           and then Hook_Selected (R, I)
-         then
-            return I;
-         end if;
-      end loop;
-      return No_Row;
+      if Hooks'Length = 0 then
+         return No_Row;
+      end if;
+      return First_Next (Hooks'First, Hooks'Last);
    end Next_Hook;
 
    function Pending_Hook_Kind (R : Runner) return Reg.Hook_Kind
@@ -230,66 +234,75 @@ is
    --  outline, in file order.
    ---------------------------------------------------------------------
 
-   --  Moves Ex to the outline's next data row, when S is an outline
-   --  with a current row.
-   procedure Next_Row
-     (Doc   : Ast.Document;
-      S     : Ast.Scenario_Handle;
-      Ex    : in out Expand.Example_Ref;
-      Found : out Boolean)
-   with Post => (if Found then S in 1 .. Ast.Scenario_Count (Doc))
-   is
-   begin
-      Found := False;
-      if Ex.Block in Ast.Examples_Index
-        and then S in 1 .. Ast.Scenario_Count (Doc)
-      then
-         Ex := Expand.Next_Example (Doc, S, Ex);
-         Found := Ex.Block in Ast.Examples_Index;
-      end if;
-   end Next_Row;
+   --  Where the scenario walk stands: the scenario, the outline row due
+   --  in it (none for a plain scenario), and whether a position was
+   --  found at all.
+   type Scenario_Position is record
+      Found    : Boolean := False;
+      Scenario : Ast.Scenario_Handle := Ast.No_Scenario;
+      Example  : Expand.Example_Ref;
+   end record;
 
-   --  Moves S to the next plain scenario or the next outline with a data
-   --  row, and Ex to that outline's first row.
-   procedure Next_Scenario
-     (Doc   : Ast.Document;
-      S     : in out Ast.Scenario_Handle;
-      Ex    : in out Expand.Example_Ref;
-      Found : out Boolean)
-   with Post => (if Found then S in 1 .. Ast.Scenario_Count (Doc))
+   --  A position that names a scenario of Doc when it was found.
+   function In_Document
+     (Doc : Ast.Document; P : Scenario_Position) return Boolean
+   is (if P.Found then P.Scenario in 1 .. Ast.Scenario_Count (Doc));
+
+   --  From S and Ex, the outline's next data row, when S is an outline
+   --  with a current row; else S and Ex as they are, not found.
+   function Next_Row
+     (Doc : Ast.Document; S : Ast.Scenario_Handle; Ex : Expand.Example_Ref)
+      return Scenario_Position
+   is (if Ex.Status = Expand.Row_Due
+         and then S in 1 .. Ast.Scenario_Count (Doc)
+       then
+         (declare
+            Next : constant Expand.Example_Ref :=
+              Expand.Next_Example (Doc, S, Ex);
+          begin
+            (Found    => Next.Status = Expand.Row_Due,
+             Scenario => S,
+             Example  => Next))
+       else (Found => False, Scenario => S, Example => Ex))
+   with Post => In_Document (Doc, Next_Row'Result);
+
+   --  From S, the next plain scenario or the next outline with a data
+   --  row, with that outline's first row.  When no scenario follows S,
+   --  From as it is, not found.
+   function Next_Scenario
+     (Doc : Ast.Document; From : Scenario_Position) return Scenario_Position
+   with Post => In_Document (Doc, Next_Scenario'Result)
    is
+      Result : Scenario_Position := (From with delta Found => False);
    begin
-      Found := False;
-      while S < Ast.Scenario_Count (Doc) loop
-         pragma Loop_Variant (Increases => S);
-         S := S + 1;
-         Ex :=
-           (if Ast.Scenario (Doc, S).Kind = Ast.Plain
-            then (others => <>)
-            else Expand.First_Example (Doc, S));
-         Found :=
-           Ast.Scenario (Doc, S).Kind = Ast.Plain
-           or else Ex.Block in Ast.Examples_Index;
-         exit when Found;
+      while Result.Scenario < Ast.Scenario_Count (Doc) loop
+         pragma Loop_Invariant (not Result.Found);
+         pragma Loop_Variant (Increases => Result.Scenario);
+         Result.Scenario := Result.Scenario + 1;
+         Result.Example :=
+           (if Ast.Scenario (Doc, Result.Scenario).Kind = Ast.Plain
+            then Expand.No_Example
+            else Expand.First_Example (Doc, Result.Scenario));
+         Result.Found :=
+           Ast.Scenario (Doc, Result.Scenario).Kind = Ast.Plain
+           or else Result.Example.Status = Expand.Row_Due;
+         exit when Result.Found;
       end loop;
+      return Result;
    end Next_Scenario;
 
-   --  Moves S and Ex to the next scenario position: the outline's next
-   --  data row, else the next scenario.  Ex.Block is no block for a
-   --  plain scenario.
-   procedure Next_Position
-     (Doc   : Ast.Document;
-      S     : in out Ast.Scenario_Handle;
-      Ex    : in out Expand.Example_Ref;
-      Found : out Boolean)
-   with Post => (if Found then S in 1 .. Ast.Scenario_Count (Doc))
-   is
-   begin
-      Next_Row (Doc, S, Ex, Found);
-      if not Found then
-         Next_Scenario (Doc, S, Ex, Found);
-      end if;
-   end Next_Position;
+   --  The next scenario position after S and Ex: the outline's next data
+   --  row, else the next scenario.  A plain scenario has no row due.
+   function Next_Position
+     (Doc : Ast.Document; S : Ast.Scenario_Handle; Ex : Expand.Example_Ref)
+      return Scenario_Position
+   is (declare
+         In_Outline : constant Scenario_Position := Next_Row (Doc, S, Ex);
+       begin
+         (if In_Outline.Found
+          then In_Outline
+          else Next_Scenario (Doc, In_Outline)))
+   with Post => In_Document (Doc, Next_Position'Result);
 
    --  The scenario's name as reported: an outline's is substituted from
    --  its data row, or kept as written when that would not fit.
@@ -298,23 +311,24 @@ is
       return String
    is (declare
          Name : constant Ast.Slice := Ast.Scenario (Doc, S).Head.Name;
-         Done : constant Expand.Text_Result :=
-           Expand.Resolved (Doc, Name, Ex.Header_Row, Ex.Data_Row);
        begin
-         (if Done.Ok then Expand.Value (Done) else Ast.Text (Doc, Name)))
+         Expand.Value_Or
+           (Expand.Resolved
+              (Doc, Name, Expand.Header_Row_Of (Ex), Expand.Data_Row_Of (Ex)),
+            Ast.Text (Doc, Name)))
    with Pre => S <= Ast.Scenario_Count (Doc);
 
    --  The scenario's line: its header's, or its data row's.
    function Scenario_Line
      (Doc : Ast.Document; S : Ast.Scenario_Index; Ex : Expand.Example_Ref)
-      return Natural
-   is (if Ex.Data_Row in Ast.Examples_Row_Index
+      return Line_Number
+   is (if Ex.Status = Expand.Row_Due
        then Expand.Concrete_Line (Doc, Ex.Data_Row)
        else Ast.Scenario (Doc, S).Head.Line)
    with Pre => S <= Ast.Scenario_Count (Doc);
 
    function Line_Selected
-     (Lines : Line_Selection; Line : Natural) return Boolean
+     (Lines : Line_Selection; Line : Line_Number) return Boolean
    is (Lines.Count = 0
        or else (for some I in 1 .. Lines.Count => Lines.Lines (I) = Line));
 
@@ -333,15 +347,15 @@ is
 
    --  Moves to the next scenario position both filters keep.
    procedure Seek_Scenario (R : in out Runner; Found : out Boolean) is
-      S  : Ast.Scenario_Handle := R.Scenario;
-      Ex : Expand.Example_Ref := R.Example;
+      Next : Scenario_Position;
    begin
       Found := R.Doc /= null;
       while Found loop
          pragma Loop_Invariant (R.Doc /= null);
-         Next_Position (R.Doc.all, S, Ex, Found);
-         R.Scenario := S;
-         R.Example := Ex;
+         Next := Next_Position (R.Doc.all, R.Scenario, R.Example);
+         R.Scenario := Next.Scenario;
+         R.Example := Next.Example;
+         Found := Next.Found;
          exit when not Found or else Passes_Filters (R);
       end loop;
    end Seek_Scenario;
@@ -423,12 +437,12 @@ is
    function Header_Of (R : Runner) return Ast.Examples_Row_Handle
    is (if R.Segment = Background
        then Ast.No_Examples_Row
-       else R.Example.Header_Row);
+       else Expand.Header_Row_Of (R.Example));
 
    function Data_Of (R : Runner) return Ast.Examples_Row_Handle
    is (if R.Segment = Background
        then Ast.No_Examples_Row
-       else R.Example.Data_Row);
+       else Expand.Data_Row_Of (R.Example));
 
    --  Expands the current step, looks up its definition and checks it
    --  fits.  An undefined step reports its text as written.
@@ -449,11 +463,11 @@ is
         Expand.Step_Fits (R.Doc.all, Node, Header_Of (R), Data_Of (R));
       R.Ctx.Step_Failed := False;
       R.Step_Outcome := (others => <>);
-      Frames.Set
-        (R.Frame.Step,
-         (if R.Match.Found
-          then Expand.Value (R.Text)
-          else Ast.Text (R.Doc.all, Node.Text)));
+      R.Frame.Step :=
+        Frames.To_Step
+          (if R.Match.Found
+           then Expand.Value (R.Text)
+           else Ast.Text (R.Doc.all, Node.Text));
       R.Frame.Step_Line := Node.Line;
    end Resolve;
 
@@ -480,7 +494,7 @@ is
    --  The frame's step, cleared outside step execution.
    procedure Clear_Step (F : in out Frames.Frame) is
    begin
-      F.Step := (others => <>);
+      F.Step := Frames.To_Step ("");
       F.Step_Line := No_Line;
    end Clear_Step;
 
@@ -501,17 +515,15 @@ is
       then
          return;
       end if;
-      R.Step_Arguments := Args.Make (Expand.Value (R.Text), R.Match.Captures);
-      Args.Attach
-        (R.Step_Arguments,
-         R.Doc,
-         Ast.Step (R.Doc.all, R.Step).Doc,
-         Ast.Step (R.Doc.all, R.Step).Table);
-      if Header_Of (R) in Ast.Examples_Row_Index
-        and then Data_Of (R) in Ast.Examples_Row_Index
-      then
-         Args.Set_Example (R.Step_Arguments, Header_Of (R), Data_Of (R));
-      end if;
+      R.Step_Arguments :=
+        Args.Make
+          (Expand.Value (R.Text),
+           R.Match.Captures,
+           (Doc        => R.Doc,
+            Doc_String => Ast.Step (R.Doc.all, R.Step).Doc,
+            Table      => Ast.Step (R.Doc.all, R.Step).Table,
+            Header_Row => Header_Of (R),
+            Data_Row   => Data_Of (R)));
    end Assemble;
 
    ---------------------------------------------------------------------
@@ -549,10 +561,10 @@ is
         and then R.Scenario in 1 .. Ast.Scenario_Count (R.Doc.all)
       then
          R.Tag_Set :=
-           Expand.Effective_Tags (R.Doc.all, R.Scenario, R.Example.Block);
-         Frames.Set
-           (R.Frame.Scenario,
-            Scenario_Name (R.Doc.all, R.Scenario, R.Example));
+           Expand.Effective_Tags
+             (R.Doc.all, R.Scenario, Expand.Block_Of (R.Example));
+         R.Frame.Scenario :=
+           Frames.To_Name (Scenario_Name (R.Doc.all, R.Scenario, R.Example));
          R.Frame.Scenario_Line :=
            Scenario_Line (R.Doc.all, R.Scenario, R.Example);
          R.Ctx.Selected := Filter_Selects (R);
@@ -572,7 +584,7 @@ is
         (R,
          (Kind     => Scenario_Opened,
           Scenario => R.Scenario,
-          Data_Row => R.Example.Data_Row,
+          Data_Row => Expand.Data_Row_Of (R.Example),
           others   => <>));
    end Open;
 
@@ -589,7 +601,7 @@ is
          (Kind     => Scenario_Entered,
           Entered  => True,
           Scenario => R.Scenario,
-          Data_Row => R.Example.Data_Row,
+          Data_Row => Expand.Data_Row_Of (R.Example),
           others   => <>));
    end Enter;
 
@@ -606,7 +618,7 @@ is
           Entered  => True,
           Cause    => Cause,
           Scenario => R.Scenario,
-          Data_Row => R.Example.Data_Row,
+          Data_Row => Expand.Data_Row_Of (R.Example),
           Step     => R.Step,
           Outcome  => R.Step_Outcome));
    end Close_Step_As;
@@ -639,7 +651,7 @@ is
           Status   => Status,
           Entered  => True,
           Scenario => R.Scenario,
-          Data_Row => R.Example.Data_Row,
+          Data_Row => Expand.Data_Row_Of (R.Example),
           Outcome  => R.Scenario_Outcome,
           others   => <>));
    end Close;
@@ -652,7 +664,7 @@ is
           Dropped  => True,
           Entered  => Entered,
           Scenario => R.Scenario,
-          Data_Row => R.Example.Data_Row,
+          Data_Row => Expand.Data_Row_Of (R.Example),
           others   => <>));
    end Drop;
 
@@ -661,7 +673,7 @@ is
    begin
       R.Doc := null;
       R.Scenario := Ast.No_Scenario;
-      R.Example := (others => <>);
+      R.Example := Expand.No_Example;
       R.Step := Ast.No_Step;
       R.Step_Arguments := Args.Make ("", (others => <>));
    end Release;
@@ -811,11 +823,11 @@ is
       R.Doc := Doc;
       R.Lines := Lines;
       R.Scenario := Ast.No_Scenario;
-      R.Example := (others => <>);
+      R.Example := Expand.No_Example;
       R.Frame := (others => <>);
-      Frames.Set (R.Frame.File, File);
-      Frames.Set
-        (R.Frame.Feature, Ast.Text (Doc.all, Ast.Feature (Doc.all).Head.Name));
+      R.Frame.File := Frames.To_Path (File);
+      R.Frame.Feature :=
+        Frames.To_Name (Ast.Text (Doc.all, Ast.Feature (Doc.all).Head.Name));
       R.Frame.Feature_Line := Ast.Feature (Doc.all).Head.Line;
       Trigger (R, E_Feature);
    end Start_Feature;

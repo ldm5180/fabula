@@ -235,7 +235,7 @@ is
    function Line_Event
      (Kind   : Event_Kind;
       Line   : String;
-      Number : Positive;
+      Number : Source_Line;
       Class  : Scan.Classification) return Event
    is
       Result : Event :=

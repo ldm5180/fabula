@@ -6,6 +6,7 @@
 --  Every slice and range is sliceable by construction of its index
 --  subtypes, so a reader needs no invariant to stay in bounds.
 with Fabula.Limits;
+with Fabula.Pool_Ranges;
 with Fabula.Scan;
 
 package Fabula.Ast
@@ -15,98 +16,87 @@ is
    subtype Arena_Index is Positive range 1 .. Limits.Text_Arena_Bytes;
    subtype Arena_Count is Natural range 0 .. Limits.Text_Arena_Bytes;
 
+   --  The length of a slice that holds no character.
+   No_Characters : constant Arena_Count := 0;
+
    --  A span of the text arena; Last < First is the empty slice.
    type Slice is record
-      First : Arena_Index := 1;
-      Last  : Arena_Count := 0;
+      First : Arena_Index := Arena_Index'First;
+      Last  : Arena_Count := No_Characters;
    end record;
 
    Empty_Slice : constant Slice := (First => 1, Last => 0);
 
+   function Is_Empty (S : Slice) return Boolean
+   is (S.Last < S.First);
+
    function Length (S : Slice) return Natural
-   is (if S.Last >= S.First then S.Last - S.First + 1 else 0);
+   is (if Is_Empty (S) then No_Characters else S.Last - S.First + 1);
 
    --  One handle type per pool, so no node can index the wrong pool.
-   --  Handle 0 is "none"; ranges are First .. Last, empty when
+   --  Each pool's Pool_Ranges instance holds its index arithmetic: its
+   --  None is "no member", and a range is First .. Last, empty when
    --  Last < First.
    type Rule_Handle is range 0 .. Limits.Max_Rules;
-   subtype Rule_Index is Rule_Handle range 1 .. Rule_Handle'Last;
+   package Rule_Pool is new Pool_Ranges (Rule_Handle);
+   subtype Rule_Index is Rule_Pool.Index;
+   No_Rule : constant Rule_Handle := Rule_Pool.None;
 
    type Scenario_Handle is range 0 .. Limits.Max_Scenarios;
-   subtype Scenario_Index is Scenario_Handle range 1 .. Scenario_Handle'Last;
-   No_Scenario : constant Scenario_Handle := 0;
-
-   type Scenario_Range is record
-      First : Scenario_Index := 1;
-      Last  : Scenario_Handle := 0;
-   end record;
+   package Scenario_Pool is new Pool_Ranges (Scenario_Handle);
+   subtype Scenario_Index is Scenario_Pool.Index;
+   subtype Scenario_Range is Scenario_Pool.Pool_Range;
+   No_Scenario : constant Scenario_Handle := Scenario_Pool.None;
 
    type Step_Handle is range 0 .. Limits.Max_Steps;
-   subtype Step_Index is Step_Handle range 1 .. Step_Handle'Last;
-   No_Step : constant Step_Handle := 0;
-
-   type Step_Range is record
-      First : Step_Index := 1;
-      Last  : Step_Handle := 0;
-   end record;
+   package Step_Pool is new Pool_Ranges (Step_Handle);
+   subtype Step_Index is Step_Pool.Index;
+   subtype Step_Range is Step_Pool.Pool_Range;
+   No_Step : constant Step_Handle := Step_Pool.None;
 
    type Tag_Handle is range 0 .. Limits.Max_Tags;
-   subtype Tag_Index is Tag_Handle range 1 .. Tag_Handle'Last;
-
-   type Tag_Range is record
-      First : Tag_Index := 1;
-      Last  : Tag_Handle := 0;
-   end record;
+   package Tag_Pool is new Pool_Ranges (Tag_Handle);
+   subtype Tag_Index is Tag_Pool.Index;
+   subtype Tag_Range is Tag_Pool.Pool_Range;
 
    --  A step carries at most one table and one doc string, so both
    --  pools are sized by the step pool.
    type Table_Handle is range 0 .. Limits.Max_Steps;
-   subtype Table_Index is Table_Handle range 1 .. Table_Handle'Last;
+   package Table_Pool is new Pool_Ranges (Table_Handle);
+   subtype Table_Index is Table_Pool.Index;
+   No_Table : constant Table_Handle := Table_Pool.None;
 
    type Doc_Handle is range 0 .. Limits.Max_Steps;
-   subtype Doc_Index is Doc_Handle range 1 .. Doc_Handle'Last;
+   package Doc_Pool is new Pool_Ranges (Doc_Handle);
+   subtype Doc_Index is Doc_Pool.Index;
+   No_Doc : constant Doc_Handle := Doc_Pool.None;
 
    type Row_Handle is range 0 .. Limits.Max_Table_Rows;
-   subtype Row_Index is Row_Handle range 1 .. Row_Handle'Last;
-
-   type Row_Range is record
-      First : Row_Index := 1;
-      Last  : Row_Handle := 0;
-   end record;
+   package Row_Pool is new Pool_Ranges (Row_Handle);
+   subtype Row_Index is Row_Pool.Index;
+   subtype Row_Range is Row_Pool.Pool_Range;
 
    type Cell_Handle is range 0 .. Limits.Max_Table_Cells;
-   subtype Cell_Index is Cell_Handle range 1 .. Cell_Handle'Last;
-
-   type Cell_Range is record
-      First : Cell_Index := 1;
-      Last  : Cell_Handle := 0;
-   end record;
+   package Cell_Pool is new Pool_Ranges (Cell_Handle);
+   subtype Cell_Index is Cell_Pool.Index;
+   subtype Cell_Range is Cell_Pool.Pool_Range;
 
    type Doc_Line_Handle is range 0 .. Limits.Max_Doc_Lines;
-   subtype Doc_Line_Index is Doc_Line_Handle range 1 .. Doc_Line_Handle'Last;
-
-   type Doc_Line_Range is record
-      First : Doc_Line_Index := 1;
-      Last  : Doc_Line_Handle := 0;
-   end record;
+   package Doc_Line_Pool is new Pool_Ranges (Doc_Line_Handle);
+   subtype Doc_Line_Index is Doc_Line_Pool.Index;
+   subtype Doc_Line_Range is Doc_Line_Pool.Pool_Range;
 
    type Examples_Handle is range 0 .. Limits.Max_Examples_Blocks;
-   subtype Examples_Index is Examples_Handle range 1 .. Examples_Handle'Last;
-
-   type Examples_Range is record
-      First : Examples_Index := 1;
-      Last  : Examples_Handle := 0;
-   end record;
+   package Examples_Pool is new Pool_Ranges (Examples_Handle);
+   subtype Examples_Index is Examples_Pool.Index;
+   subtype Examples_Range is Examples_Pool.Pool_Range;
+   No_Examples : constant Examples_Handle := Examples_Pool.None;
 
    type Examples_Row_Handle is range 0 .. Limits.Max_Examples_Rows;
-   subtype Examples_Row_Index is
-     Examples_Row_Handle range 1 .. Examples_Row_Handle'Last;
-   No_Examples_Row : constant Examples_Row_Handle := 0;
-
-   type Examples_Row_Range is record
-      First : Examples_Row_Index := 1;
-      Last  : Examples_Row_Handle := 0;
-   end record;
+   package Examples_Row_Pool is new Pool_Ranges (Examples_Row_Handle);
+   subtype Examples_Row_Index is Examples_Row_Pool.Index;
+   subtype Examples_Row_Range is Examples_Row_Pool.Pool_Range;
+   No_Examples_Row : constant Examples_Row_Handle := Examples_Row_Pool.None;
 
    --  What every block header records: the keyword as written (colon
    --  dropped, so "Scenario Template" stays distinguishable), the
@@ -114,7 +104,7 @@ is
    type Header is record
       Keyword     : Slice;
       Name        : Slice;
-      Line        : Natural := 0;
+      Line        : Line_Number := No_Line;
       Description : Slice;
    end record;
 
@@ -144,15 +134,15 @@ is
       Tags     : Tag_Range;
       Steps    : Step_Range;
       Examples : Examples_Range;
-      Rule     : Rule_Handle := 0;
+      Rule     : Rule_Handle := No_Rule;
    end record;
 
    type Step_Node is record
       Keyword : Scan.Step_Keyword := Scan.K_Star;
       Text    : Slice;
-      Line    : Natural := 0;
-      Doc     : Doc_Handle := 0;
-      Table   : Table_Handle := 0;
+      Line    : Line_Number := No_Line;
+      Doc     : Doc_Handle := No_Doc;
+      Table   : Table_Handle := No_Table;
    end record;
 
    type Table_Node is record
@@ -162,7 +152,7 @@ is
    --  A table row of either pool: its cells and its source line.
    type Row_Node is record
       Cells : Cell_Range;
-      Line  : Natural := 0;
+      Line  : Line_Number := No_Line;
    end record;
 
    --  Content lines are stored trimmed on both sides; the content type
@@ -170,7 +160,7 @@ is
    type Doc_String_Node is record
       Fence        : Scan.Fence_Kind := Scan.Quotes;
       Content_Type : Slice;
-      Line         : Natural := 0;
+      Line         : Line_Number := No_Line;
       Lines        : Doc_Line_Range;
    end record;
 
@@ -179,7 +169,7 @@ is
    type Examples_Node is record
       Head       : Header;
       Tags       : Tag_Range;
-      Header_Row : Examples_Row_Handle := 0;
+      Header_Row : Examples_Row_Handle := No_Examples_Row;
       Rows       : Examples_Row_Range;
    end record;
 
@@ -200,8 +190,11 @@ is
    ---------------------------------------------------------------------
 
    function Text (Doc : Document; S : Slice) return String
-   with Post => Text'Result'First = 1 and then Text'Result'Length = Length (S);
-   --  The slice's characters, re-based to start at 1.
+   with
+     Post =>
+       Text'Result'First = Positive'First
+       and then Text'Result'Length = Length (S);
+   --  The slice's characters, re-based to start at Positive'First.
 
    function Text_Used (Doc : Document) return Arena_Count;
    function Is_Empty (Doc : Document) return Boolean;
@@ -270,7 +263,7 @@ is
    with
      Post =>
        Text_Used (Doc)
-       = Text_Used (Doc)'Old + (if Ok then Source'Length else 0)
+       = Text_Used (Doc)'Old + (if Ok then Source'Length else No_Characters)
        and then (if Ok then Length (Result) = Source'Length);
 
    procedure Set_Feature
@@ -282,7 +275,8 @@ is
 
    procedure Add_Rule (Doc : in out Document; Head : Header; Ok : out Boolean)
    with
-     Post => Rule_Count (Doc) = Rule_Count (Doc)'Old + (if Ok then 1 else 0);
+     Post =>
+       Rule_Count (Doc) = Rule_Pool.Count_After (Rule_Count (Doc)'Old, Ok);
 
    --  The new scenario joins the most recent rule, if any.
    procedure Add_Scenario
@@ -293,14 +287,16 @@ is
       Ok   : out Boolean)
    with
      Post =>
-       Scenario_Count (Doc) = Scenario_Count (Doc)'Old + (if Ok then 1 else 0);
+       Scenario_Count (Doc)
+       = Scenario_Pool.Count_After (Scenario_Count (Doc)'Old, Ok);
 
    --  The new block joins the most recent scenario.
    procedure Add_Examples
      (Doc : in out Document; Head : Header; Tags : Tag_Range; Ok : out Boolean)
    with
      Post =>
-       Examples_Count (Doc) = Examples_Count (Doc)'Old + (if Ok then 1 else 0);
+       Examples_Count (Doc)
+       = Examples_Pool.Count_After (Examples_Count (Doc)'Old, Ok);
 
    --  Appends one description line to Target's most recent node,
    --  joined to the lines before it by LF into one arena slice.  So a
@@ -321,7 +317,8 @@ is
       Text    : Slice;
       Pending : in out Tag_Range;
       Ok      : out Boolean)
-   with Post => Tag_Count (Doc) = Tag_Count (Doc)'Old + (if Ok then 1 else 0);
+   with
+     Post => Tag_Count (Doc) = Tag_Pool.Count_After (Tag_Count (Doc)'Old, Ok);
 
    --  The new step joins the most recent scenario, or the background
    --  while no scenario exists yet.
@@ -329,100 +326,106 @@ is
      (Doc     : in out Document;
       Keyword : Scan.Step_Keyword;
       Text    : Slice;
-      Line    : Natural;
+      Line    : Line_Number;
       Ok      : out Boolean)
    with
-     Post => Step_Count (Doc) = Step_Count (Doc)'Old + (if Ok then 1 else 0);
+     Post =>
+       Step_Count (Doc) = Step_Pool.Count_After (Step_Count (Doc)'Old, Ok);
 
    --  Gives the most recent step an empty table.
    procedure Add_Table (Doc : in out Document; Ok : out Boolean)
    with
-     Post => Table_Count (Doc) = Table_Count (Doc)'Old + (if Ok then 1 else 0);
+     Post =>
+       Table_Count (Doc) = Table_Pool.Count_After (Table_Count (Doc)'Old, Ok);
 
    procedure Add_Table_Row
-     (Doc : in out Document; Line : Natural; Ok : out Boolean)
+     (Doc : in out Document; Line : Line_Number; Ok : out Boolean)
    with
      Post =>
        Table_Row_Count (Doc)
-       = Table_Row_Count (Doc)'Old + (if Ok then 1 else 0);
+       = Row_Pool.Count_After (Table_Row_Count (Doc)'Old, Ok);
 
    procedure Add_Table_Cell
      (Doc : in out Document; Text : Slice; Ok : out Boolean)
    with
-     Post => Cell_Count (Doc) = Cell_Count (Doc)'Old + (if Ok then 1 else 0);
+     Post =>
+       Cell_Count (Doc) = Cell_Pool.Count_After (Cell_Count (Doc)'Old, Ok);
 
    --  The block's first row becomes its header, every later row data.
    procedure Add_Examples_Row
-     (Doc : in out Document; Line : Natural; Ok : out Boolean)
+     (Doc : in out Document; Line : Line_Number; Ok : out Boolean)
    with
      Post =>
        Examples_Row_Count (Doc)
-       = Examples_Row_Count (Doc)'Old + (if Ok then 1 else 0);
+       = Examples_Row_Pool.Count_After (Examples_Row_Count (Doc)'Old, Ok);
 
    procedure Add_Examples_Cell
      (Doc : in out Document; Text : Slice; Ok : out Boolean)
    with
-     Post => Cell_Count (Doc) = Cell_Count (Doc)'Old + (if Ok then 1 else 0);
+     Post =>
+       Cell_Count (Doc) = Cell_Pool.Count_After (Cell_Count (Doc)'Old, Ok);
 
    --  Gives the most recent step a doc string with no lines yet.
    procedure Add_Doc_String
      (Doc          : in out Document;
       Fence        : Scan.Fence_Kind;
       Content_Type : Slice;
-      Line         : Natural;
+      Line         : Line_Number;
       Ok           : out Boolean)
    with
      Post =>
        Doc_String_Count (Doc)
-       = Doc_String_Count (Doc)'Old + (if Ok then 1 else 0);
+       = Doc_Pool.Count_After (Doc_String_Count (Doc)'Old, Ok);
 
    procedure Add_Doc_Line
      (Doc : in out Document; Text : Slice; Ok : out Boolean)
    with
      Post =>
-       Doc_Line_Count (Doc) = Doc_Line_Count (Doc)'Old + (if Ok then 1 else 0);
+       Doc_Line_Count (Doc)
+       = Doc_Line_Pool.Count_After (Doc_Line_Count (Doc)'Old, Ok);
 
 private
 
-   type Rule_Pool is array (Rule_Index) of Rule_Node;
-   type Scenario_Pool is array (Scenario_Index) of Scenario_Node;
-   type Step_Pool is array (Step_Index) of Step_Node;
-   type Tag_Pool is array (Tag_Index) of Slice;
-   type Table_Pool is array (Table_Index) of Table_Node;
-   type Row_Pool is array (Row_Index) of Row_Node;
-   type Cell_Pool is array (Cell_Index) of Slice;
-   type Doc_Pool is array (Doc_Index) of Doc_String_Node;
-   type Doc_Line_Pool is array (Doc_Line_Index) of Slice;
-   type Examples_Pool is array (Examples_Index) of Examples_Node;
-   type Examples_Row_Pool is array (Examples_Row_Index) of Row_Node;
+   type Rule_Slots is array (Rule_Index) of Rule_Node;
+   type Scenario_Slots is array (Scenario_Index) of Scenario_Node;
+   type Step_Slots is array (Step_Index) of Step_Node;
+   type Tag_Slots is array (Tag_Index) of Slice;
+   type Table_Slots is array (Table_Index) of Table_Node;
+   type Row_Slots is array (Row_Index) of Row_Node;
+   type Cell_Slots is array (Cell_Index) of Slice;
+   type Doc_Slots is array (Doc_Index) of Doc_String_Node;
+   type Doc_Line_Slots is array (Doc_Line_Index) of Slice;
+   type Examples_Slots is array (Examples_Index) of Examples_Node;
+   type Examples_Row_Slots is array (Examples_Row_Index) of Row_Node;
 
+   --  Each pool's count starts at its None, the count of an empty pool.
    type Document is record
       Arena             : String (Arena_Index) := [others => ' '];
-      Used              : Arena_Count := 0;
+      Used              : Arena_Count := No_Characters;
       The_Feature       : Feature_Node;
       The_Background    : Background_Node;
-      Rules             : Rule_Pool;
-      Rules_Used        : Rule_Handle := 0;
-      Scenarios         : Scenario_Pool;
-      Scenarios_Used    : Scenario_Handle := 0;
-      Steps             : Step_Pool;
-      Steps_Used        : Step_Handle := 0;
-      Tags              : Tag_Pool;
-      Tags_Used         : Tag_Handle := 0;
-      Tables            : Table_Pool;
-      Tables_Used       : Table_Handle := 0;
-      Rows              : Row_Pool;
-      Rows_Used         : Row_Handle := 0;
-      Cells             : Cell_Pool;
-      Cells_Used        : Cell_Handle := 0;
-      Docs              : Doc_Pool;
-      Docs_Used         : Doc_Handle := 0;
-      Doc_Lines         : Doc_Line_Pool;
-      Doc_Lines_Used    : Doc_Line_Handle := 0;
-      Blocks            : Examples_Pool;
-      Blocks_Used       : Examples_Handle := 0;
-      Example_Rows      : Examples_Row_Pool;
-      Example_Rows_Used : Examples_Row_Handle := 0;
+      Rules             : Rule_Slots;
+      Rules_Used        : Rule_Handle := Rule_Pool.None;
+      Scenarios         : Scenario_Slots;
+      Scenarios_Used    : Scenario_Handle := Scenario_Pool.None;
+      Steps             : Step_Slots;
+      Steps_Used        : Step_Handle := Step_Pool.None;
+      Tags              : Tag_Slots;
+      Tags_Used         : Tag_Handle := Tag_Pool.None;
+      Tables            : Table_Slots;
+      Tables_Used       : Table_Handle := Table_Pool.None;
+      Rows              : Row_Slots;
+      Rows_Used         : Row_Handle := Row_Pool.None;
+      Cells             : Cell_Slots;
+      Cells_Used        : Cell_Handle := Cell_Pool.None;
+      Docs              : Doc_Slots;
+      Docs_Used         : Doc_Handle := Doc_Pool.None;
+      Doc_Lines         : Doc_Line_Slots;
+      Doc_Lines_Used    : Doc_Line_Handle := Doc_Line_Pool.None;
+      Blocks            : Examples_Slots;
+      Blocks_Used       : Examples_Handle := Examples_Pool.None;
+      Example_Rows      : Examples_Row_Slots;
+      Example_Rows_Used : Examples_Row_Handle := Examples_Row_Pool.None;
    end record;
 
    function Text_Used (Doc : Document) return Arena_Count

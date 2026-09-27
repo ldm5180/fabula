@@ -11,6 +11,10 @@ and requires valid JSON with the expected scenario and step structure:
   scenario before entry, so no element is opened for it and only the
   second scenario is reported.
 
+Every ``"line"`` field must name the fixture's own source line: the
+feature's header, each scenario's header and each step.  No other gate
+reads the JSON line numbers, so a writer that shifts them fails here.
+
 These are fabula's own expectations, NOT oracle output: the byte gate
 never covers ``--report-json`` (see ``tools/byte_gate.py``).  The check
 reads the report with Python's ``json`` module, so a missing or stray
@@ -39,6 +43,12 @@ DROPPED = "Ignored after all its steps ran"
 NORMAL = "A normal scenario runs after it"
 STEP_COUNT = 3
 
+#  The fixture's source lines: the feature header, and for each scenario
+#  its header and its steps, in order.
+FEATURE_LINE = 1
+SCENARIO_LINES: dict[str, int] = {DROPPED: 8, NORMAL: 13}
+STEP_LINES: dict[str, tuple[int, ...]] = {DROPPED: (9, 10, 11), NORMAL: (14, 15, 16)}
+
 #  (label, extra arguments, the scenario names the report must hold).
 CASES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     ("dropped after entry", (), (DROPPED, NORMAL)),
@@ -58,15 +68,23 @@ def report_problems(text: str, want: tuple[str, ...]) -> list[str]:
     problems: list[str] = []
     if feature.get("name") != FEATURE_NAME:
         problems.append(f"feature name {feature.get('name')!r}")
+    if feature.get("line") != FEATURE_LINE:
+        problems.append(f"feature line {feature.get('line')!r}, expected {FEATURE_LINE}")
     elements = feature.get("elements", [])
     names = tuple(element.get("name") for element in elements)
     if names != want:
         problems.append(f"scenarios {names!r}, expected {want!r}")
     for element in elements:
+        name = element.get("name")
         steps = element.get("steps", [])
         statuses = [step.get("result", {}).get("status") for step in steps]
         if len(steps) != STEP_COUNT or statuses != ["passed"] * STEP_COUNT:
-            problems.append(f"{element.get('name')!r}: steps {statuses!r}")
+            problems.append(f"{name!r}: steps {statuses!r}")
+        if element.get("line") != SCENARIO_LINES.get(name):
+            problems.append(f"{name!r}: line {element.get('line')!r}")
+        lines = tuple(step.get("line") for step in steps)
+        if lines != STEP_LINES.get(name):
+            problems.append(f"{name!r}: step lines {lines!r}")
     return problems
 
 
@@ -107,22 +125,56 @@ def run_check() -> int:
     return 0
 
 
-def _report(names: tuple[str, ...]) -> str:
-    """A well-formed report holding the named scenarios, as a fixture."""
-    step = {"result": {"status": "passed"}}
-    elements = [{"name": name, "steps": [step] * STEP_COUNT} for name in names]
-    return json.dumps([{"name": FEATURE_NAME, "elements": elements}])
+def _report(names: tuple[str, ...], shift: int = 0) -> str:
+    """A well-formed report holding the named scenarios, as a fixture.
+
+    Shift moves every "line" field by that much, as a writer that
+    miscounts would.
+    """
+    elements = [
+        {
+            "line": SCENARIO_LINES[name] + shift,
+            "name": name,
+            "steps": [
+                {"line": line + shift, "result": {"status": "passed"}}
+                for line in STEP_LINES[name]
+            ],
+        }
+        for name in names
+    ]
+    return json.dumps(
+        [{"line": FEATURE_LINE + shift, "name": FEATURE_NAME, "elements": elements}]
+    )
+
+
+def _moved(text: str, path: tuple[int | str, ...], value: int) -> str:
+    """Text with the one field at path set to value."""
+    report = json.loads(text)
+    node = report
+    for key in path[:-1]:
+        node = node[key]
+    node[path[-1]] = value
+    return json.dumps(report)
 
 
 def selftest() -> int:
     """Each failure mode must fire; a correct report must pass."""
     good = _report((DROPPED, NORMAL))
+    both = (DROPPED, NORMAL)
     cases = {
-        "a correct report": (good, (DROPPED, NORMAL), False),
-        "a missing comma": (good.replace("}, {", "} {"), (DROPPED, NORMAL), True),
-        "a stray closing brace": (good + "}", (DROPPED, NORMAL), True),
+        "a correct report": (good, both, False),
+        "a missing comma": (good.replace("}, {", "} {"), both, True),
+        "a stray closing brace": (good + "}", both, True),
         "a scenario dropped before entry reported": (good, (NORMAL,), True),
-        "a scenario dropped after entry lost": (_report((NORMAL,)), (DROPPED, NORMAL), True),
+        "a scenario dropped after entry lost": (_report((NORMAL,)), both, True),
+        "every line one too high": (_report(both, shift=1), both, True),
+        "the feature line wrong": (_moved(good, (0, "line"), 2), both, True),
+        "a scenario line wrong": (_moved(good, (0, "elements", 1, "line"), 12), both, True),
+        "a step line wrong": (
+            _moved(good, (0, "elements", 0, "steps", 2, "line"), 12),
+            both,
+            True,
+        ),
     }
     failures = []
     for label, (text, want, should_fail) in cases.items():

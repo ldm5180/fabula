@@ -12,6 +12,7 @@ with Fabula.Frames;
 with Fabula.Limits;
 with Fabula.Registry;
 with Fabula.Results;
+with Fabula.Searches;
 with Fabula.Tags;
 private with Fabula.Expand;
 private with Sml.Machines;
@@ -63,13 +64,13 @@ package Fabula.Run with SPARK_Mode is
    --  by its header's line, a concrete outline scenario by its data
    --  row's line.  An empty selection selects every scenario.
    subtype Line_Count is Natural range 0 .. Limits.Max_Line_Selections;
-   type Line_List is array (1 .. Limits.Max_Line_Selections) of Positive;
+   type Line_List is array (1 .. Limits.Max_Line_Selections) of Source_Line;
 
    --  The count of an empty selection.
    None_Selected : constant Line_Count := 0;
 
    --  What fills Lines past Count; no reader looks there.
-   Unused_Line : constant Positive := 1;
+   Unused_Line : constant Source_Line := First_Line;
 
    type Line_Selection is record
       Count : Line_Count := None_Selected;
@@ -78,7 +79,7 @@ package Fabula.Run with SPARK_Mode is
 
    All_Lines : constant Line_Selection := (others => <>);
 
-   procedure Add_Line (Selection : in out Line_Selection; Line : Positive)
+   procedure Add_Line (Selection : in out Line_Selection; Line : Source_Line)
    with
      Pre  => Selection.Count < Limits.Max_Line_Selections,
      Post => Selection.Count = Selection.Count'Old + 1;
@@ -95,7 +96,7 @@ package Fabula.Run with SPARK_Mode is
 
    --  The row Pending_Hook and Pending_Step name when no request of
    --  theirs is pending; table rows are numbered from 1.
-   No_Row : constant := 0;
+   No_Row : constant Natural := Searches.Not_Found;
 
    ---------------------------------------------------------------------
    --  Notices, one at a time.  Scenario_Opened comes before its

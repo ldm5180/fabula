@@ -4,44 +4,32 @@
 --  per step -- deliberately independent of the parse arena so hooks
 --  and tests need no AST types.
 with Fabula.Limits;
+with Fabula.Texts;
 
 package Fabula.Frames
   with SPARK_Mode
 is
 
-   type Name_Text is record
-      Data : String (1 .. Limits.Max_Name_Length) := [others => ' '];
-      Len  : Natural range 0 .. Limits.Max_Name_Length := 0;
-   end record;
-
-   type Path_Text is record
-      Data : String (1 .. Limits.Max_Path_Length) := [others => ' '];
-      Len  : Natural range 0 .. Limits.Max_Path_Length := 0;
-   end record;
-
-   type Step_Text is record
-      Data : String (1 .. Limits.Max_Step_Text_Length) := [others => ' '];
-      Len  : Natural range 0 .. Limits.Max_Step_Text_Length := 0;
-   end record;
+   subtype Name_Text is Texts.Bounded_Text (Limits.Max_Name_Length);
+   subtype Path_Text is Texts.Bounded_Text (Limits.Max_Path_Length);
+   subtype Step_Text is Texts.Bounded_Text (Limits.Max_Step_Text_Length);
 
    type Frame is record
       File          : Path_Text;
       Feature       : Name_Text;
-      Feature_Line  : Natural := No_Line;
+      Feature_Line  : Line_Number := No_Line;
       Scenario      : Name_Text;
-      Scenario_Line : Natural := No_Line;
+      Scenario_Line : Line_Number := No_Line;
       Step          : Step_Text;
-      Step_Line     : Natural := No_Line;
+      Step_Line     : Line_Number := No_Line;
       --  Step components stay empty outside step execution.
    end record;
 
-   procedure Set (T : out Name_Text; Value : String);  --  truncates
-   function Value (T : Name_Text) return String;
+   --  Each keeps Value's first characters, as many as its text holds.
+   function To_Name (Value : String) return Name_Text;
+   function To_Path (Value : String) return Path_Text;
+   function To_Step (Value : String) return Step_Text;
 
-   procedure Set (T : out Path_Text; Value : String);  --  truncates
-   function Value (T : Path_Text) return String;
-
-   procedure Set (T : out Step_Text; Value : String);  --  truncates
-   function Value (T : Step_Text) return String;
+   function Value (T : Texts.Bounded_Text) return String renames Texts.Value;
 
 end Fabula.Frames;

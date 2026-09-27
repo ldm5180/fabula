@@ -3,6 +3,7 @@
 --  shell owns the only exception handler.
 with Fabula.Limits;
 with Fabula.Numbers;
+with Fabula.Texts;
 
 package Fabula.Check
   with SPARK_Mode
@@ -10,17 +11,26 @@ is
 
    type Control is (Continue, Skip_Scenario, Ignore_Scenario, Fail_Scenario);
 
+   subtype Message_Text is Texts.Bounded_Text (Limits.Max_Message_Length);
+
    type Outcome is record
       Passing : Boolean := True;
       Order   : Control := Continue;
-      Msg     : String (1 .. Limits.Max_Message_Length) := [others => ' '];
-      Msg_Len : Natural range 0 .. Limits.Max_Message_Length := 0;
+      Message : Message_Text;
    end record;
+
+   --  The message of the last failure; "" while none was recorded.
+   function Failure_Text (R : Outcome) return String
+   is (Texts.Value (R.Message));
 
    procedure Reset (R : out Outcome);
 
    procedure Record_Failure (R : in out Outcome; Message : String);
    --  Sets Passing False; keeps the LAST message (truncated to fit).
+
+   --  What a failed read calls the value it could not read, unless the
+   --  caller names it.
+   Unnamed_Value : constant String := "Value";
 
    procedure Is_True
      (R : in out Outcome; Condition : Boolean; Message : String := "");
@@ -56,7 +66,7 @@ is
       procedure Fail_Read
         (R     : in out Outcome;
          Error : Numbers.Read_Error;
-         What  : String := "Value");
+         What  : String := Unnamed_Value);
 
       procedure Equal
         (R : in out Outcome; Got, Want : Item; Message : String := "");

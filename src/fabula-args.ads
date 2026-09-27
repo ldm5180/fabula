@@ -9,6 +9,9 @@ with Fabula.Expressions;
 with Fabula.Limits;
 with Fabula.Numbers;
 
+private with Fabula.Searches;
+private with Fabula.Texts;
+
 package Fabula.Args
   with SPARK_Mode
 is
@@ -21,8 +24,20 @@ is
 
    type List is private;
 
-   function Count (A : List) return Natural
-   with Post => Count'Result <= Limits.Max_Args_Per_Step;
+   --  How many captures a step can hold, and a capture's number.
+   subtype Arg_Count is Expressions.Capture_Count;
+   subtype Arg_Index is Positive range 1 .. Limits.Max_Args_Per_Step;
+
+   --  The table layouts the readers below know by position: hashes keep
+   --  their keys in the first row, and rows_hash is a table of
+   --  Pair_Columns columns, the keys in Key_Column and the values in
+   --  Value_Column.
+   Key_Row      : constant := 1;
+   Key_Column   : constant := 1;
+   Value_Column : constant := 2;
+   Pair_Columns : constant := 2;
+
+   function Count (A : List) return Arg_Count;
 
    function Has_Doc (A : List) return Boolean;
    function Has_Table (A : List) return Boolean;
@@ -31,29 +46,35 @@ is
    --  Assembly, by the runner.
    ---------------------------------------------------------------------
 
+   --  What a step carries besides its text: its doc string and table in
+   --  Doc (No_Doc and No_Table for none), and, for a step of an
+   --  outline, the Examples rows its doc lines and cells then read
+   --  substituted from (No_Examples_Row for a plain step).
+   type Attachments is record
+      Doc        : Document_Access;
+      Doc_String : Ast.Doc_Handle := Ast.No_Doc;
+      Table      : Ast.Table_Handle := Ast.No_Table;
+      Header_Row : Ast.Examples_Row_Handle := Ast.No_Examples_Row;
+      Data_Row   : Ast.Examples_Row_Handle := Ast.No_Examples_Row;
+   end record;
+
+   No_Attachments : constant Attachments := (others => <>);
+
    --  Text is the step text, as expanded, that Captures slice.
    function Make
-     (Text : String; Captures : Expressions.Capture_List) return List
+     (Text     : String;
+      Captures : Expressions.Capture_List;
+      Attached : Attachments := No_Attachments) return List
    with
-     Pre  => Text'First = 1 and then Text'Length <= Limits.Max_Line_Length,
+     Pre  =>
+       Text'First = First_Column
+       and then Text'Length <= Limits.Max_Line_Length,
      Post =>
        Count (Make'Result) = Captures.Count
-       and then not Has_Doc (Make'Result)
-       and then not Has_Table (Make'Result);
-
-   --  Gives A the step's doc string and table; handle 0 is "none".
-   procedure Attach
-     (A          : in out List;
-      Doc        : Document_Access;
-      Doc_String : Ast.Doc_Handle;
-      Table      : Ast.Table_Handle)
-   with Post => Count (A) = Count (A)'Old;
-
-   --  Makes A one concrete step of an outline: its doc lines and cells
-   --  then read substituted from this Examples row.
-   procedure Set_Example
-     (A : in out List; Header_Row, Data_Row : Ast.Examples_Row_Index)
-   with Post => Count (A) = Count (A)'Old;
+       and then (if Attached.Doc = null
+                 then
+                   not Has_Doc (Make'Result)
+                   and then not Has_Table (Make'Result));
 
    ---------------------------------------------------------------------
    --  Captures.  The numeric readers return a Fabula.Numbers result,
@@ -63,21 +84,21 @@ is
    --  as "".
    ---------------------------------------------------------------------
 
-   function Int (A : List; N : Positive) return Numbers.Integer_Reads.Read
+   function Int (A : List; N : Arg_Index) return Numbers.Integer_Reads.Read
    with Pre => N <= Count (A);
 
-   function Long (A : List; N : Positive) return Numbers.Long_Reads.Read
+   function Long (A : List; N : Arg_Index) return Numbers.Long_Reads.Read
    with Pre => N <= Count (A);
 
-   function Real (A : List; N : Positive) return Numbers.Real_Reads.Read
+   function Real (A : List; N : Arg_Index) return Numbers.Real_Reads.Read
    with Pre => N <= Count (A);
 
-   function Text (A : List; N : Positive) return String
+   function Text (A : List; N : Arg_Index) return String
    with
      Pre  => N <= Count (A),
      Post => Text'Result'Length <= Limits.Max_Line_Length;
 
-   function Word (A : List; N : Positive) return String
+   function Word (A : List; N : Arg_Index) return String
    with
      Pre  => N <= Count (A),
      Post => Word'Result'Length <= Limits.Max_Line_Length;
@@ -102,7 +123,7 @@ is
    with
      Pre  => Has_Doc (A) and then N <= Doc_Line_Count (A),
      Post =>
-       Doc_Line'Result'First = 1
+       Doc_Line'Result'First = First_Column
        and then Doc_Line'Result'Length <= Limits.Max_Line_Length;
 
    ---------------------------------------------------------------------
@@ -124,7 +145,7 @@ is
        and then Row <= Row_Count (A)
        and then Col <= Col_Count (A),
      Post =>
-       Cell'Result'First = 1
+       Cell'Result'First = First_Column
        and then Cell'Result'Length <= Limits.Max_Line_Length;
 
    function Cell_Int
@@ -146,104 +167,86 @@ is
        Has_Table (A) and then Row < Row_Count (A) and then Has_Column (A, Key);
 
    function Has_Pair (A : List; Key : String) return Boolean
-   with Pre => Has_Table (A) and then Col_Count (A) = 2;
+   with Pre => Has_Table (A) and then Col_Count (A) = Pair_Columns;
 
-   --  Column 1 holds the keys, column 2 the values; the first row
-   --  whose key is Key wins.
+   --  The first row whose key is Key wins.
    function Pair_Value (A : List; Key : String) return String
    with
      Pre =>
-       Has_Table (A) and then Col_Count (A) = 2 and then Has_Pair (A, Key);
+       Has_Table (A)
+       and then Col_Count (A) = Pair_Columns
+       and then Has_Pair (A, Key);
 
 private
 
    use type Ast.Cell_Handle;
-   use type Ast.Doc_Line_Handle;
-   use type Ast.Row_Handle;
 
-   subtype Text_Length is Natural range 0 .. Limits.Max_Line_Length;
-
-   --  Text (1 .. Len) is the matched text.  Header_Row and Data_Row
-   --  are 0 for a step of a plain scenario.
+   --  Text is the matched text, which the captures slice.
    type List is record
-      Text       : String (1 .. Limits.Max_Line_Length) := [others => ' '];
-      Len        : Text_Length := 0;
-      Captures   : Expressions.Capture_List;
-      Doc        : Document_Access;
-      Doc_String : Ast.Doc_Handle := 0;
-      Table      : Ast.Table_Handle := 0;
-      Header_Row : Ast.Examples_Row_Handle := 0;
-      Data_Row   : Ast.Examples_Row_Handle := 0;
+      Text     : Texts.Line_Text;
+      Captures : Expressions.Capture_List;
+      Attached : Attachments;
    end record;
 
-   function Count (A : List) return Natural
+   function Count (A : List) return Arg_Count
    is (A.Captures.Count);
 
    function Has_Doc (A : List) return Boolean
-   is (A.Doc /= null
-       and then A.Doc_String in 1 .. Ast.Doc_String_Count (A.Doc.all));
+   is (A.Attached.Doc /= null
+       and then Ast.Doc_Pool.Is_Live
+                  (A.Attached.Doc_String,
+                   Ast.Doc_String_Count (A.Attached.Doc.all)));
 
    function Has_Table (A : List) return Boolean
-   is (A.Doc /= null and then A.Table in 1 .. Ast.Table_Count (A.Doc.all));
-
-   --  How many members a stored range holds when it lies inside a pool
-   --  of Used members; 0 when it is empty or runs past the pool.
-   function Span
-     (R : Ast.Doc_Line_Range; Used : Ast.Doc_Line_Handle) return Natural
-   is (if R.Last < R.First or else R.Last > Used
-       then 0
-       else Natural (R.Last - R.First) + 1);
-
-   function Span (R : Ast.Row_Range; Used : Ast.Row_Handle) return Natural
-   is (if R.Last < R.First or else R.Last > Used
-       then 0
-       else Natural (R.Last - R.First) + 1);
-
-   function Span (R : Ast.Cell_Range; Used : Ast.Cell_Handle) return Natural
-   is (if R.Last < R.First or else R.Last > Used
-       then 0
-       else Natural (R.Last - R.First) + 1);
+   is (A.Attached.Doc /= null
+       and then Ast.Table_Pool.Is_Live
+                  (A.Attached.Table, Ast.Table_Count (A.Attached.Doc.all)));
 
    function Doc_Node (A : List) return Ast.Doc_String_Node
-   is (Ast.Doc_String (A.Doc.all, A.Doc_String))
+   is (Ast.Doc_String (A.Attached.Doc.all, A.Attached.Doc_String))
    with Pre => Has_Doc (A);
 
    function Doc_Line_Count (A : List) return Natural
-   is (Span (Doc_Node (A).Lines, Ast.Doc_Line_Count (A.Doc.all)));
+   is (Ast.Doc_Line_Pool.Span
+         (Doc_Node (A).Lines, Ast.Doc_Line_Count (A.Attached.Doc.all)));
 
    function Table_Rows (A : List) return Ast.Row_Range
-   is (Ast.Table (A.Doc.all, A.Table).Rows)
+   is (Ast.Table (A.Attached.Doc.all, A.Attached.Table).Rows)
    with Pre => Has_Table (A);
 
    function Row_Count (A : List) return Natural
-   is (Span (Table_Rows (A), Ast.Table_Row_Count (A.Doc.all)));
+   is (Ast.Row_Pool.Span
+         (Table_Rows (A), Ast.Table_Row_Count (A.Attached.Doc.all)));
 
    --  Table row R, counted from 1.
    function Row_At (A : List; R : Positive) return Ast.Row_Node
    is (Ast.Table_Row
-         (A.Doc.all, Ast.Row_Index (Natural (Table_Rows (A).First) + R - 1)))
+         (A.Attached.Doc.all, Ast.Row_Pool.Nth (Table_Rows (A), R)))
    with Pre => Has_Table (A) and then R <= Row_Count (A);
 
    --  The first row's width; the parser refuses a ragged table.
    function Col_Count (A : List) return Natural
-   is (if Row_Count (A) = 0
-       then 0
-       else Span (Row_At (A, 1).Cells, Ast.Cell_Count (A.Doc.all)));
+   is (if Row_Count (A) = Ast.Row_Pool.No_Members
+       then Ast.Cell_Pool.No_Members
+       else
+         Ast.Cell_Pool.Span
+           (Row_At (A, Key_Row).Cells, Ast.Cell_Count (A.Attached.Doc.all)));
 
-   --  The first column whose key (row 1) is Key, or 0.
+   --  The first column whose key (row Key_Row) is Key, or
+   --  Searches.Not_Found.
    function Column_Of (A : List; Key : String) return Natural
    with Pre => Has_Table (A), Post => Column_Of'Result <= Col_Count (A);
 
    function Has_Column (A : List; Key : String) return Boolean
-   is (Column_Of (A, Key) /= 0);
+   is (Column_Of (A, Key) /= Searches.Not_Found);
 
-   --  The first row whose column 1 is Key, or 0.
+   --  The first row whose Key_Column is Key, or Searches.Not_Found.
    function Pair_Row (A : List; Key : String) return Natural
    with
-     Pre  => Has_Table (A) and then Col_Count (A) = 2,
+     Pre  => Has_Table (A) and then Col_Count (A) = Pair_Columns,
      Post => Pair_Row'Result <= Row_Count (A);
 
    function Has_Pair (A : List; Key : String) return Boolean
-   is (Pair_Row (A, Key) /= 0);
+   is (Pair_Row (A, Key) /= Searches.Not_Found);
 
 end Fabula.Args;

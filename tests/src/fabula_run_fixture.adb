@@ -99,9 +99,9 @@ package body Fabula_Run_Fixture is
               & " "
               & Fabula.Args.Word (A, 2)
               & " @"
-              & Trimmed (F.Scenario_Line)
+              & Trimmed (Integer (F.Scenario_Line))
               & ":"
-              & Trimmed (F.Step_Line);
+              & Trimmed (Integer (F.Step_Line));
 
          when Read_Doc   =>
             return Fabula.Args.Doc_String (A);

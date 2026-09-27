@@ -119,13 +119,18 @@ is
       return Text_Of (B);
    end Step_Text;
 
-   function Location_Text (File : String; Line_No : Natural) return String is
+   --  A line number as the reference interpreter prints it.
+   function Line_Image (Line_No : Line_Number) return String
+   is (Check.Integer_Image (Integer (Line_No)));
+
+   function Location_Text (File : String; Line_No : Line_Number) return String
+   is
       B : Builder;
    begin
       Put (B, "  ");
       Put (B, File);
       Put (B, ':');
-      Put (B, Check.Integer_Image (Line_No));
+      Put (B, Line_Image (Line_No));
       return Text_Of (B);
    end Location_Text;
 
@@ -155,9 +160,12 @@ is
         (if C = 0 or else C > Ast.Cell_Count (Doc)
          then 0
          else
-           Expand.Resolved
-             (Doc, Ast.Cell (Doc, C), Sub.Header_Row, Sub.Data_Row)
-             .Len);
+           Expand.Value
+             (Expand.Resolved
+                (Doc,
+                 Ast.Cell (Doc, C),
+                 Sub.Header_Row,
+                 Sub.Data_Row))'Length);
    begin
       if Col <= Limits.Max_Table_Columns then
          Widths (Col) := Natural'Max (Widths (Col), Len);
@@ -444,7 +452,10 @@ is
    ---------------------------------------------------------------------
 
    procedure Add_Failed
-     (Store : in out Failed_Store; Name, File : String; Line_No : Natural) is
+     (Store   : in out Failed_Store;
+      Name    : String;
+      File    : String;
+      Line_No : Line_Number) is
    begin
       if Store.Count = Limits.Max_Failed_Scenarios then
          return;
@@ -463,7 +474,7 @@ is
    function Failed_File (Store : Failed_Store; I : Positive) return String
    is (Store.Items (I).File (1 .. Store.Items (I).File_Len));
 
-   function Failed_Line (Store : Failed_Store; I : Positive) return Natural
+   function Failed_Line (Store : Failed_Store; I : Positive) return Line_Number
    is (Store.Items (I).Line);
 
    ---------------------------------------------------------------------
@@ -471,7 +482,7 @@ is
    ---------------------------------------------------------------------
 
    function Verbose_Scenario_Start
-     (Name : String; File : String; Line_No : Natural) return String
+     (Name : String; File : String; Line_No : Line_Number) return String
    is
       B : Builder;
    begin
@@ -480,7 +491,7 @@ is
       Put (B, "' - File: ");
       Put (B, File);
       Put (B, ':');
-      Put (B, Check.Integer_Image (Line_No));
+      Put (B, Line_Image (Line_No));
       return Text_Of (B);
    end Verbose_Scenario_Start;
 
@@ -593,7 +604,7 @@ is
 
    function Parse_Error_Text
      (File    : String;
-      Line_No : Natural;
+      Line_No : Line_Number;
       Kind    : Parse.Error_Kind;
       At_End  : Boolean;
       Token   : String) return String
@@ -602,7 +613,7 @@ is
    begin
       Put (B, File);
       Put (B, ':');
-      Put (B, Check.Integer_Image (Line_No));
+      Put (B, Line_Image (Line_No));
       Put (B, ": Error");
       if No_Token_Kind (Kind) then
          Put (B, " : ");

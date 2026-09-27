@@ -76,7 +76,7 @@ is
    --  Two leading spaces, a colon and headroom for the line number's
    --  digits (Natural's widest 'Image is ten digits).
 
-   function Location_Text (File : String; Line_No : Natural) return String
+   function Location_Text (File : String; Line_No : Line_Number) return String
    with Pre => File'Length <= Max_Piece - Location_Extra;
    --  "  <File>:<Line_No>".
 
@@ -171,7 +171,10 @@ is
    --  Records one failed scenario; once Store is full, further calls
    --  are no-ops and the earliest entries still render.
    procedure Add_Failed
-     (Store : in out Failed_Store; Name, File : String; Line_No : Natural)
+     (Store   : in out Failed_Store;
+      Name    : String;
+      File    : String;
+      Line_No : Line_Number)
    with
      Pre  =>
        Name'Length <= Limits.Max_Name_Length
@@ -187,7 +190,7 @@ is
    function Failed_File (Store : Failed_Store; I : Positive) return String
    with Pre => I <= Failed_Count (Store);
 
-   function Failed_Line (Store : Failed_Store; I : Positive) return Natural
+   function Failed_Line (Store : Failed_Store; I : Positive) return Line_Number
    with Pre => I <= Failed_Count (Store);
 
    ---------------------------------------------------------------------
@@ -202,7 +205,7 @@ is
      "[   VERBOSE   ] ----------------------------------";
 
    function Verbose_Scenario_Start
-     (Name : String; File : String; Line_No : Natural) return String
+     (Name : String; File : String; Line_No : Line_Number) return String
    with Pre => File'Length <= Limits.Max_Path_Length;
    --  "[   VERBOSE   ] Scenario Start '<Name>' - File: <File>:<Line_No>".
 
@@ -256,7 +259,7 @@ is
 
    function Parse_Error_Text
      (File    : String;
-      Line_No : Natural;
+      Line_No : Line_Number;
       Kind    : Parse.Error_Kind;
       At_End  : Boolean;
       Token   : String) return String
@@ -418,7 +421,7 @@ private
       Name_Len : Natural range 0 .. Limits.Max_Name_Length := 0;
       File     : String (1 .. Limits.Max_Path_Length) := [others => ' '];
       File_Len : Natural range 0 .. Limits.Max_Path_Length := 0;
-      Line     : Natural := 0;
+      Line     : Line_Number := No_Line;
    end record;
 
    type Failed_Entries is

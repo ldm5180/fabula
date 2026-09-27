@@ -13,7 +13,55 @@ package body Fabula_Check_Tests is
    use AUnit.Test_Cases.Registration;
 
    function Msg (R : Outcome) return String
-   is (R.Msg (1 .. R.Msg_Len));
+   is (Failure_Text (R));
+
+   --  A Compare instance whose Image counts its calls: a comparison
+   --  images its values only when it failed and the caller gave no
+   --  Message of its own.
+   Image_Calls : Natural := 0;
+
+   function Counted_Image (I : Integer) return String is
+   begin
+      Image_Calls := Image_Calls + 1;
+      return Integer_Image (I);
+   end Counted_Image;
+
+   package Counted is new
+     Fabula.Check.Compare
+       (Integer,
+        Image      => Counted_Image,
+        Item_Reads => Integer_Reads);
+
+   procedure Test_Lazy_Image (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      R : Outcome;
+   begin
+      Image_Calls := 0;
+      Counted.Equal (R, 1, 1);
+      Counted.Not_Equal (R, 1, 2);
+      Counted.Greater (R, 2, 1);
+      Counted.Greater_Or_Equal (R, 1, 1);
+      Counted.Less (R, 1, 2);
+      Counted.Less_Or_Equal (R, 1, 1);
+      Assert (Image_Calls = 0, "a passing comparison images nothing");
+      Counted.Equal (R, 1, 2, "custom");
+      Counted.Not_Equal (R, 1, 1, "custom");
+      Counted.Greater (R, 1, 2, "custom");
+      Counted.Greater_Or_Equal (R, 1, 2, "custom");
+      Counted.Less (R, 2, 1, "custom");
+      Counted.Less_Or_Equal (R, 2, 1, "custom");
+      Assert
+        (Image_Calls = 0,
+         "a failed comparison with a Message images nothing, got"
+         & Image_Calls'Image);
+      Assert (Msg (R) = "custom", "the Message is the failure text");
+      Counted.Equal (R, 1, 2);
+      Assert
+        (Image_Calls = 2,
+         "a failed comparison without a Message images Got and Want, got"
+         & Image_Calls'Image);
+      Assert (Msg (R) = "Value 1 is not equal to 2", "the default message");
+   end Test_Lazy_Image;
 
    procedure Test_Equal (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
@@ -185,8 +233,9 @@ package body Fabula_Check_Tests is
       Text_Equal (R, Got, Want);
       Assert (not R.Passing, "unequal long text must fail");
       Assert
-        (R.Msg_Len = Fabula.Limits.Max_Message_Length,
-         "a long default message truncates to the cap, got" & R.Msg_Len'Image);
+        (Msg (R)'Length = Fabula.Limits.Max_Message_Length,
+         "a long default message truncates to the cap, got"
+         & Msg (R)'Length'Image);
       Assert
         (Msg (R)
          = Full
@@ -227,8 +276,9 @@ package body Fabula_Check_Tests is
    begin
       Fail (R, Long);
       Assert
-        (R.Msg_Len = Fabula.Limits.Max_Message_Length,
-         "a message over the cap truncates to the cap, got" & R.Msg_Len'Image);
+        (Msg (R)'Length = Fabula.Limits.Max_Message_Length,
+         "a message over the cap truncates to the cap, got"
+         & Msg (R)'Length'Image);
       Assert
         (Msg (R)
          = Long
@@ -481,7 +531,7 @@ package body Fabula_Check_Tests is
       Reset (R);
       Assert (R.Passing, "Reset restores Passing True");
       Assert (R.Order = Continue, "Reset restores Order Continue");
-      Assert (R.Msg_Len = 0, "Reset clears the message");
+      Assert (Msg (R) = "", "Reset clears the message");
    end Test_Reset;
 
    overriding
@@ -525,6 +575,8 @@ package body Fabula_Check_Tests is
       Register_Routine
         (T, Test_Fail_Read'Access, "Fail_Read: one message for a bad read");
       Register_Routine (T, Test_Reset'Access, "Reset restores defaults");
+      Register_Routine
+        (T, Test_Lazy_Image'Access, "Image runs only for a default message");
    end Register_Tests;
 
    overriding

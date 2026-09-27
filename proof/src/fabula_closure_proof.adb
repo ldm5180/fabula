@@ -141,9 +141,10 @@ is
       end loop;
    end Closure_Hook_Walk;
 
-   use type Fabula.Ast.Examples_Handle;
+   use type Fabula.Line_Number;
    use type Fabula.Ast.Scenario_Handle;
    use type Fabula.Ast.Step_Handle;
+   use type Fabula.Expand.Walk_Status;
    use type Closure_Run.Command;
    use type Closure_Run.Notice_Kind;
 
@@ -160,14 +161,20 @@ is
          Node : constant Fabula.Ast.Step_Node := Fabula.Ast.Step (Doc, Step);
       begin
          if not Fabula.Expand.Step_Fits
-                  (Doc, Node, Ref.Header_Row, Ref.Data_Row)
+                  (Doc,
+                   Node,
+                   Fabula.Expand.Header_Row_Of (Ref),
+                   Fabula.Expand.Data_Row_Of (Ref))
          then
             return 0;
          end if;
          return
-           Fabula.Expand.Resolved
-             (Doc, Node.Text, Ref.Header_Row, Ref.Data_Row)
-             .Len;
+           Fabula.Expand.Value
+             (Fabula.Expand.Resolved
+                (Doc,
+                 Node.Text,
+                 Fabula.Expand.Header_Row_Of (Ref),
+                 Fabula.Expand.Data_Row_Of (Ref)))'Length;
       end;
    end Closure_Step_Length;
 
@@ -181,7 +188,7 @@ is
       Ref :=
         Fabula.Expand.Next_Example
           (Doc, 1, Fabula.Expand.First_Example (Doc, 1));
-      if Ref.Block = 0 then
+      if Ref.Status /= Fabula.Expand.Row_Due then
          return;
       end if;
       declare
@@ -190,9 +197,10 @@ is
          Tags : constant Fabula.Expand.Tag_Set :=
            Fabula.Expand.Effective_Tags (Doc, 1, Ref.Block);
       begin
-         Total := Name.Len;
+         Total := Fabula.Expand.Value (Name)'Length;
          if Fabula.Expand.Contains (Doc, Tags, "@a")
-           and then Fabula.Expand.Concrete_Line (Doc, Ref.Data_Row) > 0
+           and then Fabula.Expand.Concrete_Line (Doc, Ref.Data_Row)
+                    /= Fabula.No_Line
          then
             Total :=
               Closure_Step_Length
@@ -210,9 +218,15 @@ is
       if Closure_Registry.Steps_Valid (Closure_Steps) then
          R := Closure_Registry.Find (Closure_Steps, Text);
       end if;
-      A := Fabula.Args.Make (Text, R.Captures);
-      Fabula.Args.Attach (A, Ref, 1, 1);
-      Fabula.Args.Set_Example (A, 1, 2);
+      A :=
+        Fabula.Args.Make
+          (Text,
+           R.Captures,
+           (Doc        => Ref,
+            Doc_String => 1,
+            Table      => 1,
+            Header_Row => 1,
+            Data_Row   => 2));
    end Closure_Assemble;
 
    function Closure_Read_Captures (A : Fabula.Args.List) return Natural is
@@ -447,10 +461,10 @@ is
 
    procedure Closure_Frame (F : in out Fabula.Frames.Frame) is
    begin
-      Fabula.Frames.Set (F.Feature, "a feature");
-      Fabula.Frames.Set (F.Scenario, "a scenario");
-      Fabula.Frames.Set (F.Step, "a step");
-      Fabula.Frames.Set (F.File, "a.feature");
+      F.Feature := Fabula.Frames.To_Name ("a feature");
+      F.Scenario := Fabula.Frames.To_Name ("a scenario");
+      F.Step := Fabula.Frames.To_Step ("a step");
+      F.File := Fabula.Frames.To_Path ("a.feature");
       declare
          Step_Len : constant Natural := Fabula.Frames.Value (F.Step)'Length;
          pragma Unreferenced (Step_Len);
@@ -458,5 +472,29 @@ is
          null;
       end;
    end Closure_Frame;
+
+   procedure Closure_Texts (Kept : out Natural) is
+      Room   : constant := 4;
+      Long   : constant String := "abcdef";
+      First  : constant String := "abcd";
+      Start  : constant String := "ab";
+      Piece  : constant String := "c";
+      Joined : constant String := "abc";
+      Rest   : constant String := "xyz";
+      Filled : constant String := "abcx";
+      T      : Fabula.Texts.Bounded_Text (Room) :=
+        Fabula.Texts.Truncated (Long, Room);
+      Ok     : Boolean := True;
+   begin
+      pragma Assert (Fabula.Texts.Value (T) = First);
+      T := Fabula.Texts.Truncated (Start, Room);
+      Fabula.Texts.Append (T, Piece, Ok);
+      pragma Assert (Ok and then Fabula.Texts.Value (T) = Joined);
+      Fabula.Texts.Append (T, Rest, Ok);
+      pragma Assert (not Ok and then Fabula.Texts.Value (T) = Joined);
+      Fabula.Texts.Append_Truncated (T, Rest);
+      pragma Assert (Fabula.Texts.Value (T) = Filled);
+      Kept := Fabula.Texts.Length (T);
+   end Closure_Texts;
 
 end Fabula_Closure_Proof;

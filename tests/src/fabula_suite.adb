@@ -24,7 +24,9 @@ with Fabula_Run_Select_Tests;
 with Fabula_Run_Table_Tests;
 with Fabula_Run_Tests;
 with Fabula_Scan_Tests;
+with Fabula_Searches_Tests;
 with Fabula_Tags_Tests;
+with Fabula_Texts_Tests;
 
 package body Fabula_Suite is
 
@@ -37,6 +39,10 @@ package body Fabula_Suite is
    procedure Add_Parsing (Result : AUnit.Test_Suites.Access_Test_Suite) is
       Limits_Test      : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Limits_Tests.Test;
+      Texts_Test       : constant AUnit.Test_Cases.Test_Case_Access :=
+        new Fabula_Texts_Tests.Test;
+      Searches_Test    : constant AUnit.Test_Cases.Test_Case_Access :=
+        new Fabula_Searches_Tests.Test;
       Scan_Test        : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Scan_Tests.Test;
       Expressions_Test : constant AUnit.Test_Cases.Test_Case_Access :=
@@ -51,6 +57,8 @@ package body Fabula_Suite is
         new Fabula_Corpus_Tests.Test;
    begin
       AUnit.Test_Suites.Add_Test (Result, Limits_Test);
+      AUnit.Test_Suites.Add_Test (Result, Texts_Test);
+      AUnit.Test_Suites.Add_Test (Result, Searches_Test);
       AUnit.Test_Suites.Add_Test (Result, Scan_Test);
       AUnit.Test_Suites.Add_Test (Result, Expressions_Test);
       AUnit.Test_Suites.Add_Test (Result, Tags_Test);

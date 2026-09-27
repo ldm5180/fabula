@@ -11,11 +11,32 @@ is
      Assertion_Policy
        (Ghost => Ignore, Post => Ignore, Loop_Invariant => Ignore);
 
+   --  The negated magnitude before any digit is read.
+   No_Digits : constant Long_Long_Integer := 0;
+
    function Digit_At (Text : String; I : Positive) return Long_Long_Integer
    is (Long_Long_Integer (Digit_Value (Text (I))))
    with
      Pre  => I in Text'Range and then Is_Digit (Text (I)),
-     Post => Digit_At'Result in 0 .. 9;
+     Post =>
+       Digit_At'Result
+       in Long_Long_Integer (Digit_Number'First)
+        .. Long_Long_Integer (Digit_Number'Last);
+
+   --  The read of an integer text whose digits accumulated to Negated,
+   --  its magnitude negated, or passed Long_Long_Integer'First when
+   --  Too_Big.
+   function Signed
+     (Text : String; Negated : Long_Long_Integer; Too_Big : Boolean)
+      return Long_Reads.Read
+   is (if Too_Big
+       then Long_Reads.Failure (Out_Of_Range)
+       elsif Text (Text'First) = Minus_Sign
+       then Long_Reads.Success (Negated)
+       elsif Negated = Long_Long_Integer'First
+       then Long_Reads.Failure (Out_Of_Range)
+       else Long_Reads.Success (-Negated))
+   with Pre => Text'Length > 0 and then Negated <= No_Digits;
 
    --  The digits accumulate as a negative number, the magnitude read so
    --  far negated: Long_Long_Integer'First has no positive twin, and
@@ -23,7 +44,7 @@ is
    --  pass Long_Long_Integer'First the text is too big, and the loop
    --  reads no further digits.
    function Parse_Long (Text : String) return Long_Reads.Read is
-      Negated : Long_Long_Integer := 0;
+      Negated : Long_Long_Integer := No_Digits;
       Too_Big : Boolean := False;
    begin
       if not Is_Integer_Text (Text) then
@@ -38,25 +59,18 @@ is
                 else
                   Wide_Integer (Negated)
                   = -Magnitude (Text, First_Digit (Text), I - 1));
-         --  The test is Negated * 10 - digit < Long_Long_Integer'First,
+         --  The test is Negated * Radix - digit < Long_Long_Integer'First,
          --  rearranged so that no step overflows.
          if Too_Big then
             null;
-         elsif Negated < (Long_Long_Integer'First + Digit_At (Text, I)) / 10
+         elsif Negated < (Long_Long_Integer'First + Digit_At (Text, I)) / Radix
          then
             Too_Big := True;
          else
-            Negated := Negated * 10 - Digit_At (Text, I);
+            Negated := Negated * Radix - Digit_At (Text, I);
          end if;
       end loop;
-      if Too_Big then
-         return Long_Reads.Failure (Out_Of_Range);
-      elsif Text (Text'First) = '-' then
-         return Long_Reads.Success (Negated);
-      elsif Negated = Long_Long_Integer'First then
-         return Long_Reads.Failure (Out_Of_Range);
-      end if;
-      return Long_Reads.Success (-Negated);
+      return Signed (Text, Negated, Too_Big);
    end Parse_Long;
 
    function Parse_Integer (Text : String) return Integer_Reads.Read is

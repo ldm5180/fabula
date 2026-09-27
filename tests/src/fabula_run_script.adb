@@ -92,7 +92,7 @@ package body Fabula_Run_Script is
 
       --  A failing outcome's message, after a colon; nothing otherwise.
       function Message (O : Fabula.Check.Outcome) return String
-      is (if O.Passing then "" else ": " & O.Msg (1 .. O.Msg_Len));
+      is (if O.Passing then "" else ": " & Fabula.Check.Failure_Text (O));
 
       function Notice_Line
         (N : Run.Notice; F : Fabula.Frames.Frame) return String

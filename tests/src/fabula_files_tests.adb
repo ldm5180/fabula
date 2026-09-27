@@ -17,6 +17,7 @@ with Fabula_Shell_Scratch; use Fabula_Shell_Scratch;
 package body Fabula_Files_Tests is
 
    use AUnit.Test_Cases.Registration;
+   use type Fabula.Line_Number;
    use type Fabula.Ast.Step_Handle;
    use type Fabula.Parse.Error_Kind;
    use type Fabula.Parse.Refusal;

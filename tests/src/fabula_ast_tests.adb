@@ -9,6 +9,15 @@ package body Fabula_Ast_Tests is
    use AUnit.Test_Cases.Registration;
    use type Fabula.Scan.Step_Keyword;
    use type Fabula.Scan.Fence_Kind;
+   use type Fabula.Line_Number;
+   use type Cell_Range;
+   use type Doc_Line_Range;
+   use type Examples_Range;
+   use type Examples_Row_Range;
+   use type Row_Range;
+   use type Scenario_Range;
+   use type Step_Range;
+   use type Tag_Range;
 
    --  A document is a megabyte-scale record: it lives at library level,
    --  never on a test routine's stack.
@@ -22,7 +31,10 @@ package body Fabula_Ast_Tests is
    end Put;
 
    procedure Make_Head
-     (Keyword : String; Name : String; Line : Positive; Head : out Header) is
+     (Keyword : String;
+      Name    : String;
+      Line    : Fabula.Source_Line;
+      Head    : out Header) is
    begin
       Head := (Line => Line, others => <>);
       Put (Keyword, Head.Keyword);
@@ -148,7 +160,7 @@ package body Fabula_Ast_Tests is
       Add_Table (Doc, Ok);
       Check (Ok, "table");
       for Row in 1 .. 2 loop
-         Add_Table_Row (Doc, 2 + Row, Ok);
+         Add_Table_Row (Doc, Fabula.Line_Number (2 + Row), Ok);
          Check (Ok, "table row");
          for Col in 1 .. 2 loop
             Put
@@ -189,7 +201,7 @@ package body Fabula_Ast_Tests is
       Add_Examples (Doc, Head, Pending, Ok);
       Check (Ok, "examples");
       for Row in 1 .. 3 loop
-         Add_Examples_Row (Doc, 3 + Row, Ok);
+         Add_Examples_Row (Doc, Fabula.Line_Number (3 + Row), Ok);
          Check (Ok, "examples row");
          Put (Row'Image, S);
          Add_Examples_Cell (Doc, S, Ok);
@@ -292,6 +304,27 @@ package body Fabula_Ast_Tests is
          "a document is" & Bytes'Image & " bytes, over 4 MB");
    end Test_Size;
 
+   --  One pool's range arithmetic, through the cell pool's instance.
+   procedure Test_Pool_Ranges (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      One : constant Cell_Range := Cell_Pool.Extended (Cell_Pool.Empty, 3);
+      Two : constant Cell_Range := Cell_Pool.Extended (One, 4);
+   begin
+      Assert (Cell_Pool.Is_Empty (Cell_Pool.Empty), "Empty holds nothing");
+      Assert (One = (3, 3), "an empty range becomes its new member alone");
+      Assert (Two = (3, 4), "a range widens to its newest member");
+      Assert (Cell_Pool.Width (Two) = 2, "a range's width");
+      Assert (Cell_Pool.Width (Cell_Pool.Empty) = 0, "the empty width");
+      Assert (Cell_Pool.Span (Two, 4) = 2, "a range inside its pool spans");
+      Assert (Cell_Pool.Span (Two, 3) = 0, "a range past its pool spans none");
+      Assert (Cell_Pool.Span (Cell_Pool.Empty, 0) = 0, "the empty span");
+      Assert (Cell_Pool.Inside (Cell_Pool.Empty, 0), "empty is inside");
+      Assert (not Cell_Pool.Inside (Two, 3), "a range past the pool is not");
+      Assert (not Cell_Pool.Is_Live (Cell_Pool.None, 5), "None is no member");
+      Assert (Cell_Pool.Is_Live (5, 5), "the newest member is live");
+      Assert (not Cell_Pool.Is_Live (6, 5), "a handle past the count is not");
+   end Test_Pool_Ranges;
+
    procedure Test_Clear (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
    begin
@@ -313,6 +346,7 @@ package body Fabula_Ast_Tests is
       Register_Routine (T, Test_Doc_String'Access, "doc strings");
       Register_Routine (T, Test_Descriptions'Access, "descriptions");
       Register_Routine (T, Test_Pool_Overflow'Access, "pool overflow");
+      Register_Routine (T, Test_Pool_Ranges'Access, "pool range arithmetic");
       Register_Routine (T, Test_Clear'Access, "clear");
       Register_Routine (T, Test_Size'Access, "a document's size");
    end Register_Tests;

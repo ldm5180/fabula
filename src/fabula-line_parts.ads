@@ -4,6 +4,7 @@
 --  and its commands both read lines only through here.
 with Fabula.Limits;
 with Fabula.Scan;
+with Fabula.Searches;
 
 private package Fabula.Line_Parts
   with Pure, SPARK_Mode
@@ -14,7 +15,7 @@ is
 
    --  The position Fence_Run and a cell's Stop hold when the line has
    --  none; positions in a line are numbered from 1.
-   No_Position : constant := 0;
+   No_Position : constant Natural := Searches.Not_Found;
 
    --  A span of one line; Last < First is the empty span.
    type Span is record

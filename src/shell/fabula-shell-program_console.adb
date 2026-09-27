@@ -235,7 +235,7 @@ is
    procedure Print_Failure_Message (Outcome : Fabula.Check.Outcome) is
    begin
       Fabula.Shell.Console.Put
-        (Outcome.Msg (1 .. Outcome.Msg_Len), Fabula.Shell.Console.Error);
+        (Fabula.Check.Failure_Text (Outcome), Fabula.Shell.Console.Error);
       Fabula.Shell.Console.New_Line;
    end Print_Failure_Message;
 
@@ -358,7 +358,7 @@ is
    begin
       if not N.Outcome.Passing
         and then N.Outcome.Order /= Fabula.Check.Fail_Scenario
-        and then N.Outcome.Msg_Len > 0
+        and then Fabula.Check.Failure_Text (N.Outcome)'Length > 0
         and then not Suppressed
       then
          Print_Failure_Message (N.Outcome);
@@ -435,7 +435,7 @@ is
          return;
       end if;
       if N.Outcome.Order = Fabula.Check.Fail_Scenario
-        and then N.Outcome.Msg_Len > 0
+        and then Fabula.Check.Failure_Text (N.Outcome)'Length > 0
       then
          Print_Failure_Message (N.Outcome);
       end if;

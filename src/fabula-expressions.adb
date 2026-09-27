@@ -1,3 +1,5 @@
+with Fabula.Searches;
+
 package body Fabula.Expressions
   with SPARK_Mode
 is
@@ -37,7 +39,7 @@ is
    --!format on
 
    --  What Key_At answers when no key starts at the position.
-   No_Key : constant := 0;
+   No_Key : constant Natural := Searches.Not_Found;
 
    No_Token : constant Token := (others => <>);
 
@@ -48,7 +50,8 @@ is
    --  The state of one Compile run.  Result.Text (1 .. Used) holds the
    --  literal characters so far; Result.Text (Run_First .. Used) is the
    --  literal run no token covers yet.  Groups (1 .. Open_Count) are the
-   --  open groups' Optional tokens, innermost last.
+   --  open groups' Optional tokens, innermost last.  Ok turns False at
+   --  the first refusal and stays False.
    type Builder is record
       Result     : Compiled;
       Used       : Char_Count := Char_Count'First;
@@ -56,7 +59,7 @@ is
       Params     : Capture_Count := Capture_Count'First;
       Open_Count : Token_Count := Token_Count'First;
       Groups     : Group_Stack := [others => Token_Index'First];
-      Refused    : Boolean := False;
+      Ok         : Boolean := True;
    end record;
 
    function Builder_OK (B : Builder) return Boolean
@@ -81,16 +84,17 @@ is
        and then (if Key_At'Result /= No_Key
                  then From + Keys (Key_At'Result).Length - 1 <= Source'Last)
    is
+      function Spelled_At (Row : Positive) return Boolean
+      is (Row in Keys'Range
+          and then Is_Source (Source)
+          and then From in Source'Range
+          and then Keys (Row).Length - 1 <= Source'Last - From
+          and then Source (From .. From + Keys (Row).Length - 1)
+                   = Keys (Row).Text (1 .. Keys (Row).Length));
+
+      function First_Spelled is new Searches.Find_First (Spelled_At);
    begin
-      for Row in Keys'Range loop
-         if Keys (Row).Length - 1 <= Source'Last - From
-           and then Source (From .. From + Keys (Row).Length - 1)
-                    = Keys (Row).Text (1 .. Keys (Row).Length)
-         then
-            return Row;
-         end if;
-      end loop;
-      return No_Key;
+      return First_Spelled (Keys'First, Keys'Last);
    end Key_At;
 
    --  True when Source (From) opens a brace group that no key spells and
@@ -119,19 +123,19 @@ is
       return False;
    end Unknown_Key_At;
 
-   --  Appends New_Token, or marks the pattern refused when the token
-   --  table is full.
+   --  Appends New_Token, or sets Ok False, refusing the pattern, when
+   --  the token table is full.
    procedure Add_Token
-     (Result : in out Compiled; Refused : in out Boolean; New_Token : Token)
+     (Result : in out Compiled; Ok : in out Boolean; New_Token : Token)
    with
      Post =>
        (if Result.Count'Old < Limits.Max_Pattern_Tokens
-        then Result.Count = Result.Count'Old + 1 and then Refused = Refused'Old
-        else Result.Count = Result.Count'Old and then Refused)
+        then Result.Count = Result.Count'Old + 1 and then Ok = Ok'Old
+        else Result.Count = Result.Count'Old and then not Ok)
    is
    begin
       if Result.Count = Limits.Max_Pattern_Tokens then
-         Refused := True;
+         Ok := False;
          return;
       end if;
       Result.Count := Result.Count + 1;
@@ -160,7 +164,7 @@ is
    is
    begin
       if B.Run_First <= B.Used then
-         Add_Token (B.Result, B.Refused, Literal_Token (B.Run_First, B.Used));
+         Add_Token (B.Result, B.Ok, Literal_Token (B.Run_First, B.Used));
       end if;
       B.Run_First := B.Used + 1;
    end Flush_Run;
@@ -172,13 +176,13 @@ is
    is
    begin
       if B.Params = Limits.Max_Args_Per_Step then
-         B.Refused := True;
+         B.Ok := False;
          return;
       end if;
       Flush_Run (B);
       Add_Token
         (B.Result,
-         B.Refused,
+         B.Ok,
          (No_Token with delta Kind => Parameter, Param => Kind));
       B.Params := B.Params + 1;
    end Add_Param;
@@ -192,7 +196,7 @@ is
    begin
       Flush_Run (B);
       Before := B.Result.Count;
-      Add_Token (B.Result, B.Refused, (No_Token with delta Kind => Optional));
+      Add_Token (B.Result, B.Ok, (No_Token with delta Kind => Optional));
       if B.Result.Count > Before then
          B.Open_Count := B.Open_Count + 1;
          B.Groups (B.Open_Count) := B.Result.Count;
@@ -208,7 +212,7 @@ is
    is
    begin
       if B.Open_Count = 0 then
-         B.Refused := True;
+         B.Ok := False;
          return;
       end if;
       Flush_Run (B);
@@ -279,7 +283,7 @@ is
    begin
       if B.Run_First < Word_First then
          Add_Token
-           (B.Result, B.Refused, Literal_Token (B.Run_First, Word_First - 1));
+           (B.Result, B.Ok, Literal_Token (B.Run_First, Word_First - 1));
       end if;
    end Flush_Before;
 
@@ -311,7 +315,7 @@ is
       B.Used := Middle + Added;
       Add_Token
         (B.Result,
-         B.Refused,
+         B.Ok,
          (No_Token
           with delta
             Kind   => Alternation,
@@ -382,7 +386,7 @@ is
          Add_Param (B, Keys (Key).Kind);
          I := I + Keys (Key).Length;
       elsif C = Key_Opener and then Unknown_Key_At (Source, I) then
-         B.Refused := True;
+         B.Ok := False;
          I := I + 1;
       elsif C = Choice_Mark and then Starts_Choice (B, Source, I) then
          Add_Alternation (B, Source, I);
@@ -397,14 +401,14 @@ is
       B      : Builder;
       I      : Positive := Source'First;
    begin
-      while I <= Source'Last and then not B.Refused loop
+      while I <= Source'Last and then B.Ok loop
          pragma Loop_Invariant (B.Used < I and then Builder_OK (B));
          pragma Loop_Variant (Increases => I);
          Consume (B, Source, I);
       end loop;
       Flush_Run (B);
       return
-        (if not B.Refused and then B.Open_Count = 0
+        (if B.Ok and then B.Open_Count = 0
          then (B.Result with delta Valid => True)
          else Refused_Pattern);
    end Compile;

@@ -65,13 +65,25 @@ is
 
    end Reads;
 
-   package Integer_Reads is new Reads (Integer, "Integer");
-   package Long_Reads is new Reads (Long_Long_Integer, "Long_Long_Integer");
-   package Real_Reads is new Reads (Long_Float, "Long_Float");
+   --  Each value type's own name, as a failure message spells it.
+   Integer_Name : constant String := "Integer";
+   Long_Name    : constant String := "Long_Long_Integer";
+   Real_Name    : constant String := "Long_Float";
+
+   package Integer_Reads is new Reads (Integer, Integer_Name);
+   package Long_Reads is new Reads (Long_Long_Integer, Long_Name);
+   package Real_Reads is new Reads (Long_Float, Real_Name);
 
    ---------------------------------------------------------------------
    --  The grammars.
    ---------------------------------------------------------------------
+
+   Minus_Sign    : constant Character := '-';
+   Decimal_Point : constant Character := '.';
+
+   --  The base of a decimal numeral, and the values its digits stand for.
+   Radix : constant := 10;
+   subtype Digit_Number is Natural range 0 .. Radix - 1;
 
    function Is_Digit (C : Character) return Boolean
    is (C in Decimal_Digit);
@@ -82,7 +94,7 @@ is
        and then Is_Digit (Text (Text'Last))
        and then (for all I in Text'Range =>
                    Is_Digit (Text (I))
-                   or else (I = Text'First and then Text (I) = '-')));
+                   or else (I = Text'First and then Text (I) = Minus_Sign)));
 
    --  -?[0-9]*\.?[0-9]+ : an optional minus sign, then digits with at
    --  most one point, and a digit last.
@@ -91,18 +103,19 @@ is
        and then Is_Digit (Text (Text'Last))
        and then (for all I in Text'Range =>
                    Is_Digit (Text (I))
-                   or else (I = Text'First and then Text (I) = '-')
-                   or else (Text (I) = '.'
+                   or else (I = Text'First and then Text (I) = Minus_Sign)
+                   or else (Text (I) = Decimal_Point
                             and then (for all J in Text'Range =>
-                                        (if J /= I then Text (J) /= '.')))));
+                                        (if J /= I
+                                         then Text (J) /= Decimal_Point)))));
 
-   function Digit_Value (C : Character) return Natural
-   is (Character'Pos (C) - Character'Pos ('0'))
-   with Pre => Is_Digit (C), Post => Digit_Value'Result <= 9;
+   function Digit_Value (C : Character) return Digit_Number
+   is (Character'Pos (C) - Character'Pos (Decimal_Digit'First))
+   with Pre => Is_Digit (C);
 
    --  Where the digits of an integer text start: after its sign.
    function First_Digit (Text : String) return Positive
-   is (if Text (Text'First) = '-' then Text'First + 1 else Text'First)
+   is (if Text (Text'First) = Minus_Sign then Text'First + 1 else Text'First)
    with Pre => Is_Integer_Text (Text);
 
    ---------------------------------------------------------------------
@@ -113,21 +126,24 @@ is
 
    subtype Wide_Integer is Long_Long_Long_Integer;
 
+   --  The magnitude of no digits at all.
+   No_Magnitude : constant Wide_Integer := 0;
+
    --  One past the largest magnitude a Long_Long_Integer holds (that of
    --  Long_Long_Integer'First).  A magnitude that reaches it stays
    --  there, so the digits of a text of any length fit.
    Past_Long : constant Wide_Integer :=
-     Wide_Integer (Long_Long_Integer'Last) + 2;
+     -Wide_Integer (Long_Long_Integer'First) + 1;
 
    --  The digits Text (From .. Last) as a number, capped at Past_Long.
    function Magnitude
      (Text : String; From : Positive; Last : Natural) return Wide_Integer
    is (if Last < From
-       then 0
+       then No_Magnitude
        else
          Wide_Integer'Min
            (Magnitude (Text, From, Last - 1)
-            * 10
+            * Radix
             + Wide_Integer (Digit_Value (Text (Last))),
             Past_Long))
    with
@@ -136,13 +152,13 @@ is
        From >= Text'First
        and then Last <= Text'Last
        and then (for all I in From .. Last => Is_Digit (Text (I))),
-     Post               => Magnitude'Result in 0 .. Past_Long,
+     Post               => Magnitude'Result in No_Magnitude .. Past_Long,
      Subprogram_Variant => (Decreases => Last);
 
    --  The signed decimal value of an integer text, capped as Magnitude
    --  is: exact whenever a Long_Long_Integer can hold it.
    function Decimal_Value (Text : String) return Wide_Integer
-   is (if Text (Text'First) = '-'
+   is (if Text (Text'First) = Minus_Sign
        then -Magnitude (Text, First_Digit (Text), Text'Last)
        else Magnitude (Text, First_Digit (Text), Text'Last))
    with Ghost, Pre => Is_Integer_Text (Text);

@@ -11,6 +11,7 @@ with Fabula_Fixtures; use Fabula_Fixtures;
 package body Fabula_Format_Tests is
 
    use AUnit.Test_Cases.Registration;
+   use type Fabula.Line_Number;
 
    --  A document is a megabyte-scale record: it lives at library level,
    --  never on a test routine's stack.
@@ -470,7 +471,7 @@ package body Fabula_Format_Tests is
       Store : Failed_Store := Empty_Failed_Store;
    begin
       for I in 1 .. Fabula.Limits.Max_Failed_Scenarios + 5 loop
-         Add_Failed (Store, "s", "f.feature", I);
+         Add_Failed (Store, "s", "f.feature", Fabula.Line_Number (I));
       end loop;
       Assert
         (Failed_Count (Store) = Fabula.Limits.Max_Failed_Scenarios,
