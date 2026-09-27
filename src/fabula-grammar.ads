@@ -5,6 +5,7 @@
 --  block; Fabula.Parse performs it against the document.
 with Fabula.Ast;
 with Fabula.Limits;
+with Fabula.Line_Parts;
 with Fabula.Scan;
 with Sml.Machines;
 with Sml.Request_Block;
@@ -12,6 +13,8 @@ with Sml.Request_Block;
 private package Fabula.Grammar
   with SPARK_Mode
 is
+
+   use type Scan.Line_Class;
 
    --  Feature_Tags and Block_Tags hold a line of tags waiting for the
    --  header it belongs to; the tags themselves wait in Work.Pending.
@@ -55,6 +58,12 @@ is
 
    subtype Line_Length is Natural range 0 .. Limits.Max_Line_Length;
 
+   --  The length of an event that carries no line, at end of input.
+   No_Text : constant Line_Length := 0;
+
+   --  A table's cell count before its first row sets it.
+   No_Width : constant Line_Length := 0;
+
    --  The classification's slices lie inside a line of Length.
    function Fits (C : Scan.Classification; Length : Line_Length) return Boolean
    is (C.Indent <= Length
@@ -87,8 +96,8 @@ is
    --  classification.  End of input carries no line.
    type Event is record
       Kind   : Event_Kind := E_End_Of_Input;
-      Number : Natural := 0;
-      Length : Line_Length := 0;
+      Number : Natural := No_Line;
+      Length : Line_Length := No_Text;
       Text   : String (1 .. Limits.Max_Line_Length) := [others => ' '];
       Class  : Scan.Classification;
    end record
@@ -98,7 +107,8 @@ is
    is (Evt.Text (1 .. Evt.Length))
    with
      Post =>
-       Line_Of'Result'First = 1 and then Line_Of'Result'Length = Evt.Length;
+       Line_Of'Result'First = First_Column
+       and then Line_Of'Result'Length = Evt.Length;
 
    --  The event a line of Class raises outside a doc string.
    function Kind_For (Class : Scan.Line_Class) return Event_Kind
@@ -111,7 +121,7 @@ is
       Class  : Scan.Classification) return Event
    with
      Pre  =>
-       Line'First = 1
+       Line'First = First_Column
        and then Line'Length <= Limits.Max_Line_Length
        and then Fits (Class, Line'Length),
      Post =>
@@ -120,6 +130,15 @@ is
 
    function End_Event (Number : Natural) return Event
    is ((Number => Number, others => <>));
+
+   --  A table row's shape: whether it closes, and its cell count.  Any
+   --  other line has the shape of no row.
+   function Shape (Evt : Event) return Line_Parts.Row_Shape
+   is (if Evt.Class.Class = Scan.Table_Row
+       then
+         Line_Parts.Measure_Row
+           (Line_Of (Evt), Evt.Class.Body_First, Evt.Class.Body_Last)
+       else (others => <>));
 
    type Guard_Kind is
      (Always,
@@ -134,6 +153,7 @@ is
       After_Outline,   --  the newest scenario is an outline
       Step_Doc,        --  the open doc string belongs to a step
       Step_Doc_Ends,   --  ... and nothing follows its closing run
+      Feature_Seen,    --  the Feature header has been read
       For_Feature,
       For_Rule,
       For_Background,
@@ -166,7 +186,8 @@ is
       Refuse_Tags,
       Refuse_Ragged,
       Refuse_Open_Row,
-      Refuse_Close,
+      Refuse_Close_In_Feature,
+      Refuse_Close_Before_Feature,
       Refuse_Open_Doc);
 
    package Req is new Sml.Request_Block (Command => Command, None => Nothing);
@@ -180,9 +201,9 @@ is
       Requests        : Req.Block;
       Arrived_In      : State := Prologue;
       Owner           : State := Failed;
-      Doc_Line        : Natural := 0;
+      Doc_Line        : Natural := No_Line;
       Takes_Argument  : Boolean := False;
-      Width           : Line_Length := 0;
+      Width           : Line_Length := No_Width;
       Last_Is_Outline : Boolean := False;
       Feature_Seen    : Boolean := False;
       Described       : Ast.Block_Kind := Ast.Feature_Block;
@@ -209,7 +230,7 @@ is
         Evaluate    => Evaluate,
         Execute     => Execute);
 
-   Rows : constant := 137;
+   Rows : constant := 138;
    --  The transition table's length; a Parser embeds a machine of it.
 
    function Started return SM.Machine

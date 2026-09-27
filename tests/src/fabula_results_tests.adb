@@ -22,12 +22,12 @@ package body Fabula_Results_Tests is
       Add_Parse_Error (C);
       Add_Hook_Error (C);
 
-      Assert (C.Scenarios_Passed = 2, "two passed scenarios");
-      Assert (C.Scenarios_Failed = 1, "one failed scenario");
-      Assert (C.Scenarios_Skipped = 1, "one skipped scenario");
-      Assert (C.Scenarios_Undefined = 1, "one undefined scenario");
-      Assert (C.Steps_Passed = 1, "one passed step");
-      Assert (C.Steps_Undefined = 1, "one undefined step");
+      Assert (C.Scenarios (Passed) = 2, "two passed scenarios");
+      Assert (C.Scenarios (Failed) = 1, "one failed scenario");
+      Assert (C.Scenarios (Skipped) = 1, "one skipped scenario");
+      Assert (C.Scenarios (Undefined) = 1, "one undefined scenario");
+      Assert (C.Steps (Passed) = 1, "one passed step");
+      Assert (C.Steps (Undefined) = 1, "one undefined step");
       Assert (C.Parse_Errors = 1, "one parse error");
       Assert (C.Hook_Errors = 1, "one hook error");
    end Test_Counter_Accumulation;
@@ -114,24 +114,60 @@ package body Fabula_Results_Tests is
    procedure Test_Saturation (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
       C : Counts :=
-        (Scenarios_Passed => Natural'Last,
-         Steps_Failed     => Natural'Last,
-         Parse_Errors     => Natural'Last,
-         others           => 0);
+        (Scenarios    => [Passed => Natural'Last, others => 0],
+         Steps        => [Failed => Natural'Last, others => 0],
+         Parse_Errors => Natural'Last,
+         Hook_Errors  => 0);
    begin
       Add_Scenario (C, Passed);
       Add_Step (C, Failed);
       Add_Parse_Error (C);
       Assert
-        (C.Scenarios_Passed = Natural'Last,
+        (C.Scenarios (Passed) = Natural'Last,
          "a scenario counter at Natural'Last saturates, does not wrap");
       Assert
-        (C.Steps_Failed = Natural'Last,
+        (C.Steps (Failed) = Natural'Last,
          "a step counter at Natural'Last saturates, does not wrap");
       Assert
         (C.Parse_Errors = Natural'Last,
          "Parse_Errors at Natural'Last saturates, does not wrap");
    end Test_Saturation;
+
+   --  Every status's counter, scenario and step alike, stops at
+   --  Natural'Last, and adding to one status leaves the others alone.
+   procedure Test_Status_Saturation
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Near : constant Natural := Natural'Last - 1;
+   begin
+      for S in Status loop
+         declare
+            C    : Counts :=
+              (Scenarios => [others => Near],
+               Steps     => [others => Near],
+               others    => 0);
+            Want : Status_Counts := [others => Near];
+         begin
+            Add_Scenario (C, S);
+            Add_Scenario (C, S);
+            Add_Step (C, S);
+            Add_Step (C, S);
+            Want (S) := Natural'Last;
+            Assert
+              (C.Scenarios = Want,
+               S'Image & ": the scenario counter stops at Natural'Last");
+            Assert
+              (C.Steps = Want,
+               S'Image & ": the step counter stops at Natural'Last");
+         end;
+      end loop;
+      Assert
+        (Saturating_Add (Natural'Last, 1) = Natural'Last,
+         "a sum past Natural'Last stops there");
+      Assert (Saturating_Add (Near, 1) = Natural'Last, "a sum up to it fits");
+      Assert (Saturating_Add (2, 3) = 5, "a small sum is exact");
+   end Test_Status_Saturation;
 
    overriding
    procedure Register_Tests (T : in out Test) is
@@ -155,6 +191,10 @@ package body Fabula_Results_Tests is
          "an Undefined scenario alone does not fail");
       Register_Routine
         (T, Test_Saturation'Access, "counters saturate at Natural'Last");
+      Register_Routine
+        (T,
+         Test_Status_Saturation'Access,
+         "every status's counter saturates on its own");
    end Register_Tests;
 
    overriding

@@ -27,11 +27,11 @@ is
    type Frame is record
       File          : Path_Text;
       Feature       : Name_Text;
-      Feature_Line  : Natural := 0;
+      Feature_Line  : Natural := No_Line;
       Scenario      : Name_Text;
-      Scenario_Line : Natural := 0;
+      Scenario_Line : Natural := No_Line;
       Step          : Step_Text;
-      Step_Line     : Natural := 0;
+      Step_Line     : Natural := No_Line;
       --  Step components stay empty outside step execution.
    end record;
 

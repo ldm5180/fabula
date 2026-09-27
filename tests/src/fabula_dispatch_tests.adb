@@ -1,6 +1,7 @@
 with AUnit.Assertions; use AUnit.Assertions;
 
 with Fabula.Limits;
+with Fabula.Results;
 with Fabula.Shell.Dispatch;
 with Fabula.Shell.Files;
 
@@ -11,6 +12,7 @@ with Fabula_Run_Script;       use Fabula_Run_Script;
 package body Fabula_Dispatch_Tests is
 
    use AUnit.Test_Cases.Registration;
+   use all type Fabula.Results.Status;
 
    --  A whole run of Source through drive loop D: the Before_All hooks,
    --  the feature, the After_All hooks, each driven until it idles.
@@ -83,7 +85,9 @@ package body Fabula_Dispatch_Tests is
       Assert_Trace (Log, Tally_Trace);
       Assert_Counts
         (Counting_Run.Counts_Of (R),
-         (Scenarios_Passed => 2, Steps_Passed => 3, others => 0));
+         (Scenarios => [Passed => 2, others => 0],
+          Steps     => [Passed => 3, others => 0],
+          others    => 0));
    end Test_Order;
 
    Raising_Doc : constant Lines :=
@@ -120,10 +124,9 @@ package body Fabula_Dispatch_Tests is
       Assert_Trace (Log, Raising_Trace);
       Assert_Counts
         (Counting_Run.Counts_Of (R),
-         (Scenarios_Failed => 2,
-          Steps_Failed     => 2,
-          Steps_Skipped    => 1,
-          others           => 0));
+         (Scenarios => [Failed => 2, others => 0],
+          Steps     => [Failed => 2, Skipped => 1, others => 0],
+          others    => 0));
    end Test_Step_Exceptions;
 
    --  A numeric read is a result, never an exception.  A failed read
@@ -273,12 +276,10 @@ package body Fabula_Dispatch_Tests is
           +"close passed plain"]);
       Assert_Counts
         (Raising_Run.Counts_Of (R),
-         (Scenarios_Passed => 1,
-          Scenarios_Failed => 1,
-          Steps_Passed     => 1,
-          Steps_Skipped    => 1,
-          Hook_Errors      => 1,
-          others           => 0));
+         (Scenarios    => [Passed => 1, Failed => 1, others => 0],
+          Steps        => [Passed => 1, Skipped => 1, others => 0],
+          Hook_Errors  => 1,
+          Parse_Errors => 0));
    end Test_Hook_Exceptions;
 
    --  Files' line numbers become the runner's selection.

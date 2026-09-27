@@ -38,38 +38,168 @@ is
          when G.Prologue | G.Feature_Tags => Expected_Feature,
          when others                      => Expected_Scenario);
 
+   ---------------------------------------------------------------------
+   --  Sticky arena writes.  Each is Fabula.Ast's own write, made only
+   --  while Ok holds.  Ok is the sticky flag: once one write finds its
+   --  arena or pool full it stays False and every later write of the
+   --  same command is skipped, so a command reads as a straight run of
+   --  writes and Check reports the failure once, at the end.
+   ---------------------------------------------------------------------
+
+   procedure Append_Text
+     (Doc    : in out Fabula.Ast.Document;
+      Source : String;
+      Result : out Fabula.Ast.Slice;
+      Ok     : in out Boolean)
+   with Post => (if not Ok'Old then not Ok)
+   is
+   begin
+      Result := Fabula.Ast.Empty_Slice;
+      if Ok then
+         Fabula.Ast.Append_Text (Doc, Source, Result, Ok);
+      end if;
+   end Append_Text;
+
+   procedure Add_Tag
+     (Doc     : in out Fabula.Ast.Document;
+      Text    : Fabula.Ast.Slice;
+      Pending : in out Fabula.Ast.Tag_Range;
+      Ok      : in out Boolean)
+   with Post => (if not Ok'Old then not Ok)
+   is
+   begin
+      if Ok then
+         Fabula.Ast.Add_Tag (Doc, Text, Pending, Ok);
+      end if;
+   end Add_Tag;
+
+   procedure Add_Step
+     (Doc     : in out Fabula.Ast.Document;
+      Keyword : Fabula.Scan.Step_Keyword;
+      Text    : Fabula.Ast.Slice;
+      Line    : Natural;
+      Ok      : in out Boolean)
+   with Post => (if not Ok'Old then not Ok)
+   is
+   begin
+      if Ok then
+         Fabula.Ast.Add_Step (Doc, Keyword, Text, Line, Ok);
+      end if;
+   end Add_Step;
+
+   procedure Add_Doc_String
+     (Doc   : in out Fabula.Ast.Document;
+      Kind  : Fabula.Scan.Fence_Kind;
+      CType : Fabula.Ast.Slice;
+      Line  : Natural;
+      Ok    : in out Boolean)
+   with Post => (if not Ok'Old then not Ok)
+   is
+   begin
+      if Ok then
+         Fabula.Ast.Add_Doc_String (Doc, Kind, CType, Line, Ok);
+      end if;
+   end Add_Doc_String;
+
+   procedure Add_Doc_Line
+     (Doc  : in out Fabula.Ast.Document;
+      Text : Fabula.Ast.Slice;
+      Ok   : in out Boolean)
+   with Post => (if not Ok'Old then not Ok)
+   is
+   begin
+      if Ok then
+         Fabula.Ast.Add_Doc_Line (Doc, Text, Ok);
+      end if;
+   end Add_Doc_Line;
+
+   procedure Add_Table (Doc : in out Fabula.Ast.Document; Ok : in out Boolean)
+   with Post => (if not Ok'Old then not Ok)
+   is
+   begin
+      if Ok then
+         Fabula.Ast.Add_Table (Doc, Ok);
+      end if;
+   end Add_Table;
+
+   --  Appends a new row, numbered Line, to Kind's pool.
+   procedure Append_Row
+     (Doc  : in out Fabula.Ast.Document;
+      Kind : Table_Kind;
+      Line : Natural;
+      Ok   : in out Boolean)
+   with Post => (if not Ok'Old then not Ok)
+   is
+   begin
+      if not Ok then
+         return;
+      end if;
+      case Kind is
+         when Step_Table     =>
+            Fabula.Ast.Add_Table_Row (Doc, Line, Ok);
+
+         when Examples_Table =>
+            Fabula.Ast.Add_Examples_Row (Doc, Line, Ok);
+      end case;
+   end Append_Row;
+
+   --  Adds Text as a cell of the newest row of Kind's pool.
+   procedure Add_Cell
+     (Doc  : in out Fabula.Ast.Document;
+      Text : Fabula.Ast.Slice;
+      Kind : Table_Kind;
+      Ok   : in out Boolean)
+   with Post => (if not Ok'Old then not Ok)
+   is
+   begin
+      if not Ok then
+         return;
+      end if;
+      case Kind is
+         when Step_Table     =>
+            Fabula.Ast.Add_Table_Cell (Doc, Text, Ok);
+
+         when Examples_Table =>
+            Fabula.Ast.Add_Examples_Cell (Doc, Text, Ok);
+      end case;
+   end Add_Cell;
+
+   ---------------------------------------------------------------------
+   --  Block headers.
+   ---------------------------------------------------------------------
+
    function Is_Header (Evt : G.Event) return Boolean
    is (Evt.Class.Class
        in Fabula.Scan.Feature_Header .. Fabula.Scan.Examples_Header);
 
-   --  Appends the header's keyword (colon dropped) and title.
+   --  The header's keyword, its colon dropped.
+   function Keyword_Text (Evt : G.Event) return String
+   is (declare
+         Line : constant String := G.Line_Of (Evt);
+         Key  : constant Parts.Span :=
+           Parts.Keyword_Of
+             (Line,
+              Evt.Class.Indent + 1,
+              Natural'Max (Evt.Class.Title_First - 1, Evt.Class.Indent));
+       begin
+         Line (Key.First .. Key.Last))
+   with Pre => Is_Header (Evt);
+
+   function Title_Text (Evt : G.Event) return String
+   is (G.Line_Of (Evt) (Evt.Class.Title_First .. Evt.Class.Title_Last))
+   with Pre => Is_Header (Evt);
+
+   --  Appends the header's keyword and title.
    procedure Make_Head
      (Doc  : in out Fabula.Ast.Document;
       Evt  : G.Event;
       Head : out Fabula.Ast.Header;
-      Ok   : out Boolean)
-   is
-      Line : constant String := G.Line_Of (Evt);
-      Key  : Parts.Span;
+      Ok   : in out Boolean) is
    begin
       Head := (Line => Evt.Number, others => <>);
-      Ok := True;
-      if not Is_Header (Evt) then
-         return;
-      end if;
-      Key :=
-        Parts.Keyword_Of
-          (Line,
-           Evt.Class.Indent + 1,
-           Natural'Max (Evt.Class.Title_First - 1, Evt.Class.Indent));
-      Fabula.Ast.Append_Text
-        (Doc, Line (Key.First .. Key.Last), Head.Keyword, Ok);
-      if Ok then
-         Fabula.Ast.Append_Text
-           (Doc,
-            Line (Evt.Class.Title_First .. Evt.Class.Title_Last),
-            Head.Name,
-            Ok);
+      if Is_Header (Evt) then
+         Append_Text (Doc, Keyword_Text (Evt), Head.Keyword, Ok);
+         Append_Text (Doc, Title_Text (Evt), Head.Name, Ok);
       end if;
    end Make_Head;
 
@@ -87,11 +217,13 @@ is
       Doc  : in out Fabula.Ast.Document;
       Cmd  : G.Command;
       Head : Fabula.Ast.Header;
-      Ok   : out Boolean)
+      Ok   : in out Boolean)
    is
       Tags : constant Fabula.Ast.Tag_Range := P.Work.Pending;
    begin
-      Ok := True;
+      if not Ok then
+         return;
+      end if;
       case Cmd is
          when G.Open_Feature    =>
             Fabula.Ast.Set_Feature (Doc, Head, Tags);
@@ -124,12 +256,10 @@ is
       Cmd : G.Command)
    is
       Head : Fabula.Ast.Header;
-      Ok   : Boolean;
+      Ok   : Boolean := True;
    begin
       Make_Head (Doc, Evt, Head, Ok);
-      if Ok then
-         Attach (P, Doc, Cmd, Head, Ok);
-      end if;
+      Attach (P, Doc, Cmd, Head, Ok);
       P.Work.Pending := (others => <>);
       P.Work.Described := Described_By (Cmd);
       if Cmd in G.Open_Scenario | G.Open_Outline then
@@ -137,6 +267,10 @@ is
       end if;
       Check (P, Ok, Evt.Number);
    end Open_Block;
+
+   ---------------------------------------------------------------------
+   --  Tags, descriptions and steps.
+   ---------------------------------------------------------------------
 
    --  Appends every tag on the line, each with its '@'.
    procedure Collect_Tags
@@ -156,10 +290,8 @@ is
          pragma Loop_Variant (Increases => Pos);
          Tag := Parts.Next_Tag (Line, Pos, Evt.Class.Body_Last);
          exit when Tag.Last < Tag.First;
-         Fabula.Ast.Append_Text (Doc, Line (Tag.First .. Tag.Last), Text, Ok);
-         if Ok then
-            Fabula.Ast.Add_Tag (Doc, Text, P.Work.Pending, Ok);
-         end if;
+         Append_Text (Doc, Line (Tag.First .. Tag.Last), Text, Ok);
+         Add_Tag (Doc, Text, P.Work.Pending, Ok);
          Pos := Tag.Last + 1;
       end loop;
       Check (P, Ok, Evt.Number);
@@ -170,7 +302,8 @@ is
      (P : in out Parser; Doc : in out Fabula.Ast.Document; Evt : G.Event)
    is
       Line : constant String := G.Line_Of (Evt);
-      Kept : constant Parts.Span := Parts.Trimmed (Line, 1, Line'Last);
+      Kept : constant Parts.Span :=
+        Parts.Trimmed (Line, Line'First, Line'Last);
       Ok   : Boolean;
    begin
       Fabula.Ast.Describe
@@ -178,24 +311,26 @@ is
       Check (P, Ok, Evt.Number);
    end Describe;
 
-   procedure Add_Step
+   procedure Store_Step
      (P : in out Parser; Doc : in out Fabula.Ast.Document; Evt : G.Event)
    is
       Line : constant String := G.Line_Of (Evt);
       Text : Fabula.Ast.Slice;
-      Ok   : Boolean;
+      Ok   : Boolean := True;
    begin
       if Evt.Class.Class /= Fabula.Scan.Step_Line then
          return;
       end if;
-      Fabula.Ast.Append_Text
+      Append_Text
         (Doc, Line (Evt.Class.Text_First .. Evt.Class.Text_Last), Text, Ok);
-      if Ok then
-         Fabula.Ast.Add_Step (Doc, Evt.Class.Keyword, Text, Evt.Number, Ok);
-      end if;
+      Add_Step (Doc, Evt.Class.Keyword, Text, Evt.Number, Ok);
       P.Work.Takes_Argument := True;
       Check (P, Ok, Evt.Number);
-   end Add_Step;
+   end Store_Step;
+
+   ---------------------------------------------------------------------
+   --  Tables.
+   ---------------------------------------------------------------------
 
    --  A cell's stored text: a step table drops one pair of surrounding
    --  quotes, an Examples table keeps the cell as written.
@@ -209,7 +344,7 @@ is
      (Doc  : in out Fabula.Ast.Document;
       Evt  : G.Event;
       Kind : Table_Kind;
-      Ok   : out Boolean)
+      Ok   : in out Boolean)
    is
       Line : constant String := G.Line_Of (Evt);
       Pos  : Positive;
@@ -217,7 +352,6 @@ is
       Keep : Parts.Span;
       Text : Fabula.Ast.Slice;
    begin
-      Ok := True;
       if Evt.Class.Class /= Fabula.Scan.Table_Row then
          return;
       end if;
@@ -225,26 +359,39 @@ is
       while Ok and then Pos <= Evt.Class.Body_Last loop
          pragma Loop_Variant (Increases => Pos);
          Next := Parts.Next_Cell (Line, Pos, Evt.Class.Body_Last);
-         exit when Next.Stop = 0;
+         exit when Next.Stop = Parts.No_Position;
          Keep := Stored (Line, Next.Text, Kind);
-         Fabula.Ast.Append_Text
-           (Doc, Line (Keep.First .. Keep.Last), Text, Ok);
-         if Ok and then Kind = Step_Table then
-            Fabula.Ast.Add_Table_Cell (Doc, Text, Ok);
-         elsif Ok then
-            Fabula.Ast.Add_Examples_Cell (Doc, Text, Ok);
-         end if;
+         Append_Text (Doc, Line (Keep.First .. Keep.Last), Text, Ok);
+         Add_Cell (Doc, Text, Kind, Ok);
          Pos := Next.Stop + 1;
       end loop;
    end Add_Cells;
 
-   function Width_Of (Evt : G.Event) return G.Line_Length
-   is (if Evt.Class.Class = Fabula.Scan.Table_Row
-       then
-         Parts.Measure_Row
-           (G.Line_Of (Evt), Evt.Class.Body_First, Evt.Class.Body_Last)
-           .Cells
-       else 0);
+   --  A step's first table row opens its table; the step then takes no
+   --  further argument.
+   procedure Open_Step_Table
+     (P   : in out Parser;
+      Doc : in out Fabula.Ast.Document;
+      Cmd : G.Command;
+      Ok  : in out Boolean)
+   with Post => (if not Ok'Old then not Ok)
+   is
+   begin
+      if Cmd = G.Open_Table then
+         Add_Table (Doc, Ok);
+         P.Work.Takes_Argument := False;
+      end if;
+   end Open_Step_Table;
+
+   --  A table's first row sets the cell count every later row must
+   --  match.
+   procedure Record_Width (P : in out Parser; Evt : G.Event; Cmd : G.Command)
+   is
+   begin
+      if Cmd in G.Open_Table | G.Add_Header_Row then
+         P.Work.Width := G.Shape (Evt).Cells;
+      end if;
+   end Record_Width;
 
    procedure Add_Row
      (P   : in out Parser;
@@ -258,64 +405,60 @@ is
          else Examples_Table);
       Ok   : Boolean := True;
    begin
-      if Cmd = G.Open_Table then
-         Fabula.Ast.Add_Table (Doc, Ok);
-         P.Work.Takes_Argument := False;
-      end if;
-      if Ok and then Kind = Step_Table then
-         Fabula.Ast.Add_Table_Row (Doc, Evt.Number, Ok);
-      elsif Ok then
-         Fabula.Ast.Add_Examples_Row (Doc, Evt.Number, Ok);
-      end if;
-      if Ok then
-         Add_Cells (Doc, Evt, Kind, Ok);
-      end if;
-      if Cmd in G.Open_Table | G.Add_Header_Row then
-         P.Work.Width := Width_Of (Evt);
-      end if;
+      Open_Step_Table (P, Doc, Cmd, Ok);
+      Append_Row (Doc, Kind, Evt.Number, Ok);
+      Add_Cells (Doc, Evt, Kind, Ok);
+      Record_Width (P, Evt, Cmd);
       Check (P, Ok, Evt.Number);
    end Add_Row;
 
+   ---------------------------------------------------------------------
+   --  Doc strings.
+   ---------------------------------------------------------------------
+
    --  Gives the last step a doc string whose content type is the text
    --  after the opening fence.
-   procedure Add_Doc_String
+   procedure Store_Doc_String
      (P : in out Parser; Doc : in out Fabula.Ast.Document; Evt : G.Event)
    is
       Line  : constant String := G.Line_Of (Evt);
-      Kind  : Fabula.Scan.Fence_Kind;
       CType : Fabula.Ast.Slice;
-      Ok    : Boolean;
+      Ok    : Boolean := True;
    begin
       P.Work.Takes_Argument := False;
-      if Evt.Class.Class /= Fabula.Scan.Doc_Fence then
-         return;
-      end if;
-      Kind := Evt.Class.Fence;
-      Fabula.Ast.Append_Text
-        (Doc, Line (Evt.Class.Type_First .. Evt.Class.Type_Last), CType, Ok);
-      if Ok then
-         Fabula.Ast.Add_Doc_String (Doc, Kind, CType, Evt.Number, Ok);
+      if Evt.Class.Class = Fabula.Scan.Doc_Fence then
+         Append_Text
+           (Doc,
+            Line (Evt.Class.Type_First .. Evt.Class.Type_Last),
+            CType,
+            Ok);
+         Add_Doc_String (Doc, Evt.Class.Fence, CType, Evt.Number, Ok);
       end if;
       Check (P, Ok, Evt.Number);
-   end Add_Doc_String;
+   end Store_Doc_String;
 
-   procedure Add_Doc_Line
+   procedure Store_Doc_Line
      (P : in out Parser; Doc : in out Fabula.Ast.Document; Evt : G.Event)
    is
       Line : constant String := G.Line_Of (Evt);
-      Kept : constant Parts.Span := Parts.Trimmed (Line, 1, Line'Last);
+      Kept : constant Parts.Span :=
+        Parts.Trimmed (Line, Line'First, Line'Last);
       Text : Fabula.Ast.Slice;
-      Ok   : Boolean;
+      Ok   : Boolean := True;
    begin
-      Fabula.Ast.Append_Text (Doc, Line (Kept.First .. Kept.Last), Text, Ok);
-      if Ok then
-         Fabula.Ast.Add_Doc_Line (Doc, Text, Ok);
-      end if;
+      Append_Text (Doc, Line (Kept.First .. Kept.Last), Text, Ok);
+      Add_Doc_Line (Doc, Text, Ok);
       Check (P, Ok, Evt.Number);
-   end Add_Doc_Line;
+   end Store_Doc_Line;
 
-   --  Doc-string commands.  Owner is where the machine resumes when the
-   --  block closes; Doc_Line is where an unterminated one is reported.
+   --  A doc string opens: Owner is where the machine resumes when it
+   --  closes; Line is where an unterminated one is reported.
+   procedure Set_Owner (P : in out Parser; Owner : G.State; Line : Natural) is
+   begin
+      P.Work.Owner := Owner;
+      P.Work.Doc_Line := Line;
+   end Set_Owner;
+
    procedure Doc_Command
      (P   : in out Parser;
       Doc : in out Fabula.Ast.Document;
@@ -324,45 +467,44 @@ is
    begin
       case Cmd is
          when G.Add_Short_Doc | G.Open_Step_Doc =>
-            Add_Doc_String (P, Doc, Evt);
-            P.Work.Owner := G.In_Steps;
+            Store_Doc_String (P, Doc, Evt);
+            Set_Owner (P, G.In_Steps, Evt.Number);
 
          when G.Absorb_Doc                      =>
-            P.Work.Owner := P.Work.Arrived_In;
+            Set_Owner (P, P.Work.Arrived_In, Evt.Number);
 
          when G.Add_Doc_Line                    =>
-            Add_Doc_Line (P, Doc, Evt);
+            Store_Doc_Line (P, Doc, Evt);
 
          when others                            =>
-            P.Work.Owner := G.Failed;
+            Set_Owner (P, G.Failed, Evt.Number);
       end case;
-      if Cmd /= G.Add_Doc_Line then
-         P.Work.Doc_Line := Evt.Number;
-      end if;
    end Doc_Command;
+
+   ---------------------------------------------------------------------
+   --  Refusals and the engine.
+   ---------------------------------------------------------------------
 
    procedure Refuse_Command (P : in out Parser; Evt : G.Event; Cmd : G.Command)
    is
    begin
       case Cmd is
-         when G.Refuse_Tags     =>
+         when G.Refuse_Tags                 =>
             Refuse (P, Tag_Line_Malformed, Evt.Number);
 
-         when G.Refuse_Ragged   =>
+         when G.Refuse_Ragged               =>
             Refuse (P, Ragged_Table, Evt.Number);
 
-         when G.Refuse_Open_Row =>
+         when G.Refuse_Open_Row             =>
             Refuse (P, Unterminated_Table_Row, Evt.Number);
 
-         when G.Refuse_Close    =>
-            Refuse
-              (P,
-               (if P.Work.Feature_Seen
-                then Expected_Scenario
-                else Expected_Feature),
-               Evt.Number);
+         when G.Refuse_Close_In_Feature     =>
+            Refuse (P, Expected_Scenario, Evt.Number);
 
-         when others            =>
+         when G.Refuse_Close_Before_Feature =>
+            Refuse (P, Expected_Feature, Evt.Number);
+
+         when others                        =>
             Refuse (P, Unterminated_Doc_String, P.Work.Doc_Line);
       end case;
    end Refuse_Command;
@@ -388,7 +530,7 @@ is
             Describe (P, Doc, Evt);
 
          when G.Add_Step                         =>
-            Add_Step (P, Doc, Evt);
+            Store_Step (P, Doc, Evt);
 
          when G.Open_Table .. G.Add_Example_Row  =>
             Add_Row (P, Doc, Evt, Cmd);
@@ -423,14 +565,14 @@ is
         (Machine   => G.Started,
          Work      => (others => <>),
          Error     => (others => <>),
-         Last_Line => 0);
+         Last_Line => No_Line);
       Fabula.Ast.Clear (Doc);
    end Start;
 
    --  Inside a doc string the class is overridden: a line is content,
    --  or it closes the block when it holds a fence run anywhere.
    function Doc_Kind (Line : String) return G.Event_Kind
-   is (if Parts.Fence_Run (Line, 1, Line'Length) /= 0
+   is (if Parts.Fence_Run (Line, Line'First, Line'Length) /= Parts.No_Position
        then G.E_Fence
        else G.E_Content)
    with Pre => Parts.Is_Line (Line);

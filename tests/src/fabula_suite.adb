@@ -21,6 +21,7 @@ with Fabula_Registry_Tests;
 with Fabula_Reports_Tests;
 with Fabula_Results_Tests;
 with Fabula_Run_Select_Tests;
+with Fabula_Run_Table_Tests;
 with Fabula_Run_Tests;
 with Fabula_Scan_Tests;
 with Fabula_Tags_Tests;
@@ -80,6 +81,8 @@ package body Fabula_Suite is
         new Fabula_Run_Tests.Test;
       Run_Select_Test  : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Run_Select_Tests.Test;
+      Run_Table_Test   : constant AUnit.Test_Cases.Test_Case_Access :=
+        new Fabula_Run_Table_Tests.Test;
       Format_Test      : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Format_Tests.Test;
       Format_Json_Test : constant AUnit.Test_Cases.Test_Case_Access :=
@@ -97,6 +100,7 @@ package body Fabula_Suite is
       AUnit.Test_Suites.Add_Test (Result, Names_Test);
       AUnit.Test_Suites.Add_Test (Result, Run_Test);
       AUnit.Test_Suites.Add_Test (Result, Run_Select_Test);
+      AUnit.Test_Suites.Add_Test (Result, Run_Table_Test);
       AUnit.Test_Suites.Add_Test (Result, Format_Test);
       AUnit.Test_Suites.Add_Test (Result, Format_Json_Test);
       AUnit.Test_Suites.Add_Test (Result, Cli_Test);

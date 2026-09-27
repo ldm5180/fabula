@@ -445,6 +445,94 @@ package body Fabula_Parse_Tests is
          "the rule pool is full, not overrun");
    end Test_Pool_Overflow;
 
+   --  The tag pool overflowed one tag at a time: each scenario takes
+   --  two tags, so the tag line of the scenario one past half the pool
+   --  is the first that no longer fits.
+   function Many_Tagged_Scenarios return Lines is
+      Count  : constant := Fabula.Limits.Max_Tags / 2 + 1;
+      Result : Lines (1 .. 1 + 3 * Count);
+   begin
+      Result (1) := +"Feature: f";
+      for S in 0 .. Count - 1 loop
+         Result (2 + 3 * S) := +"@a @b";
+         Result (3 + 3 * S) := +"Scenario: s";
+         Result (4 + 3 * S) := +"Given x";
+      end loop;
+      return Result;
+   end Many_Tagged_Scenarios;
+
+   procedure Test_Tag_Pool_Overflow
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Run (Many_Tagged_Scenarios);
+      Assert_Refuses
+        (Pool_Exhausted,
+         2 + 3 * (Fabula.Limits.Max_Tags / 2),
+         "the tag line one past the pool");
+      Assert
+        (Tag_Count (Doc) = Tag_Handle (Fabula.Limits.Max_Tags),
+         "the tag pool is full, not overrun");
+   end Test_Tag_Pool_Overflow;
+
+   --  A document that leaves Room bytes of the text arena free: the
+   --  headers "Feature: f" and "Scenario: s" store 17 bytes, and steps
+   --  of Chunk bytes, plus one shorter step, fill the rest.
+   Room  : constant := 4;
+   Chunk : constant := 2_000;
+   Fill  : constant := Fabula.Limits.Text_Arena_Bytes - Room - 17;
+
+   function Nearly_Full return Lines is
+      Full_Steps : constant := Fill / Chunk;
+      Result     : Lines (1 .. 3 + Full_Steps);
+   begin
+      Result (1) := +"Feature: f";
+      Result (2) := +"Scenario: s";
+      for S in 1 .. Full_Steps loop
+         Result (2 + S) := +("Given " & [1 .. Chunk => 'x']);
+      end loop;
+      Result (Result'Last) := +("Given " & [1 .. Fill mod Chunk => 'y']);
+      return Result;
+   end Nearly_Full;
+
+   --  A header whose keyword no longer fits refuses, even when its empty
+   --  title would still fit: the failed keyword write sticks, so the
+   --  title is not written and the scenario is not added.
+   procedure Test_Header_Overflow (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Setup : constant Lines := Nearly_Full;
+   begin
+      Run (Setup);
+      Assert_Parses ("the nearly full document");
+      Assert
+        (Text_Used (Doc) = Fabula.Limits.Text_Arena_Bytes - Room,
+         "the arena has room for less than one keyword");
+      Run (Setup & [+"Scenario:"]);
+      Assert_Refuses
+        (Pool_Exhausted, Setup'Length + 1, "a keyword past the arena");
+      Assert (Scenario_Count (Doc) = 1, "the refused scenario is not added");
+   end Test_Header_Overflow;
+
+   --  A doc string that closes where no state can take it refuses as
+   --  the state it met: before the Feature header, and after it.
+   procedure Test_Refuse_Close (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+   begin
+      Run ([+"@t", +Q3, +"abc", +Q3, +"Feature: f"]);
+      Assert_Refuses (Expected_Feature, 4, "a stray doc string before it");
+      Run
+        ([+"Feature: f",
+          +"Scenario: s",
+          +"Given a",
+          +"  | x |",
+          +Q3,
+          +"abc",
+          +Q3]);
+      Assert_Refuses (Expected_Scenario, 7, "a stray doc string after it");
+   end Test_Refuse_Close;
+
    procedure Test_Prologue (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
    begin
@@ -485,6 +573,12 @@ package body Fabula_Parse_Tests is
         (T, Test_Dangling_Rule'Access, "a rule with no scenario refuses");
       Register_Routine (T, Test_Stickiness'Access, "refusals stick");
       Register_Routine (T, Test_Pool_Overflow'Access, "pool overflow");
+      Register_Routine
+        (T, Test_Tag_Pool_Overflow'Access, "tag pool overflow on a tag line");
+      Register_Routine
+        (T, Test_Header_Overflow'Access, "a header keyword past the arena");
+      Register_Routine
+        (T, Test_Refuse_Close'Access, "a stray doc string's two refusals");
       Register_Routine (T, Test_Prologue'Access, "before the Feature");
    end Register_Tests;
 

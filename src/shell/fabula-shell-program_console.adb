@@ -18,19 +18,14 @@ is
    use type Fabula.Ast.Table_Handle;
    use type Fabula.Results.Status;
 
-   Doc_Ref             : Fabula.Args.Document_Access;
-   Quiet_Active        : Boolean := False;
-   Verbose_Active      : Boolean := False;
-   Filter_Active       : Boolean := False;
-   --  Scenario_Closed carries no word of whether this scenario was ever
-   --  entered -- a -t-filtered drop and an after-hook Ignore look
-   --  identical on the notice.  Set True only by
-   --  On_Scenario_Entered, so On_Scenario_Closed can tell them apart.
-   Scenario_Is_Entered : Boolean := False;
-   Dry_Run_Active      : Boolean := False;
-   Compiled_Filter     : Fabula.Tags.Compiled;
-   Tag_Expr_Text       : Ada.Strings.Unbounded.Unbounded_String;
-   Failed              : Fabula.Format.Failed_Store :=
+   Doc_Ref         : Fabula.Args.Document_Access;
+   Quiet_Active    : Boolean := False;
+   Verbose_Active  : Boolean := False;
+   Filter_Active   : Boolean := False;
+   Dry_Run_Active  : Boolean := False;
+   Compiled_Filter : Fabula.Tags.Compiled;
+   Tag_Expr_Text   : Ada.Strings.Unbounded.Unbounded_String;
+   Failed          : Fabula.Format.Failed_Store :=
      Fabula.Format.Empty_Failed_Store;
 
    Current_Tag_Set : Fabula.Expand.Tag_Set;
@@ -306,7 +301,6 @@ is
    procedure On_Scenario_Entered
      (N : Runner.Notice; Info : Fabula.Frames.Frame) is
    begin
-      Scenario_Is_Entered := True;
       if Verbose_Active then
          Print_Tag_Check (N.Scenario, N.Data_Row);
          --  -d is the one Skip trigger the shell can see ahead of the
@@ -429,13 +423,11 @@ is
    procedure On_Scenario_Closed (N : Runner.Notice; Info : Fabula.Frames.Frame)
    is
       use type Fabula.Check.Control;
-      Was_Entered : constant Boolean := Scenario_Is_Entered;
    begin
-      Scenario_Is_Entered := False;
       if N.Dropped then
          --  a dropped scenario never touches the failure bookkeeping
          --  below: it is ignored and counts nowhere.
-         if Was_Entered then
+         if N.Entered then
             Print_Scenario_End;
          elsif Verbose_Active then
             Print_Dropped_Before_Entry (N.Scenario, N.Data_Row);

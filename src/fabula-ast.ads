@@ -34,6 +34,7 @@ is
 
    type Scenario_Handle is range 0 .. Limits.Max_Scenarios;
    subtype Scenario_Index is Scenario_Handle range 1 .. Scenario_Handle'Last;
+   No_Scenario : constant Scenario_Handle := 0;
 
    type Scenario_Range is record
       First : Scenario_Index := 1;
@@ -42,6 +43,7 @@ is
 
    type Step_Handle is range 0 .. Limits.Max_Steps;
    subtype Step_Index is Step_Handle range 1 .. Step_Handle'Last;
+   No_Step : constant Step_Handle := 0;
 
    type Step_Range is record
       First : Step_Index := 1;
@@ -99,6 +101,7 @@ is
    type Examples_Row_Handle is range 0 .. Limits.Max_Examples_Rows;
    subtype Examples_Row_Index is
      Examples_Row_Handle range 1 .. Examples_Row_Handle'Last;
+   No_Examples_Row : constant Examples_Row_Handle := 0;
 
    type Examples_Row_Range is record
       First : Examples_Row_Index := 1;

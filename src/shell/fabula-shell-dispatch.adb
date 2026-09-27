@@ -6,7 +6,6 @@ package body Fabula.Shell.Dispatch
   with SPARK_Mode => Off
 is
 
-   use type Runner.Command;
    use type Runner.Notice_Kind;
 
    ---------------------------------------------------------------------
@@ -18,12 +17,18 @@ is
    --  scenario's steps, background included, are at most Max_Steps.
    ---------------------------------------------------------------------
 
+   --  A scenario's own notices: opened, entered, closed.
+   Scenario_Notices : constant := 3;
+
+   --  A step's own moves: its request and its closing notice.
+   Step_Moves : constant := 2;
+
    Hook_Rows : constant Long_Long_Integer := Runner.Hooks'Length;
 
-   Per_Step : constant Long_Long_Integer := 2 + Hook_Rows;
+   Per_Step : constant Long_Long_Integer := Step_Moves + Hook_Rows;
 
    Per_Scenario : constant Long_Long_Integer :=
-     3 + Hook_Rows + Limits.Max_Steps * Per_Step;
+     Scenario_Notices + Hook_Rows + Limits.Max_Steps * Per_Step;
 
    Max_Moves : constant Long_Long_Integer :=
      Hook_Rows
@@ -121,50 +126,55 @@ is
       Runner.Post_Step_Result (R, Outcome);
    end Answer_Step;
 
-   --  The all-hooks run on the run's context, every other hook on the
-   --  scenario's.
-   procedure Answer_Hook
-     (R       : in out Runner.Runner;
-      Ctx     : in out Reg.Context;
-      All_Ctx : in out Reg.Context)
+   --  Runs the pending hook on Ctx and posts its outcome.
+   procedure Answer_Hook (R : in out Runner.Runner; Ctx : in out Reg.Context)
    is
       Outcome : Fabula.Check.Outcome;
    begin
-      if Runner.Next_Request (R) in Runner.C_Before_All | Runner.C_After_All
-      then
-         Call_Hook (R, All_Ctx, Outcome);
-      else
-         Call_Hook (R, Ctx, Outcome);
-      end if;
+      Call_Hook (R, Ctx, Outcome);
       Runner.Post_Hook_Result (R, Outcome);
    end Answer_Hook;
 
+   --  The messages of the core defects Drive raises on.
+   Clash_Message : constant String := "a request and a notice wait together";
+   Stuck_Message : constant String := "the runner stopped inside a feature";
+   Bound_Message : constant String :=
+     "the runner did not idle within its move bound";
+
    --  Each pass makes one move or ends the loop at an idle runner, and
    --  the runner's own cursors only move forward between two idles, so
-   --  no correct runner needs more than Max_Moves passes.
+   --  no correct runner needs more than Max_Moves passes.  The all-hooks
+   --  run on the run's context, every other hook on the scenario's.
    procedure Drive
      (R       : in out Runner.Runner;
       Ctx     : in out Reg.Context;
       All_Ctx : in out Reg.Context) is
    begin
       for Move in 1 .. Max_Moves loop
-         if Runner.Has_Notice (R)
-           and then Runner.Next_Request (R) /= Runner.C_None
-         then
-            raise Program_Error with "a request and a notice wait together";
-         elsif Runner.Has_Notice (R) then
-            Pass_Notice (R, Ctx);
-         elsif Runner.Next_Request (R) = Runner.C_Step then
-            Answer_Step (R, Ctx);
-         elsif Runner.Next_Request (R) /= Runner.C_None then
-            Answer_Hook (R, Ctx, All_Ctx);
-         elsif Runner.Between_Features (R) or else Runner.Run_Finished (R) then
-            return;
-         else
-            raise Program_Error with "the runner stopped inside a feature";
-         end if;
+         case Runner.Waiting_For (R) is
+            when Runner.Notice_Wait   =>
+               Pass_Notice (R, Ctx);
+
+            when Runner.Step_Wait     =>
+               Answer_Step (R, Ctx);
+
+            when Runner.All_Hook_Wait =>
+               Answer_Hook (R, All_Ctx);
+
+            when Runner.Hook_Wait     =>
+               Answer_Hook (R, Ctx);
+
+            when Runner.Idle          =>
+               return;
+
+            when Runner.Clash         =>
+               raise Program_Error with Clash_Message;
+
+            when Runner.Stuck         =>
+               raise Program_Error with Stuck_Message;
+         end case;
       end loop;
-      raise Program_Error with "the runner did not idle within its move bound";
+      raise Program_Error with Bound_Message;
    end Drive;
 
    ---------------------------------------------------------------------

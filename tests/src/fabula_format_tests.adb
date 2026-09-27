@@ -89,7 +89,7 @@ package body Fabula_Format_Tests is
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
-      C : constant Counts := (others => 0);
+      C : constant Counts := (others => <>);
    begin
       Assert
         (Scenarios_Summary (C) = "0 Scenario ()",
@@ -100,8 +100,10 @@ package body Fabula_Format_Tests is
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
-      All_Passed : constant Counts := (Scenarios_Passed => 10, others => 0);
-      All_Failed : constant Counts := (Scenarios_Failed => 2, others => 0);
+      All_Passed : constant Counts :=
+        (Scenarios => [Passed => 10, others => 0], others => <>);
+      All_Failed : constant Counts :=
+        (Scenarios => [Failed => 2, others => 0], others => <>);
    begin
       Assert
         (Scenarios_Summary (All_Passed) = "10 Scenarios (10 passed)",
@@ -116,10 +118,8 @@ package body Fabula_Format_Tests is
    is
       pragma Unreferenced (T);
       C : constant Counts :=
-        (Scenarios_Failed  => 1,
-         Scenarios_Skipped => 2,
-         Scenarios_Passed  => 3,
-         others            => 0);
+        (Scenarios => [Failed => 1, Skipped => 2, Passed => 3, others => 0],
+         others    => <>);
    begin
       Assert
         (Scenarios_Summary (C) = "6 Scenarios (1 failed, 2 skipped, 3 passed)",
@@ -130,7 +130,7 @@ package body Fabula_Format_Tests is
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
-      C : constant Counts := (others => 0);
+      C : constant Counts := (others => <>);
    begin
       Assert (Steps_Summary (C) = "0 Step ()", "a zero-step run");
    end Test_Steps_Summary_Zero;
@@ -139,9 +139,10 @@ package body Fabula_Format_Tests is
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
-      All_Passed : constant Counts := (Steps_Passed => 28, others => 0);
+      All_Passed : constant Counts :=
+        (Steps => [Passed => 28, others => 0], others => <>);
       Mixed      : constant Counts :=
-        (Steps_Skipped => 3, Steps_Passed => 3, others => 0);
+        (Steps => [Skipped => 3, Passed => 3, others => 0], others => <>);
    begin
       Assert
         (Steps_Summary (All_Passed) = "28 Steps (28 passed)",
@@ -156,11 +157,8 @@ package body Fabula_Format_Tests is
    is
       pragma Unreferenced (T);
       C : constant Counts :=
-        (Steps_Failed    => 1,
-         Steps_Undefined => 2,
-         Steps_Skipped   => 3,
-         Steps_Passed    => 4,
-         others          => 0);
+        (Steps  => [Failed => 1, Undefined => 2, Skipped => 3, Passed => 4],
+         others => <>);
    begin
       Assert
         (Steps_Summary (C)

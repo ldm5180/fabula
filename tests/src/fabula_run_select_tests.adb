@@ -12,6 +12,7 @@ with Fabula_Run_Script;  use Fabula_Run_Script;
 package body Fabula_Run_Select_Tests is
 
    use AUnit.Test_Cases.Registration;
+   use all type Fabula.Results.Status;
 
    ---------------------------------------------------------------------
    --  Tagged hooks against effective tags, in table order.
@@ -140,7 +141,9 @@ package body Fabula_Run_Select_Tests is
       Assert_Trace (Log, Outline_Trace);
       Assert_Counts
         (Bare_Run.Counts_Of (R),
-         (Scenarios_Passed => 2, Steps_Passed => 4, others => 0));
+         (Scenarios => [Passed => 2, others => 0],
+          Steps     => [Passed => 4, others => 0],
+          others    => 0));
    end Test_Outline;
 
    ---------------------------------------------------------------------
@@ -206,7 +209,9 @@ package body Fabula_Run_Select_Tests is
       Assert_Trace (Log, Important_Trace);
       Assert_Counts
         (Control_Run.Counts_Of (R),
-         (Scenarios_Passed => 1, Steps_Passed => 1, others => 0));
+         (Scenarios => [Passed => 1, others => 0],
+          Steps     => [Passed => 1, others => 0],
+          others    => 0));
       Control.Run_One
         (Filter_Doc, Filtered ("not @ship"), Control_Run.All_Lines, Log, R);
       Assert_Trace (Log, Not_Ship_Trace);
@@ -259,7 +264,7 @@ package body Fabula_Run_Select_Tests is
       Assert_Trace (Log, No_Trace);
       Noted.Run_One (Names_Doc, Named (""), Noted_Run.All_Lines, Log, R);
       Assert
-        (Noted_Run.Counts_Of (R).Scenarios_Passed = 3,
+        (Noted_Run.Counts_Of (R).Scenarios (Passed) = 3,
          "an empty pattern list selects every scenario");
    end Test_Name_Filter;
 
@@ -401,11 +406,9 @@ package body Fabula_Run_Select_Tests is
       Assert_Trace (Log, Dry_Trace);
       Assert_Counts
         (Control_Run.Counts_Of (R),
-         (Scenarios_Failed  => 3,
-          Scenarios_Skipped => 1,
-          Steps_Skipped     => 6,
-          Steps_Undefined   => 1,
-          others            => 0));
+         (Scenarios => [Failed => 3, Skipped => 1, others => 0],
+          Steps     => [Skipped => 6, Undefined => 1, others => 0],
+          others    => 0));
       Lifecycle.Run_One
         (Dry_Lifecycle_Doc,
          (Dry_Run => True, others => <>),
@@ -459,16 +462,12 @@ package body Fabula_Run_Select_Tests is
       Assert (Run_Finished (R), "the run is over");
       Assert_Counts
         (Counts_Of (R),
-         (Scenarios_Passed    => 2,
-          Scenarios_Failed    => 2,
-          Scenarios_Skipped   => 1,
-          Scenarios_Undefined => 0,
-          Steps_Passed        => 2,
-          Steps_Failed        => 1,
-          Steps_Skipped       => 2,
-          Steps_Undefined     => 1,
-          Parse_Errors        => 1,
-          Hook_Errors         => 0));
+         (Scenarios    =>
+            [Passed => 2, Failed => 2, Skipped => 1, Undefined => 0],
+          Steps        =>
+            [Passed => 2, Failed => 1, Skipped => 2, Undefined => 1],
+          Parse_Errors => 1,
+          Hook_Errors  => 0));
       Assert
         (Fabula.Results.Run_Failed (Counts_Of (R)), "failures fail the run");
    end Test_Counts;
