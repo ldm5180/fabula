@@ -1,0 +1,22 @@
+# JSON report snapshots: regression snapshots of fabula's own output,
+# NOT oracle output.  Each file under expected/ holds the exact bytes
+# the RELEASE example binary wrote for one run, and
+# tools/json_snapshot_check.py compares every run with its file byte
+# for byte.  The byte gate covers console output only; these guard the
+# JSON writer's commas, brackets and trailing newline on the paths no
+# golden reaches: several features, a feature with no scenario element,
+# a report with no feature, scenarios dropped before and after entry,
+# and both report targets (standard output ends with a newline, a file
+# does not).
+#
+# One run per line:  snapshot | target | argument | argument ...
+#   target  stdout: --report-json last, the report read from stdout
+#           file:   --report-json=<a scratch file> first, the file read
+# Arguments are repo-relative; every run starts in the repo root.
+two_features_stdout.json  | stdout | tests/data/json_snapshots/features/two
+two_features_file.json    | file   | tests/data/json_snapshots/features/two
+dropped_stdout.json       | stdout | tests/data/json_snapshots/features/dropped.feature
+dropped_file.json         | file   | tests/data/json_snapshots/features/dropped.feature
+all_filtered_file.json    | file   | -t | @nothing_matches | tests/data/json_snapshots/features/two
+no_feature_stdout.json    | stdout | tests/data/json_snapshots/features/missing.feature
+no_feature_file.json      | file   | tests/data/json_snapshots/features/missing.feature

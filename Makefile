@@ -69,9 +69,16 @@ run: example
 #              check the --report-json output for a scenario dropped before
 #              and after entry: valid JSON, the expected scenarios and steps
 #              (tools/json_report_check.py, also fabula's own expectations).
+#              Then compare the JSON report byte for byte with the
+#              regression snapshots of fabula's own output (NOT oracle
+#              output) in tests/data/json_snapshots/: several features,
+#              no feature, no scenario element, dropped scenarios, and
+#              both report targets (tools/json_snapshot_check.py).
 fabula-only: example
 	python3 tools/json_report_check.py --selftest
 	python3 tools/json_report_check.py
+	python3 tools/json_snapshot_check.py --selftest
+	python3 tools/json_snapshot_check.py
 	@status=0; \
 	for feature in tests/data/fabula_only/*.feature; do \
 		output="$$(./example/bin/release/box_main -c "$$feature" 2>&1)"; \

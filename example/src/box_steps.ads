@@ -5,6 +5,7 @@ with Fabula.Args;
 with Fabula.Check;
 with Fabula.Frames;
 with Fabula.Registry;
+with Fabula.Texts;
 
 package Box_Steps
   with SPARK_Mode => Off
@@ -45,26 +46,29 @@ is
    Max_Label_Length : constant := 128;
    Max_Note_Length  : constant := 2_048;
 
-   type Item_Text is record
-      Data : String (1 .. Max_Item_Length) := [others => ' '];
-      Len  : Natural range 0 .. Max_Item_Length := 0;
-   end record;
+   subtype Item_Text is Fabula.Texts.Bounded_Text (Max_Item_Length);
 
    type Item_List is array (1 .. Max_Items) of Item_Text;
 
+   --  How many items a box holds; an empty box holds none.
+   subtype Item_Count_Range is Natural range 0 .. Max_Items;
+
+   No_Items : constant Item_Count_Range := 0;
+
    --  The box, plus Note: one text value that holds either the customs
    --  declaration's content type or the shipping label.  No scenario
-   --  needs both at once.
+   --  needs both at once.  Has_Label says the labeled box was built; the
+   --  label itself may still be empty.
    type Box_Context is record
       Has_Label  : Boolean := False;
-      Label      : String (1 .. Max_Label_Length) := [others => ' '];
-      Label_Len  : Natural range 0 .. Max_Label_Length := 0;
+      Label      : Fabula.Texts.Bounded_Text (Max_Label_Length);
       Items      : Item_List;
-      Item_Count : Natural range 0 .. Max_Items := 0;
-      Weight     : Natural := 0;
+      Item_Count : Item_Count_Range := No_Items;
+      --  No step reads it: it shows an After hook (Close_Box) that edits
+      --  the scenario's context, as the reference interpreter's own box
+      --  example does.
       Is_Open    : Boolean := True;
-      Note       : String (1 .. Max_Note_Length) := [others => ' '];
-      Note_Len   : Natural range 0 .. Max_Note_Length := 0;
+      Note       : Fabula.Texts.Bounded_Text (Max_Note_Length);
    end record;
 
    package Steps is new
@@ -74,6 +78,23 @@ is
         Context   => Box_Context);
 
    use Steps;
+
+   --  Where each value sits among a step's captures, named by its role
+   --  in the patterns below; the body reads each capture by these names.
+   --    "I place {int} x {string} in it":  a count, then an item
+   Count_Capture    : constant := 1;
+   Item_Capture     : constant := 2;
+   --    "The {int}. item is {string}":  an index, then an item
+   Index_Capture    : constant := 1;
+   --    "... should be {string}", "... should equal {string}"
+   Expected_Capture : constant := 1;
+   --    "{word} is/are in the box"
+   Sought_Capture   : constant := 1;
+   --    "I have {int},{int} as coordinates"
+   X_Capture        : constant := 1;
+   Y_Capture        : constant := 2;
+   --    "The box contains {int} item(s)" and "{int} item(s) is/are
+   --    {string}" read Count_Capture, and the latter Item_Capture.
 
    Step_Defs : constant Steps.Step_Table :=
      [Step ("An empty box") >= Init_Box,

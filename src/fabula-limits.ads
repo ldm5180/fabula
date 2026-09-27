@@ -66,10 +66,13 @@ is
    --  file:line): comfortably above Max_Step_Text_Length plus a path,
    --  a name and a bracket label.
 
-   Max_Escaped_Text_Length : constant := 6 * Max_Line_Length;
-   --  A JSON-escaped text field. Six times Max_Line_Length covers the
-   --  worst case where every source character expands to "\u00XX";
-   --  every text Format escapes is first bounded to one line.
+   Widest_Json_Escape : constant := 6;
+   --  The characters one source character can become in JSON: "\u00XX".
+
+   Max_Escaped_Text_Length : constant := Widest_Json_Escape * Max_Line_Length;
+   --  A JSON-escaped text field: the worst case, where every source
+   --  character expands to its widest escape; every text Format escapes
+   --  is first bounded to one line.
 
    Max_Table_Columns : constant := 64;
    --  Columns a rendered table's column-width pass tracks.

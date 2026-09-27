@@ -396,13 +396,32 @@ package body Fabula_Scan_Tests is
       end loop;
    end Test_Doc_Fences;
 
+   --  The five step keywords, indented by two spaces, must classify the
+   --  same as unindented and report Indent 2.
+   procedure Check_Indented_Steps is
+      type Step_Case is record
+         Text    : Unbounded_String;
+         Keyword : Step_Keyword;
+      end record;
+      Step_Cases : constant array (Positive range <>) of Step_Case :=
+        [(To_Unbounded_String ("Given"), K_Given),
+         (To_Unbounded_String ("When"), K_When),
+         (To_Unbounded_String ("Then"), K_Then),
+         (To_Unbounded_String ("And"), K_And),
+         (To_Unbounded_String ("But"), K_But)];
+   begin
+      for C of Step_Cases loop
+         Check_Step ("  " & To_String (C.Text) & " x", C.Keyword, "x", 2);
+      end loop;
+   end Check_Indented_Steps;
+
    procedure Test_Indentation (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
       type Header_Case is record
          Text  : Unbounded_String;
          Class : Line_Class;
       end record;
-      --  Every one of the 14 keywords, indented by two spaces, must
+      --  Every one of the header keywords, indented by two spaces, must
       --  classify the same as unindented and report Indent 2.
       Header_Cases : constant array (Positive range <>) of Header_Case :=
         [(To_Unbounded_String ("Feature:"), Feature_Header),
@@ -414,25 +433,13 @@ package body Fabula_Scan_Tests is
          (To_Unbounded_String ("Background:"), Background_Header),
          (To_Unbounded_String ("Examples:"), Examples_Header),
          (To_Unbounded_String ("Scenarios:"), Examples_Header)];
-      type Step_Case is record
-         Text    : Unbounded_String;
-         Keyword : Step_Keyword;
-      end record;
-      Step_Cases   : constant array (Positive range <>) of Step_Case :=
-        [(To_Unbounded_String ("Given"), K_Given),
-         (To_Unbounded_String ("When"), K_When),
-         (To_Unbounded_String ("Then"), K_Then),
-         (To_Unbounded_String ("And"), K_And),
-         (To_Unbounded_String ("But"), K_But)];
       Tab          : constant String := [1 => ASCII.HT];
       Triple_Quote : constant String := [1 .. 3 => '"'];
    begin
       for C of Header_Cases loop
          Check_Header ("  " & To_String (C.Text) & " x", C.Class, "x", 2);
       end loop;
-      for C of Step_Cases loop
-         Check_Step ("  " & To_String (C.Text) & " x", C.Keyword, "x", 2);
-      end loop;
+      Check_Indented_Steps;
       --  Indent counts characters, not visual columns: one tab is one
       --  character of indent, not a tab stop's width.
       Check_Step (Tab & "Given x", K_Given, "x", 1);

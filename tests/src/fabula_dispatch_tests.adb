@@ -316,24 +316,19 @@ package body Fabula_Dispatch_Tests is
          "every line of a full selection");
    end Test_Selection;
 
-   --  -n patterns past the runner's bound are refused, and the options
-   --  keep what they had.
+   --  -n patterns as the program sets them: straight on the runner's
+   --  options, since Fabula.Cli refuses a list past the bound (its own
+   --  Test_Names_Bound).
    procedure Test_Names (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
       Most : constant String (1 .. Fabula.Limits.Max_Name_Filter_Length) :=
         [others => 'a'];
       Opts : Counting_Run.Options;
-      Fits : Boolean;
       R    : Counting_Run.Runner;
    begin
-      Counting.Set_Names (Opts, Most, Fits);
-      Assert (Fits, "the longest pattern list fits");
-      Assert (Counting_Run.Name_Patterns (Opts) = Most, "and is set");
-      Counting.Set_Names (Opts, Most & "b", Fits);
-      Assert (not Fits, "one character more does not");
-      Assert (Counting_Run.Name_Patterns (Opts) = Most, "the options keep it");
-      Counting.Set_Names (Opts, "tw?", Fits);
-      Assert (Fits, "a short pattern fits");
+      Counting_Run.Set_Names (Opts, Most);
+      Assert (Counting_Run.Name_Patterns (Opts) = Most, "the longest list");
+      Counting_Run.Set_Names (Opts, "tw?");
       Run_Counting (Tally_Doc, Opts, Counting_Run.All_Lines, R);
       Assert
         (Natural (Log.Length) = 8 and then Log (2) = "open two",
@@ -358,7 +353,7 @@ package body Fabula_Dispatch_Tests is
       Register_Routine
         (T, Test_Hook_Exceptions'Access, "raising all-hooks and hooks");
       Register_Routine (T, Test_Selection'Access, "Selection from Files");
-      Register_Routine (T, Test_Names'Access, "Set_Names and its bound");
+      Register_Routine (T, Test_Names'Access, "the -n patterns select");
    end Register_Tests;
 
    overriding

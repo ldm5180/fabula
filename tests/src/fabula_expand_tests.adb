@@ -373,6 +373,38 @@ package body Fabula_Expand_Tests is
       Assert (Ref.Status = Ended, "three rows, then done");
    end Test_Example_Blocks;
 
+   --  Every row the walk yields locates back to itself: its own block
+   --  and that block's header row.
+   procedure Test_Locate_Row (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Ref   : Example_Ref;
+      Found : Example_Ref;
+      Rows  : Natural := 0;
+   begin
+      Load (Blocks_Doc);
+      Ref := First_Example (Doc, 1);
+      while Ref.Status = Row_Due loop
+         Found := Locate_Row (Doc, 1, Ref.Data_Row);
+         Assert (Found = Ref, "row" & Ref.Data_Row'Image & " locates back");
+         Rows := Rows + 1;
+         Ref := Next_Example (Doc, 1, Ref);
+      end loop;
+      Assert (Rows = 3, "three rows walked");
+      Assert
+        (Locate_Row (Doc, 1, No_Examples_Row) = No_Example,
+         "a plain scenario's step has no row");
+      Assert
+        (Locate_Row (Doc, 2, Examples (Doc, 2).Rows.First) = No_Example,
+         "a stale scenario handle locates nothing");
+      Assert
+        (Locate_Row (Doc, No_Scenario, Examples (Doc, 2).Rows.First)
+         = No_Example,
+         "no scenario locates nothing");
+      Assert
+        (Locate_Row (Doc, 1, Examples (Doc, 1).Header_Row) = No_Example,
+         "a header row is no data row");
+   end Test_Locate_Row;
+
    ---------------------------------------------------------------------
    --  Effective tags.
    ---------------------------------------------------------------------
@@ -438,6 +470,8 @@ package body Fabula_Expand_Tests is
         (T, Test_Step_Fits'Access, "a step's expansion fits or refuses");
       Register_Routine
         (T, Test_Example_Blocks'Access, "a header-only block, then two more");
+      Register_Routine
+        (T, Test_Locate_Row'Access, "a data row locates its block");
       Register_Routine
         (T, Test_Effective_Tags'Access, "effective tags, deduplicated");
    end Register_Tests;

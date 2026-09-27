@@ -54,6 +54,9 @@ is
    procedure Put (Text : String; S : Style := Plain);
    procedure New_Line;
 
+   --  Put (Text, S), then an unstyled New_Line.
+   procedure Put_Line (Text : String; S : Style := Plain);
+
    --  Whether any write has failed since elaboration.
    function Write_Failed return Boolean;
 

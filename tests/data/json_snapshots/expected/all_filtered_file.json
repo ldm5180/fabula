@@ -1,0 +1,27 @@
+[
+  {
+    "description": "A description over two lines",
+    "elements": [
+    ],
+    "id": "Every element shape",
+    "keyword": "Feature",
+    "line": 2,
+    "name": "Every element shape",
+    "tags": [
+      "@feature_tag"
+    ],
+    "uri": "tests/data/json_snapshots/features/two/1_every_shape.feature"
+  }
+,
+  {
+    "description": "Only a description.",
+    "elements": [
+    ],
+    "id": "No scenario at all",
+    "keyword": "Feature",
+    "line": 1,
+    "name": "No scenario at all",
+    "tags": [],
+    "uri": "tests/data/json_snapshots/features/two/2_no_scenario.feature"
+  }
+]

@@ -33,27 +33,34 @@ is
    Every_Argument_Has_A_Capture : constant Boolean :=
      Fabula.Expressions.Capture_Items'Length = Fabula.Limits.Max_Args_Per_Step;
 
-   --  Fixes the instance's tag set to {"@a"}; only gnatprove's analysis
-   --  of the instance matters here, not the value it computes.
+   --  The one tag of the instance's tag set, and the whole expression
+   --  the closure compiles.
+   Closure_Tag : constant String := "@a";
+
+   --  Fixes the instance's tag set to {Closure_Tag}; only gnatprove's
+   --  analysis of the instance matters here, not the value it computes.
    function Closure_Has_Tag (Name : String) return Boolean
-   is (Name = "@a");
+   is (Name = Closure_Tag);
 
    function Closure_Eval is new Fabula.Tags.Eval (Has_Tag => Closure_Has_Tag);
 
    --  Mirrors the real calling convention: check Valid before calling
-   --  Eval.  Compile ("@a") is always valid, so the Then branch is the
-   --  one actually taken; the Else branch exists only to give Error a
-   --  call site here too.
+   --  Eval.  Compile (Closure_Tag) is always valid, so the Then branch
+   --  is the one actually taken; the Else branch exists only to give
+   --  Error a call site here too.
    Closure_Tag_Expr : constant Fabula.Tags.Compiled :=
-     Fabula.Tags.Compile ("@a");
+     Fabula.Tags.Compile (Closure_Tag);
+
+   --  What Error answers for an expression it did not refuse.
+   No_Error_Position : constant Natural := 0;
 
    Tag_Expr_Round_Trips : constant Boolean :=
      (if Fabula.Tags.Valid (Closure_Tag_Expr)
       then Closure_Eval (Closure_Tag_Expr)
-      else Fabula.Tags.Error (Closure_Tag_Expr) > 0);
+      else Fabula.Tags.Error (Closure_Tag_Expr) > No_Error_Position);
 
    Empty_Slice_Is_Empty : constant Boolean :=
-     Fabula.Ast.Length (Fabula.Ast.Empty_Slice) = 0;
+     Fabula.Ast.Length (Fabula.Ast.Empty_Slice) = Fabula.Ast.No_Characters;
 
    --  One parse of a two-line feature, as the shell will run it: proves
    --  Start, Feed and Finish callable under their contracts, and
@@ -111,7 +118,7 @@ is
    type Closure_Hook is (Fresh_Hook, Audit_Hook);
 
    type Closure_Context is record
-      Count : Natural := 0;
+      Count : Natural := Fabula.Results.Nothing_Counted;
    end record;
 
    package Closure_Registry is new

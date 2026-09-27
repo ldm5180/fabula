@@ -54,10 +54,4 @@ is
    function Selection
      (Lines : Fabula.Shell.Files.Line_Numbers) return Runner.Line_Selection;
 
-   --  Sets the -n patterns when they fit the runner's bound; Fits says
-   --  whether they did, and Opts is unchanged when they do not.  Call it
-   --  before Start_Run.
-   procedure Set_Names
-     (Opts : in out Runner.Options; Patterns : String; Fits : out Boolean);
-
 end Fabula.Shell.Dispatch;

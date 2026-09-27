@@ -123,8 +123,8 @@ package body Fabula_Corpus_Tests is
        then Natural (E.Rows.Last - E.Rows.First) + 1
        else 0);
 
-   function Counted return Counts is
-      Result : Counts := [others => 0];
+   --  Adds each scenario to the count of its kind.
+   procedure Count_Scenarios (Result : in out Counts) is
    begin
       for S in 1 .. Scenario_Count (Doc) loop
          if Scenario (Doc, S).Kind = Plain then
@@ -133,9 +133,23 @@ package body Fabula_Corpus_Tests is
             Result (Outlines) := Result (Outlines) + 1;
          end if;
       end loop;
+   end Count_Scenarios;
+
+   --  Every Examples block's data rows.
+   function Example_Rows return Natural is
+      Total : Natural := 0;
+   begin
       for E in 1 .. Examples_Count (Doc) loop
-         Result (Rows) := Result (Rows) + Data_Rows (Examples (Doc, E));
+         Total := Total + Data_Rows (Examples (Doc, E));
       end loop;
+      return Total;
+   end Example_Rows;
+
+   function Counted return Counts is
+      Result : Counts := [others => 0];
+   begin
+      Count_Scenarios (Result);
+      Result (Rows) := Example_Rows;
       Result (Steps) := Natural (Step_Count (Doc));
       Result (Tables) := Natural (Table_Count (Doc));
       Result (Docs) := Natural (Doc_String_Count (Doc));
@@ -154,6 +168,17 @@ package body Fabula_Corpus_Tests is
       end loop;
       return Total;
    end Owned_Steps;
+
+   --  Where the manifest gives the oracle's own scenario count, plain
+   --  scenarios plus outline rows must equal it.
+   procedure Check_Oracle_Total (F : Fields; Name : String; Got : Counts) is
+   begin
+      if Field (F, Max_Fields) = "" then
+         Assert
+           (Got (Plain_Count) + Got (Rows) = Natural'Value (Field (F, 9)),
+            Name & ": plain + rows must equal the oracle's count");
+      end if;
+   end Check_Oracle_Total;
 
    procedure Check_Parse (F : Fields) is
       Name   : constant String := Field (F, 1);
@@ -174,11 +199,7 @@ package body Fabula_Corpus_Tests is
          Column := Column + 1;
       end loop;
       Assert (Owned_Steps = Got (Steps), Name & ": every step has an owner");
-      if Field (F, Max_Fields) = "" then
-         Assert
-           (Got (Plain_Count) + Got (Rows) = Natural'Value (Field (F, 9)),
-            Name & ": plain + rows must equal the oracle's count");
-      end if;
+      Check_Oracle_Total (F, Name, Got);
    end Check_Parse;
 
    procedure Check_Refusal (F : Fields) is

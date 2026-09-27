@@ -1,0 +1,122 @@
+[
+  {
+    "description": "",
+    "elements": [
+      {
+        "description": "",
+        "id": "Scenarios dropped before and after entry;Kept",
+        "keyword": "Scenario",
+        "line": 7,
+        "name": "Kept",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given",
+            "line": 8,
+            "match": {
+              "location": "An empty box"
+            },
+            "name": "An empty box",
+            "result": {
+              "status": "passed"
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When",
+            "line": 9,
+            "match": {
+              "location": "I place {int} x {string} in it"
+            },
+            "name": "I place 1 x \"apple\" in it",
+            "result": {
+              "status": "passed"
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then",
+            "line": 10,
+            "match": {
+              "location": "The box contains {int} item(s)"
+            },
+            "name": "The box contains 1 item",
+            "result": {
+              "status": "passed"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "Kept"
+      }
+,
+      {
+        "description": "",
+        "id": "Scenarios dropped before and after entry;Dropped after entry, its steps already run",
+        "keyword": "Scenario",
+        "line": 17,
+        "name": "Dropped after entry, its steps already run",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given",
+            "line": 18,
+            "match": {
+              "location": "An empty box"
+            },
+            "name": "An empty box",
+            "result": {
+              "status": "passed"
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When",
+            "line": 19,
+            "match": {
+              "location": "I place {int} x {string} in it"
+            },
+            "name": "I place 1 x \"apple\" in it",
+            "result": {
+              "status": "passed"
+            }
+          }
+        ],
+        "tags": [
+          "@ignore_after"
+        ],
+        "type": "Dropped after entry, its steps already run"
+      }
+,
+      {
+        "description": "",
+        "id": "Scenarios dropped before and after entry;Kept after the drops",
+        "keyword": "Scenario",
+        "line": 21,
+        "name": "Kept after the drops",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given",
+            "line": 22,
+            "match": {
+              "location": "An empty box"
+            },
+            "name": "An empty box",
+            "result": {
+              "status": "passed"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "Kept after the drops"
+      }
+    ],
+    "id": "Scenarios dropped before and after entry",
+    "keyword": "Feature",
+    "line": 1,
+    "name": "Scenarios dropped before and after entry",
+    "tags": [],
+    "uri": "tests/data/json_snapshots/features/dropped.feature"
+  }
+]

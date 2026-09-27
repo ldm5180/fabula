@@ -1,0 +1,284 @@
+[
+  {
+    "description": "A description over two lines",
+    "elements": [
+      {
+        "description": "",
+        "id": "Every element shape;Passing, failing, then skipped",
+        "keyword": "Scenario",
+        "line": 7,
+        "name": "Passing, failing, then skipped",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given",
+            "line": 8,
+            "match": {
+              "location": "An empty box"
+            },
+            "name": "An empty box",
+            "result": {
+              "status": "passed"
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then",
+            "line": 9,
+            "match": {
+              "location": "The box contains {int} item(s)"
+            },
+            "name": "The box contains 2 items",
+            "result": {
+              "error_message": "Value 0 is not equal to 2",
+              "status": "failed"
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And",
+            "line": 10,
+            "match": {
+              "location": ""
+            },
+            "name": "The box contains 0 items",
+            "result": {
+              "status": "skipped"
+            }
+          }
+        ],
+        "tags": [
+          "@scenario_tag",
+          "@feature_tag"
+        ],
+        "type": "Passing, failing, then skipped"
+      }
+,
+      {
+        "description": "",
+        "id": "Every element shape;An undefined step",
+        "keyword": "Scenario",
+        "line": 12,
+        "name": "An undefined step",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given",
+            "line": 13,
+            "match": {
+              "location": ""
+            },
+            "name": "a step nobody defined",
+            "result": {
+              "error_message": "Undefined step",
+              "status": "undefined"
+            }
+          }
+        ],
+        "tags": [
+          "@feature_tag"
+        ],
+        "type": "An undefined step"
+      }
+,
+      {
+        "description": "",
+        "id": "(1) Every element shape;An outline row with 1",
+        "keyword": "Scenario Outline",
+        "line": 22,
+        "name": "An outline row with 1",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given",
+            "line": 16,
+            "match": {
+              "location": "An empty box"
+            },
+            "name": "An empty box",
+            "result": {
+              "status": "passed"
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When",
+            "line": 17,
+            "match": {
+              "location": "I place {int} x {string} in it"
+            },
+            "name": "I place 1 x \"pen\" in it",
+            "result": {
+              "status": "passed"
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then",
+            "line": 18,
+            "match": {
+              "location": "The box contains {int} item(s)"
+            },
+            "name": "The box contains 1 items",
+            "result": {
+              "status": "passed"
+            }
+          }
+        ],
+        "tags": [
+          "@feature_tag"
+        ],
+        "type": "An outline row with 1"
+      }
+,
+      {
+        "description": "",
+        "id": "(2) Every element shape;An outline row with 3",
+        "keyword": "Scenario Outline",
+        "line": 23,
+        "name": "An outline row with 3",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given",
+            "line": 16,
+            "match": {
+              "location": "An empty box"
+            },
+            "name": "An empty box",
+            "result": {
+              "status": "passed"
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When",
+            "line": 17,
+            "match": {
+              "location": "I place {int} x {string} in it"
+            },
+            "name": "I place 3 x \"pen\" in it",
+            "result": {
+              "status": "passed"
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then",
+            "line": 18,
+            "match": {
+              "location": "The box contains {int} item(s)"
+            },
+            "name": "The box contains 3 items",
+            "result": {
+              "status": "passed"
+            }
+          }
+        ],
+        "tags": [
+          "@feature_tag"
+        ],
+        "type": "An outline row with 3"
+      }
+,
+      {
+        "description": "",
+        "id": "Every element shape;A table and a doc string",
+        "keyword": "Scenario",
+        "line": 25,
+        "name": "A table and a doc string",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given",
+            "line": 26,
+            "match": {
+              "location": "An empty box"
+            },
+            "name": "An empty box",
+            "result": {
+              "status": "passed"
+            }
+          },
+          {
+            "arguments": [
+              {
+                "rows": [
+                  {
+                    "cells": [
+                      "apple",
+                      "2"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "keyword": "When",
+            "line": 27,
+            "match": {
+              "location": "I add all items with the raw function:"
+            },
+            "name": "I add all items with the raw function:",
+            "result": {
+              "status": "passed"
+            }
+          },
+          {
+            "arguments": [
+              {
+                "content": "Ship to: Lisbon"
+              }
+            ],
+            "keyword": "Then",
+            "line": 29,
+            "match": {
+              "location": "The box gets a shipping label"
+            },
+            "name": "The box gets a shipping label",
+            "result": {
+              "status": "passed"
+            }
+          }
+        ],
+        "tags": [
+          "@feature_tag"
+        ],
+        "type": "A table and a doc string"
+      }
+,
+      {
+        "description": "",
+        "id": "Every element shape;No steps",
+        "keyword": "Scenario",
+        "line": 34,
+        "name": "No steps",
+        "steps": [
+        ],
+        "tags": [
+          "@feature_tag"
+        ],
+        "type": "No steps"
+      }
+    ],
+    "id": "Every element shape",
+    "keyword": "Feature",
+    "line": 2,
+    "name": "Every element shape",
+    "tags": [
+      "@feature_tag"
+    ],
+    "uri": "tests/data/json_snapshots/features/two/1_every_shape.feature"
+  }
+,
+  {
+    "description": "Only a description.",
+    "elements": [
+    ],
+    "id": "No scenario at all",
+    "keyword": "Feature",
+    "line": 1,
+    "name": "No scenario at all",
+    "tags": [],
+    "uri": "tests/data/json_snapshots/features/two/2_no_scenario.feature"
+  }
+]

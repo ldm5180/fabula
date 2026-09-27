@@ -54,15 +54,40 @@ is
       Fabula.Check.Record_Failure (Outcome, Message_Of (E));
    end Record_Exception;
 
-   --  Runs the pending step's body on a copy of Ctx, which replaces Ctx
-   --  only when the body returns: a raise rolls its edits back, however
-   --  the compiler passed the context.  Step_Args is copied once.
-   procedure Call_Step
+   --  Runs one call of user code on a copy of Ctx, which replaces Ctx
+   --  only when the call returns: a raise rolls its edits back, however
+   --  the compiler passed the context, and becomes the outcome.
+   generic
+      with
+        procedure Call
+          (R       : Runner.Runner;
+           Work    : in out Reg.Context;
+           Outcome : in out Fabula.Check.Outcome);
+   procedure Contained_Call
+     (R       : Runner.Runner;
+      Ctx     : in out Reg.Context;
+      Outcome : in out Fabula.Check.Outcome);
+
+   procedure Contained_Call
      (R       : Runner.Runner;
       Ctx     : in out Reg.Context;
       Outcome : in out Fabula.Check.Outcome)
    is
       Work : Reg.Context := Ctx;
+   begin
+      Call (R, Work, Outcome);
+      Ctx := Work;
+   exception
+      when E : others =>
+         Record_Exception (Outcome, E);
+   end Contained_Call;
+
+   --  The pending step's body, with its arguments; Step_Args is copied
+   --  once.
+   procedure Execute_Pending_Step
+     (R       : Runner.Runner;
+      Work    : in out Reg.Context;
+      Outcome : in out Fabula.Check.Outcome) is
    begin
       Execute
         (Runner.Pending_Step_Kind (R),
@@ -70,30 +95,22 @@ is
          Runner.Step_Args (R),
          Runner.Current_Frame (R),
          Outcome);
-      Ctx := Work;
-   exception
-      when E : others =>
-         Record_Exception (Outcome, E);
-   end Call_Step;
+   end Execute_Pending_Step;
 
-   --  Runs the pending hook on a copy of Ctx, as Call_Step does.
-   procedure Call_Hook
+   procedure Run_Pending_Hook
      (R       : Runner.Runner;
-      Ctx     : in out Reg.Context;
-      Outcome : in out Fabula.Check.Outcome)
-   is
-      Work : Reg.Context := Ctx;
+      Work    : in out Reg.Context;
+      Outcome : in out Fabula.Check.Outcome) is
    begin
       Run_Hook
         (Runner.Pending_Hook_Kind (R),
          Work,
          Runner.Current_Frame (R),
          Outcome);
-      Ctx := Work;
-   exception
-      when E : others =>
-         Record_Exception (Outcome, E);
-   end Call_Hook;
+   end Run_Pending_Hook;
+
+   procedure Call_Step is new Contained_Call (Execute_Pending_Step);
+   procedure Call_Hook is new Contained_Call (Run_Pending_Hook);
 
    ---------------------------------------------------------------------
    --  One move each.
@@ -191,14 +208,5 @@ is
       end loop;
       return Result;
    end Selection;
-
-   procedure Set_Names
-     (Opts : in out Runner.Options; Patterns : String; Fits : out Boolean) is
-   begin
-      Fits := Patterns'Length <= Limits.Max_Name_Filter_Length;
-      if Fits then
-         Runner.Set_Names (Opts, Patterns);
-      end if;
-   end Set_Names;
 
 end Fabula.Shell.Dispatch;

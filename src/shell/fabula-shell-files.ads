@@ -6,6 +6,7 @@ with Fabula.Args;
 with Fabula.Frames;
 with Fabula.Limits;
 with Fabula.Parse;
+with Fabula.Texts;
 
 package Fabula.Shell.Files
   with SPARK_Mode => Off
@@ -20,10 +21,12 @@ is
    subtype Line_Count is Natural range 0 .. Limits.Max_Line_Selections;
    type Line_Array is array (1 .. Limits.Max_Line_Selections) of Source_Line;
 
+   No_Lines : constant Line_Count := 0;
+
    --  Distinct line numbers, in no particular order; none selects every
    --  scenario.
    type Line_Numbers is record
-      Count : Line_Count := 0;
+      Count : Line_Count := No_Lines;
       Lines : Line_Array := [others => First_Line];
    end record;
 
@@ -63,10 +66,12 @@ is
    subtype File_Count is Natural range 0 .. Limits.Max_Features_Per_Run;
    type File_Array is array (1 .. Limits.Max_Features_Per_Run) of Feature_File;
 
+   No_Files : constant File_Count := 0;
+
    --  The run's feature files in running order.  About 200 KB: keep one
    --  at library level, never on a task's stack.
    type File_List is record
-      Count : File_Count := 0;
+      Count : File_Count := No_Files;
       Files : File_Array;
    end record;
 
@@ -91,24 +96,21 @@ is
       Empty,        --  the file holds no bytes
       Unreadable);  --  the file cannot be opened or read to its end
 
-   subtype Text_Length is Natural range 0 .. Limits.Max_Line_Length;
-
    --  For Refused and Too_Long, Line is the offending line's number and
-   --  Text (1 .. Len) its text as written, less a final CR, up to
-   --  Max_Line_Length characters.  For Refused, At_End is True when the
-   --  refusal came from Fabula.Parse.Finish (end of input, no next line
-   --  to quote a token from) rather than Feed; meaningless otherwise.
+   --  Text its text as written, less a final CR, up to Max_Line_Length
+   --  characters.  For Refused, At_End is True when the refusal came
+   --  from Fabula.Parse.Finish (end of input, no next line to quote a
+   --  token from) rather than Feed; meaningless otherwise.
    type Load_Result is record
       Status  : Load_Status := Unreadable;
       Refusal : Parse.Refusal;
       At_End  : Boolean := False;
       Line    : Line_Number := No_Line;
-      Text    : String (1 .. Limits.Max_Line_Length) := [others => ' '];
-      Len     : Text_Length := 0;
+      Text    : Texts.Line_Text;
    end record;
 
    function Line_Text (R : Load_Result) return String
-   is (R.Text (1 .. R.Len));
+   is (Texts.Value (R.Text));
 
    --  Parses the file at Path into the Document, one Feed per line; a
    --  CR that ends a line is dropped, so CRLF reads as LF.  Unless the

@@ -15,6 +15,11 @@ Every ``"line"`` field must name the fixture's own source line: the
 feature's header, each scenario's header and each step.  No other gate
 reads the JSON line numbers, so a writer that shifts them fails here.
 
+Each scenario element's ``"type"`` must equal its ``"name"``: the
+reference interpreter writes the scenario's name there, not a keyword
+such as "scenario" (its ``report.cpp`` builds the element with
+``{"type", scenario.name}``).
+
 These are fabula's own expectations, NOT oracle output: the byte gate
 never covers ``--report-json`` (see ``tools/byte_gate.py``).  The check
 reads the report with Python's ``json`` module, so a missing or stray
@@ -82,6 +87,8 @@ def report_problems(text: str, want: tuple[str, ...]) -> list[str]:
             problems.append(f"{name!r}: steps {statuses!r}")
         if element.get("line") != SCENARIO_LINES.get(name):
             problems.append(f"{name!r}: line {element.get('line')!r}")
+        if element.get("type") != name:
+            problems.append(f"{name!r}: type {element.get('type')!r}, expected the name")
         lines = tuple(step.get("line") for step in steps)
         if lines != STEP_LINES.get(name):
             problems.append(f"{name!r}: step lines {lines!r}")
@@ -139,6 +146,7 @@ def _report(names: tuple[str, ...], shift: int = 0) -> str:
                 {"line": line + shift, "result": {"status": "passed"}}
                 for line in STEP_LINES[name]
             ],
+            "type": name,
         }
         for name in names
     ]
@@ -147,7 +155,7 @@ def _report(names: tuple[str, ...], shift: int = 0) -> str:
     )
 
 
-def _moved(text: str, path: tuple[int | str, ...], value: int) -> str:
+def _moved(text: str, path: tuple[int | str, ...], value: int | str) -> str:
     """Text with the one field at path set to value."""
     report = json.loads(text)
     node = report
@@ -172,6 +180,11 @@ def selftest() -> int:
         "a scenario line wrong": (_moved(good, (0, "elements", 1, "line"), 12), both, True),
         "a step line wrong": (
             _moved(good, (0, "elements", 0, "steps", 2, "line"), 12),
+            both,
+            True,
+        ),
+        "a type keyword in place of the name": (
+            _moved(good, (0, "elements", 0, "type"), "scenario"),
             both,
             True,
         ),
