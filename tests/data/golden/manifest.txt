@@ -7,13 +7,22 @@
 # (custom_parameters) is not here: unmatched custom parameter types
 # (kilogram, date) are a pre-existing, unrelated gap, out of scope for
 # this gate.
+# tests/data/cwt/ holds the oracle's own inputs, byte-identical; their C++ wording is upstream text.
+# Feature 7 is not here either. The corpus copy ships CRLF line
+# endings, and the oracle's scanner double-counts each CRLF inside a
+# doc string (an oracle bug), so its line numbers over that file never
+# match fabula's correct ones. The example manifest gates feature 7
+# over the LF copy under example/features/.
+# The 11_manual_fails golden comes from the oracle built with
+# oracle_examples.patch, which changes only the text of its example
+# fail hooks to match fabula's example. `tools/recapture_goldens.py
+# --check` re-runs the oracle over every line below.
 tests/data/cwt/parser/1_first_scenario.feature tests/data/golden/1_first_scenario.console.txt
 tests/data/cwt/parser/2_scenario_outline.feature tests/data/golden/2_scenario_outline.console.txt
 tests/data/cwt/parser/3_background.feature tests/data/golden/3_background.console.txt
 tests/data/cwt/parser/4_tags.feature tests/data/golden/4_tags.console.txt
 tests/data/cwt/parser/5_tagged_hooks.feature tests/data/golden/5_tagged_hooks.console.txt
 tests/data/cwt/parser/6_tables.feature tests/data/golden/6_tables.console.txt
-tests/data/golden/7_doc_strings_lf.feature tests/data/golden/7_doc_strings.console.txt
 tests/data/cwt/parser/9_rules.feature tests/data/golden/9_rules.console.txt
 tests/data/cwt/parser/10_continue_on_failure.feature tests/data/golden/10_continue_on_failure.console.txt
 tests/data/cwt/parser/11_manual_fails.feature tests/data/golden/11_manual_fails.console.txt

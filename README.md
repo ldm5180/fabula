@@ -149,7 +149,10 @@ where cwt double-counts CRLF. A few are fabula's own limits, also
 named where they live: one recorded message per step outcome where
 cwt prints every failing assert, Ada-image real-number formatting,
 tag expressions on standard Cucumber precedence rather than cwt's,
-and two missing `-v` hook lines.
+and two missing `-v` hook lines. Messages that name a cwt C++ call
+use Ada terms instead: the default `Fail` and `Fail_Step` messages
+name `Fabula.Check.Fail` and `Fabula.Check.Fail_Step`, and the `-v`
+skip and ignore lines name no call.
 
 ## The API in brief
 
@@ -188,10 +191,12 @@ make demo       # run the whole example/features/ suite (exit 1 by design)
 make ci         # all of the above, cheapest first
 ```
 
-The golden gate is the parity contract: 23 captured cwt outputs —
+The golden gate is the parity contract: 22 captured cwt outputs —
 the corpus set and every file under `example/features/` — that the
 example binary must reproduce byte for byte on every `make ci` run,
-locally and in CI. `make demo` runs the full example suite and
+locally and in CI. The two `11_manual_fails` captures come from cwt
+built with `tests/data/golden/oracle_examples.patch`, which changes
+only its example hook text to match fabula's example. `make demo` runs the full example suite and
 checks the summary counts against the reference interpreter's own
 run.
 

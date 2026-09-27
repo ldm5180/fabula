@@ -1,8 +1,6 @@
 --  The box world: the reference interpreter's own example, ported step
---  for step.  fabula gives each scenario one flat Context record, so
---  the two type-indexed context slots the reference interpreter's
---  step bodies use (context<box>, context<string>) become two
---  components of one Box_Context record instead.
+--  for step.  Each scenario gets one fresh Box_Context record, which
+--  holds the box and a note.
 with Fabula.Args;
 with Fabula.Check;
 with Fabula.Frames;
@@ -54,9 +52,9 @@ is
 
    type Item_List is array (1 .. Max_Items) of Item_Text;
 
-   --  The box (m_label, m_weight, m_items, m_is_open) plus the one
-   --  string register cwt's step bodies borrow for both the customs
-   --  declaration and the shipping label -- never held at once.
+   --  The box, plus Note: one text value that holds either the customs
+   --  declaration's content type or the shipping label.  No scenario
+   --  needs both at once.
    type Box_Context is record
       Has_Label  : Boolean := False;
       Label      : String (1 .. Max_Label_Length) := [others => ' '];

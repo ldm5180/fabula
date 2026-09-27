@@ -16,12 +16,12 @@ after a step
 """
 [   PASSED    ] Then The box is labeled  example/features/7_doc_strings.feature:18
 
-Scenario: Doc string as vector  example/features/7_doc_strings.feature:20
+Scenario: Doc string as one String  example/features/7_doc_strings.feature:20
 [   PASSED    ] Given An empty box with a label  example/features/7_doc_strings.feature:21
 """
 This is a docstring
 which we access
-as std::vector<std::string>
+as one Ada String with Fabula.Args.Doc_String
 """
 [   PASSED    ] Then The box is labeled  example/features/7_doc_strings.feature:27
 

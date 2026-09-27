@@ -4,13 +4,13 @@ Scenario: Steps are skipped  tests/data/cwt/parser/11_manual_fails.feature:4
 [   SKIPPED   ] Given An empty box  tests/data/cwt/parser/11_manual_fails.feature:5
 [   SKIPPED   ] When I place 1 x "apple" in it  tests/data/cwt/parser/11_manual_fails.feature:6
 [   SKIPPED   ] Then The box contains 1 item  tests/data/cwt/parser/11_manual_fails.feature:7
-Example of 'cuke::fail_scenario()' to bring a scenario to fail before running it
+Example of Fabula.Check.Fail to bring a scenario to fail before running it
 
 Scenario: Steps aren't skipped  tests/data/cwt/parser/11_manual_fails.feature:10
 [   PASSED    ] Given An empty box  tests/data/cwt/parser/11_manual_fails.feature:11
 [   PASSED    ] When I place 1 x "apple" in it  tests/data/cwt/parser/11_manual_fails.feature:12
 [   PASSED    ] Then The box contains 1 item  tests/data/cwt/parser/11_manual_fails.feature:13
-Example of 'cuke::fail_scenario()' to bring a scenario to fail after running it
+Example of Fabula.Check.Fail to bring a scenario to fail after running it
 
 Failed Scenarios:
 Steps are skipped  tests/data/cwt/parser/11_manual_fails.feature:4

@@ -17,14 +17,9 @@ location` has no oracle counterpart at all (a C++ source position
 fabula cannot reproduce), so a JSON capture could never be
 byte-identical by construction, gate or no gate.
 
-Feature 7 ships CRLF line endings; the oracle's own scanner double-
-counts each CRLF inside a doc string (an oracle bug), so its line
-numbers over the ORIGINAL file would never match fabula's correct
-ones.  The manifest points feature 7's entry at an LF-normalized copy
-of the source, `tests/data/golden/7_doc_strings_lf.feature`, generated
-once from the pinned corpus original (`tr -d '\\r'`) -- the corpus
-original itself stays untouched and byte-identical to the oracle's own
-copy.
+Each manifest's own header says which inputs it leaves out and why,
+and which goldens come from the patched oracle build
+(``tools/recapture_goldens.py`` re-runs the oracle over both).
 
 Every comparison runs the binary with the manifest's own repo-root-
 relative path string and `cwd` set to the repo root, never an absolute

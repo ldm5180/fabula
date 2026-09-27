@@ -1,5 +1,5 @@
 Feature: My first feature
-  This is my cucumber-cpp hello world
+  This is my fabula hello world
 
    Scenario: First Scenario
     Given An empty box

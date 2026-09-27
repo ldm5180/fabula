@@ -192,10 +192,10 @@ is
 
    ---------------------------------------------------------------------
    --  -v's non-hook lines, byte-copied from the oracle (docs/
-   --  report_wiring.md has each probe). The hook "executing hook" /
-   --  "not executing hook" lines stay out: no notice carries which
-   --  hooks ran or were skipped, a known gap upstream of Format, not
-   --  a Format gap.
+   --  report_wiring.md has each probe), except the skip and ignore
+   --  lines below. The hook "executing hook" / "not executing hook"
+   --  lines stay out: no notice carries which hooks ran or were
+   --  skipped, a known gap upstream of Format, not a Format gap.
    ---------------------------------------------------------------------
 
    Verbose_Separator : constant String :=
@@ -215,11 +215,13 @@ is
    function Verbose_Tag_Check
      (Tags : String; Expression : String; Passed : Boolean) return String;
 
-   Verbose_Skip : constant String :=
-     "[   VERBOSE   ] Scenario skipped with 'skip_scenario'";
+   --  The skip and ignore lines state the outcome and name no call.
+   --  Only -d prints the skip line; a Skip from a hook does not (see
+   --  Fabula.Shell.Program_Console.Set_Dry_Run).  Ignore and a -t
+   --  filter both print the ignore line.
+   Verbose_Skip : constant String := "[   VERBOSE   ] Scenario skipped";
 
-   Verbose_Ignore : constant String :=
-     "[   VERBOSE   ] Scenario ignored with 'ignore_scenario'";
+   Verbose_Ignore : constant String := "[   VERBOSE   ] Scenario ignored";
 
    Verbose_End : constant String := "[   VERBOSE   ] Scenario end";
 

@@ -4,7 +4,8 @@ A tree gets hard to follow in a small number of measurable ways:
 subprogram bodies that hold hundreds of statements, bodies declared
 inside other bodies, block nesting several levels deep, signatures with
 more outputs than a reader can hold, and literals that carry a scale
-nothing on the page names.
+nothing on the page names.  One more rule reads text, not shape: C++
+wording carried over from the reference interpreter (R12).
 
 This module measures those shapes and holds them to
 ``tools/shape-waivers``.  That file is not a way to hide a violation --
@@ -40,6 +41,7 @@ from __future__ import annotations
 import argparse
 import pathlib
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, field
 
@@ -59,6 +61,7 @@ LIMITS: dict[str, int] = {
     "alias": 0,  # R11 event alias that is not its literal minus E_
     "foreign": 0,  # R10 a comment pointing outside this repository
     "dated": 0,  # R10 a calendar date in a comment
+    "carryover": 0,  # R12 C++ wording in fabula's own text
 }
 
 RULE_OF: dict[str, str] = {
@@ -74,6 +77,7 @@ RULE_OF: dict[str, str] = {
     "alias": "R11",
     "foreign": "R10",
     "dated": "R10",
+    "carryover": "R12",
 }
 
 #  Ada is case-insensitive and gnatformat keeps one declaration per
@@ -137,6 +141,19 @@ _FOREIGN = re.compile(
     r"|\b[\w/]+\.(?:go|cpp|hpp)\b)",    # some_file.cpp
     re.I,
 )
+
+#  R12 forbids C++ wording carried over from the reference interpreter
+#  into fabula's own sources, examples, tests and docs.  fabula teaches
+#  Ada: a message, example or comment that names a C++ call, container
+#  or macro points the reader at an API fabula does not have.  The rule
+#  reads every file under these paths, not only Ada comments, because
+#  feature files and Markdown teach as much as the code.  tests/data/
+#  is exempt: it holds the oracle's own inputs, byte-identical, and the
+#  oracle's own captures of them.
+CARRYOVER_TOKENS: tuple[str, ...] = ("cuke::", "std::", "context<", "CUKE_", "cucumber-cpp")
+CARRYOVER_DIRS: tuple[str, ...] = ("src/", "example/", "tests/src/", "docs/")
+CARRYOVER_FILES: tuple[str, ...] = ("README.md",)
+CARRYOVER_EXEMPT: tuple[str, ...] = ("tests/data/",)
 
 #  R11: the event wrapper constants an engine body declares so its
 #  transition table can use the operator DSL.
@@ -530,6 +547,71 @@ def check_dated(lines: list[str]) -> dict[str, int]:
     return found
 
 
+def in_carryover_scope(rel: str) -> bool:
+    """Whether R12 reads this repo-relative path."""
+    if rel.startswith(CARRYOVER_EXEMPT):
+        return False
+    return rel in CARRYOVER_FILES or rel.startswith(CARRYOVER_DIRS)
+
+
+def check_carryover(text: str) -> dict[str, int]:
+    """Each carryover token in the text, with how often it appears."""
+    found: dict[str, int] = {}
+    for token in CARRYOVER_TOKENS:
+        count = len(re.findall(re.escape(token), text, re.I))
+        if count:
+            found[token] = count
+    return found
+
+
+def carryover_findings(root: pathlib.Path, candidates: list[str]) -> list[Finding]:
+    """R12 findings over those candidate paths that the rule covers.
+
+    One finding per token and file, counted, so a waiver names the file
+    and the token a reader can grep for.
+    """
+    findings: list[Finding] = []
+    for rel in sorted(candidates):
+        if not in_carryover_scope(rel):
+            continue
+        path = root / rel
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for token, count in check_carryover(text).items():
+            findings.append(Finding(rel, token, "carryover", count))
+    return findings
+
+
+def carryover_candidates(root: pathlib.Path) -> list[str]:
+    """Every tracked or new file under the covered paths.
+
+    Git's own list, not a directory walk: build output and the local
+    notes that .gitignore excludes are not part of the repository, and
+    a walk would read them.
+    """
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            *CARRYOVER_DIRS,
+            *CARRYOVER_FILES,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"shape-check: git ls-files failed: {result.stderr.strip()}")
+    return [line for line in result.stdout.splitlines() if line]
+
+
 def find_declarations(lines: list[str]) -> list[tuple[str, str]]:
     """Every subprogram DECLARATION that is not a body, with its header.
 
@@ -839,6 +921,28 @@ package body Fixture.Engine is
 end Fixture.Engine;
 '''
 
+#  R12: each carryover token once, in code and in a comment, in a file
+#  the rule covers.
+SELFTEST_CARRYOVER = '''\
+--  Ported from cucumber-cpp.
+procedure Fixture_Carryover is
+begin
+   Put ("Example of 'cuke::fail_scenario()'");
+   Put ("as std::vector");
+   Put ("a context<box> slot");
+   Put ("CUKE_DOC_STRING");
+end Fixture_Carryover;
+'''
+
+#  The same tokens in paths the rule must leave alone: the upstream
+#  corpus and the oracle's captures under tests/data/, and a tree the
+#  rule does not cover at all.
+SELFTEST_CARRYOVER_EXEMPT: tuple[str, ...] = (
+    "tests/data/cwt/parser/1_first_scenario.feature",
+    "tests/data/golden/11_manual_fails.console.txt",
+    "tools/notes.txt",
+)
+
 
 def selftest() -> int:
     """Prove each rule fires on a fixture written to violate it once."""
@@ -911,6 +1015,20 @@ def selftest() -> int:
         if [a for a, _ in aliases] != ["Conn_Fail"]:
             failures.append(f"alias check: expected [Conn_Fail], got {aliases}")
 
+        covered = "src/fixture_carryover.adb"
+        tree = pathlib.Path(tmp) / "carryover"
+        for rel in (covered, *SELFTEST_CARRYOVER_EXEMPT):
+            path = tree / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(SELFTEST_CARRYOVER, encoding="utf-8")
+        carryover = carryover_findings(tree, [covered, *SELFTEST_CARRYOVER_EXEMPT])
+        got_carryover = sorted((f.path, f.unit, f.value) for f in carryover)
+        want_carryover = sorted((covered, token, 1) for token in CARRYOVER_TOKENS)
+        if got_carryover != want_carryover:
+            failures.append(
+                f"carryover check: expected {want_carryover}, got {got_carryover}"
+            )
+
     if failures:
         print("FAIL: shape_check selftest")
         for failure in failures:
@@ -944,6 +1062,7 @@ def main() -> int:
     findings: list[Finding] = []
     for path in sources(root):
         findings.extend(analyze_file(path, str(path.relative_to(root))))
+    findings.extend(carryover_findings(root, carryover_candidates(root)))
     findings = canonical(findings)
 
     waiver_path = root / args.waivers

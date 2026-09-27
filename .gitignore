@@ -10,3 +10,4 @@
 /config/
 /docs/tdd-log.md
 .DS_Store
+__pycache__/

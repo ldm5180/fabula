@@ -5,7 +5,7 @@
 
 export PATH := $(PATH):$(HOME)/.alire/bin
 
-.PHONY: all build test prove format validation shape example gate run demo ci help
+.PHONY: all build test prove format validation shape example gate recapture-check run demo ci help
 
 all: build
 
@@ -47,6 +47,15 @@ example: build
 gate: example
 	python3 tools/byte_gate.py
 	python3 tools/byte_gate.py tests/data/golden/example_manifest.txt
+
+## recapture-check  Re-run the reference interpreter over every golden and
+#              compare byte for byte. Local only, not part of `ci`: it
+#              needs both oracle builds, named by FABULA_ORACLE and
+#              FABULA_ORACLE_PATCHED (tools/recapture_goldens.py says how
+#              to build them).
+recapture-check:
+	python3 tools/recapture_goldens.py --selftest
+	python3 tools/recapture_goldens.py --check
 
 ## run         Build (debug) and run the example against the byte-gate feature
 run: example

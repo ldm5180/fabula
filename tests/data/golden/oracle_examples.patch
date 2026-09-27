@@ -1,0 +1,20 @@
+diff --git a/examples/hooks.cpp b/examples/hooks.cpp
+index 03c3657..6a0ba2f 100644
+--- a/examples/hooks.cpp
++++ b/examples/hooks.cpp
+@@ -6,13 +6,13 @@ BEFORE_T(ignore, "@ignore") { cuke::ignore_scenario(); }
+ BEFORE_T(will_fail_before, "@will_fail_before")
+ {
+   cuke::fail_scenario(
+-      "Example of 'cuke::fail_scenario()' to bring a scenario to fail before "
++      "Example of Fabula.Check.Fail to bring a scenario to fail before "
+       "running it");
+ }
+ AFTER_T(will_fail_after, "@will_fail_after")
+ {
+   cuke::fail_scenario(
+-      "Example of 'cuke::fail_scenario()' to bring a scenario to fail after "
++      "Example of Fabula.Check.Fail to bring a scenario to fail after "
+       "running it");
+ }
+ 

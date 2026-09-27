@@ -1,10 +1,13 @@
 # Example-suite byte-gate manifest. One line each:
 # <source .feature under example/features/>  <golden console capture>
 # Golden captures are the pinned oracle's own PLAIN console output over
-# the LF-normalized example/features/ copies. Every file here is
-# already LF (the port strips CR from the corpus copy before writing
-# it), so unlike the corpus manifest, no separate LF-only entry is
-# needed for feature 7. Run after `make example`:
+# the example/features/ files. Every file here is LF (the port strips
+# CR from the upstream copy), so this manifest also gates feature 7,
+# which the corpus manifest cannot.
+# example/features/ rewords the oracle's example text in Ada terms; tests/data/cwt/ keeps the upstream C++ wording.
+# The 11_manual_fails golden comes from the oracle built with
+# oracle_examples.patch, which changes only the text of its example
+# fail hooks to match fabula's example. Run after `make example`:
 #   python3 tools/byte_gate.py tests/data/golden/example_manifest.txt
 # or `make gate`, which runs this manifest plus the corpus one.
 example/features/1_first_scenario.feature tests/data/golden/example/1_first_scenario.console.txt
