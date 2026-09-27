@@ -56,44 +56,17 @@ is
       E_Content,
       E_End_Of_Input);
 
-   subtype Line_Length is Natural range 0 .. Limits.Max_Line_Length;
+   subtype Line_Length is Scan.Line_Length;
 
    --  The length of an event that carries no line, at end of input.
    No_Text : constant Line_Length := 0;
 
    --  A table's cell count before its first row sets it.
-   No_Width : constant Line_Length := 0;
-
-   --  The classification's slices lie inside a line of Length.
-   function Fits (C : Scan.Classification; Length : Line_Length) return Boolean
-   is (C.Indent <= Length
-       and then (case C.Class is
-                   when Scan.Feature_Header
-                      | Scan.Rule_Header
-                      | Scan.Background_Header
-                      | Scan.Scenario_Header
-                      | Scan.Outline_Header
-                      | Scan.Examples_Header                              =>
-                     C.Title_First <= Length + 1
-                     and then C.Title_Last <= Length
-                     and then C.Title_Last >= C.Title_First - 1,
-                   when Scan.Step_Line                                    =>
-                     C.Text_First <= Length + 1
-                     and then C.Text_Last <= Length
-                     and then C.Text_Last >= C.Text_First - 1,
-                   when Scan.Tag_Line | Scan.Table_Row | Scan.Description =>
-                     C.Body_First <= Length
-                     and then C.Body_Last <= Length
-                     and then C.Body_Last >= C.Body_First,
-                   when Scan.Doc_Fence                                    =>
-                     C.Type_First <= Length + 1
-                     and then C.Type_Last <= Length
-                     and then C.Type_Last >= C.Type_First - 1,
-                   when Scan.Blank | Scan.Comment                         =>
-                     True));
+   No_Width : constant Line_Length := Line_Parts.No_Cells;
 
    --  A line event: a bounded copy of the line, its number, and its
-   --  classification.  End of input carries no line.
+   --  classification, whose slices lie inside the line.  End of input
+   --  carries no line.
    type Event is record
       Kind   : Event_Kind := E_End_Of_Input;
       Number : Natural := No_Line;
@@ -101,7 +74,7 @@ is
       Text   : String (1 .. Limits.Max_Line_Length) := [others => ' '];
       Class  : Scan.Classification;
    end record
-   with Dynamic_Predicate => Fits (Event.Class, Event.Length);
+   with Dynamic_Predicate => Scan.Slices_Fit (Event.Class, Event.Length);
 
    function Line_Of (Evt : Event) return String
    is (Evt.Text (1 .. Evt.Length))
@@ -123,7 +96,7 @@ is
      Pre  =>
        Line'First = First_Column
        and then Line'Length <= Limits.Max_Line_Length
-       and then Fits (Class, Line'Length),
+       and then Scan.Slices_Fit (Class, Line'Length),
      Post =>
        Line_Event'Result.Kind = Kind
        and then Line_Event'Result.Number = Number;

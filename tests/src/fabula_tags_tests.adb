@@ -107,13 +107,19 @@ package body Fabula_Tags_Tests is
       (+"@a.b", One ("@a.b"), True),
       (+"@x_y", One ("@x_y"), True)];
 
+   --  33 tags joined by 32 "or": the output holds 64 tokens when the
+   --  last "or" is still pending, so unwinding it runs out of room.
+   Full_Or_Chain : constant String := "@a" & To_String (32 * " or @a");
+
    --  9. Refusals, each with the position of the failing token.
    --  Parentheses group one expression, never nothing, so "()" and
    --  "(not)" refuse the same way a trailing operator does, at the
    --  closing ")"; "@a and (" refuses at the dangling "(" itself (8),
    --  not at the "and" that last set the wait position (4), and an
    --  embedded LF between two tags refuses as adjacency, the same as
-   --  a space would.
+   --  a space would.  The three Full_Or_Chain rows refuse at the last
+   --  "or" (190, or 191 after a leading "("): its unwinding overflows
+   --  the output before the end, a group's ")" or a stray ")" is read.
    Refusal_Cases : constant Refusal_Array :=
      [(+"@a and", 4),
       (+"and @a", 1),
@@ -129,7 +135,10 @@ package body Fabula_Tags_Tests is
       (+"(not)", 5),
       (+"@a and (", 8),
       (65 * "(", 65),
-      (+("@a" & ASCII.LF & "@b"), 4)];
+      (+("@a" & ASCII.LF & "@b"), 4),
+      (+Full_Or_Chain, 190),
+      (+("(" & Full_Or_Chain & ")"), 191),
+      (+(Full_Or_Chain & ")"), 190)];
 
    procedure Check (Expr : String; Tags : Fixture_Slots; Expect : Boolean) is
       Result : constant Compiled := Compile (Expr);
@@ -252,6 +261,25 @@ package body Fabula_Tags_Tests is
          & " refused, not crash");
    end Test_Overflow;
 
+   --  11. Blank names the expressions Compile refuses as "no
+   --  expression": empty, or only the six whitespace characters.
+   procedure Test_Blank (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Six_Blanks : constant String :=
+        " " & ASCII.HT & ASCII.LF & ASCII.VT & ASCII.FF & ASCII.CR;
+   begin
+      Assert (Blank (""), "the empty expression is blank");
+      Assert (Blank (Six_Blanks), "the six whitespace characters are blank");
+      Assert (not Blank (" @a "), "a tag is not blank");
+      Assert (not Blank ("("), "a parenthesis is not blank");
+      Assert
+        (not Blank ([1 => ASCII.NUL]), "a control character is not blank");
+      Assert
+        (not Valid (Compile (Six_Blanks))
+         and then Error (Compile (Six_Blanks)) = 1,
+         "Compile refuses a blank expression at position 1");
+   end Test_Blank;
+
    overriding
    procedure Register_Tests (T : in out Test) is
    begin
@@ -270,6 +298,7 @@ package body Fabula_Tags_Tests is
       Register_Routine
         (T, Test_Refusals'Access, "malformed expressions with positions");
       Register_Routine (T, Test_Overflow'Access, "token capacity");
+      Register_Routine (T, Test_Blank'Access, "blank expressions");
    end Register_Tests;
 
    overriding

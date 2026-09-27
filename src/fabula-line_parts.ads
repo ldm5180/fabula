@@ -9,15 +9,20 @@ private package Fabula.Line_Parts
   with Pure, SPARK_Mode
 is
 
+   subtype Column is Scan.Column;
+   subtype Line_Length is Scan.Line_Length;
+
    --  The position Fence_Run and a cell's Stop hold when the line has
    --  none; positions in a line are numbered from 1.
    No_Position : constant := 0;
 
    --  A span of one line; Last < First is the empty span.
    type Span is record
-      First : Positive := 1;
-      Last  : Natural := 0;
+      First : Column := Scan.Empty_First;
+      Last  : Line_Length := Scan.Empty_Last;
    end record;
+
+   Empty_Span : constant Span := (others => <>);
 
    function Is_Line (Line : String) return Boolean
    is (Line'First = First_Column
@@ -28,19 +33,7 @@ is
    is (S.Last < S.First
        or else (S.First >= Line'First and then S.Last <= Line'Last));
 
-   function Is_Space (Ch : Character) return Boolean
-   is (Ch = ' ' or else Ch = ASCII.HT);
-   --  What separates tokens on one line.
-
-   function Is_Blank (Ch : Character) return Boolean
-   is (Is_Space (Ch)
-       or else Ch = ASCII.CR
-       or else Ch = ASCII.LF
-       or else Ch = ASCII.VT
-       or else Ch = ASCII.FF);
-   --  What trimming removes: C's isspace set.
-
-   --  Line (From .. To) without its leading and trailing blanks.
+   --  Line (From .. To) without its leading and trailing White_Space.
    function Trimmed (Line : String; From : Positive; To : Natural) return Span
    with
      Pre  => Is_Line (Line) and then To <= Line'Last and then From <= To + 1,
@@ -51,7 +44,7 @@ is
 
    function Only_Blank
      (Line : String; From : Positive; To : Natural) return Boolean
-   is (for all I in From .. To => Is_Blank (Line (I)))
+   is (for all I in From .. To => Line (I) in White_Space)
    with Pre => Is_Line (Line) and then To <= Line'Last;
 
    ---------------------------------------------------------------------
@@ -86,27 +79,50 @@ is
    --  Tags.
    ---------------------------------------------------------------------
 
-   function Is_Tag_Char (Ch : Character) return Boolean
-   is (Ch in 'a' .. 'z' | 'A' .. 'Z' | Decimal_Digit
-       or else Ch in '_' | '-' | '.' | '#' | '/' | ':' | '$' | '*' | '<' | '>'
-       or else Ch in ''' | '|' | '%' | '^' | '&' | '!' | '?');
-   --  The characters a tag may hold after its '@'.
+   --  The characters a tag may hold after its Scan.Tag_Mark.
+   subtype Tag_Char is Character
+   with
+     Static_Predicate =>
+       Tag_Char
+       in Latin_Letter
+        | Decimal_Digit
+        | '_'
+        | '-'
+        | '.'
+        | '#'
+        | '/'
+        | ':'
+        | '$'
+        | '*'
+        | '<'
+        | '>'
+        | '''
+        | '|'
+        | '%'
+        | '^'
+        | '&'
+        | '!'
+        | '?';
 
-   --  Line (From .. To) is a run of tags: every token starts with '@'
-   --  and holds only tag characters.  Tags may abut (@a@b is two).
+   --  Line (From .. To) is a run of tags: every token starts with a
+   --  Scan.Tag_Mark and holds only tag characters.  Tags may abut
+   --  (@a@b is two), and Space_Or_Tab separates them.
    function Tags_Well_Formed
      (Line : String; From : Positive; To : Natural) return Boolean
    is (for all I in From .. To =>
          (Line (I) = Scan.Tag_Mark
-          or else Is_Tag_Char (Line (I))
-          or else Is_Space (Line (I)))
-         and then (if (I = From or else Is_Space (Line (I - 1)))
-                     and then not Is_Space (Line (I))
+          or else Line (I) in Tag_Char
+          or else Line (I) in Space_Or_Tab)
+         and then (if (I = From or else Line (I - 1) in Space_Or_Tab)
+                     and then Line (I) not in Space_Or_Tab
                    then Line (I) = Scan.Tag_Mark))
-   with Pre => Is_Line (Line) and then From >= 1 and then To <= Line'Last;
+   with
+     Pre =>
+       Is_Line (Line) and then From >= First_Column and then To <= Line'Last;
 
-   --  The first tag at or after From within Line (From .. To): an '@'
-   --  and the tag characters after it.  Empty when none starts there.
+   --  The first tag at or after From within Line (From .. To): a
+   --  Scan.Tag_Mark and the tag characters after it.  Empty when none
+   --  starts there.
    function Next_Tag (Line : String; From : Positive; To : Natural) return Span
    with
      Pre  => Is_Line (Line) and then To <= Line'Last,
@@ -119,12 +135,13 @@ is
    --  Table cells.
    ---------------------------------------------------------------------
 
-   --  One cell's trimmed text and the '|' that closes it (No_Position
-   --  when the line ends first).  A '|' after an odd run of backslashes
-   --  is text; the backslashes stay in the cell as written.
+   --  One cell's trimmed text and the Scan.Cell_Separator that closes it
+   --  (No_Position when the line ends first).  A separator after an odd
+   --  run of Scan.Escape_Mark is text; the escape marks stay in the cell
+   --  as written.
    type Cell is record
       Text : Span;
-      Stop : Natural := No_Position;
+      Stop : Line_Length := No_Position;
    end record;
 
    function Next_Cell
@@ -137,24 +154,26 @@ is
        and then (Next_Cell'Result.Stop = No_Position
                  or else Next_Cell'Result.Stop in From .. To);
 
+   --  A table's cell count before its first cell is read.
+   No_Cells : constant Line_Length := 0;
+
    type Row_Shape is record
-      Terminated : Boolean := False;   --  ends with an unescaped '|'
-      Cells      : Natural := 0;
+      Terminated : Boolean := False;   --  ends with an unescaped separator
+      Cells      : Line_Length := No_Cells;
    end record;
 
-   --  Line (First .. Last) is a row whose opening '|' is at First.
+   --  Line (First .. Last) is a row whose opening separator is at First.
    function Measure_Row
      (Line : String; First : Positive; Last : Natural) return Row_Shape
    with
-     Pre  => Is_Line (Line) and then Last <= Line'Last and then First <= Last,
-     Post => Measure_Row'Result.Cells <= Limits.Max_Line_Length;
+     Pre => Is_Line (Line) and then Last <= Line'Last and then First <= Last;
 
-   --  S without one pair of surrounding double quotes, when it has
-   --  them; a lone '"' becomes empty.
+   --  S without one pair of surrounding Scan.Cell_Quote, when it has
+   --  them; a lone quote becomes empty.
    function Unquoted (Line : String; S : Span) return Span
    is (if S.Last >= S.First
-         and then Line (S.First) = '"'
-         and then Line (S.Last) = '"'
+         and then Line (S.First) = Scan.Cell_Quote
+         and then Line (S.Last) = Scan.Cell_Quote
        then (First => S.First + 1, Last => S.Last - 1)
        else S)
    with Pre => Is_Line (Line) and then Within (Line, S);
@@ -163,7 +182,8 @@ is
    --  Header keywords.
    ---------------------------------------------------------------------
 
-   --  Line (From .. To) up to, not including, its first ':'.
+   --  Line (From .. To) up to, not including, its first
+   --  Scan.Header_Colon.
    function Keyword_Of
      (Line : String; From : Positive; To : Natural) return Span
    with

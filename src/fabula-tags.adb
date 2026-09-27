@@ -1,67 +1,86 @@
 with Fabula.Scan;
+with Sml.Machines.Operators;
+with Sml.Request_Block;
 
 package body Fabula.Tags
   with SPARK_Mode
 is
 
-   --  Compile reads Expr once, left to right, running a textbook
+   --  Compile reads Expr once, left to right, as a textbook
    --  shunting-yard: an explicit bounded operator stack (Builder.Stack)
    --  and the postfix output array (Builder.Result.Tokens) it feeds.
-   --  Validity (dangling operators, unbalanced parens, ...) is caught
-   --  by one flag, Expect: True wherever the grammar wants an operand,
-   --  a prefix "not", or an opening "(" next; False wherever it wants
-   --  a binary operator, a closing ")", or the end of input.
+   --  A small machine decides what each lexeme may be: an operand, a
+   --  "not" or a "(" where the grammar wants an operand; a binary
+   --  operator, a ")" or the end where it wants an operator.  The stack
+   --  work runs in the commands its rows request.
 
-   --  A refused Compiled naming the position Compile refused at.  A
-   --  Compiled value never touched by Compile at all -- its bare
-   --  default -- reports the same Valid = False through its own
-   --  field defaults, with no call here.
-   function Refused_At (Pos : Natural) return Compiled
-   is (Valid     => False,
-       Error_Pos => Pos,
-       Text      => [others => ' '],
-       Count     => 0,
-       Tokens    => [others => (Kind => Tag, First => 1, Last => 0)]);
+   ---------------------------------------------------------------------
+   --  The tag-expression grammar's tokens.  A tag starts with
+   --  Gherkin's own Scan.Tag_Mark.
+   ---------------------------------------------------------------------
 
-   function Is_Whitespace (Ch : Character) return Boolean
-   is (Ch = ' '
-       or else Ch = ASCII.HT
-       or else Ch = ASCII.CR
-       or else Ch = ASCII.LF
-       or else Ch = ASCII.VT
-       or else Ch = ASCII.FF);
+   Group_Opener : constant Character := '(';
+   Group_Closer : constant Character := ')';
+   --  Group one expression.  A lexeme ends at either one, so neither
+   --  needs white space around it.
 
-   --  A run of tag or keyword characters stops at whitespace or a
-   --  parenthesis; parentheses need no whitespace around them.
-   function Is_Delimiter (Ch : Character) return Boolean
-   is (Is_Whitespace (Ch) or else Ch = '(' or else Ch = ')');
+   Not_Word : constant String := "not";
+   And_Word : constant String := "and";
+   Or_Word  : constant String := "or";
+   Xor_Word : constant String := "xor";
 
-   function Is_Blank (Expr : String) return Boolean
-   is (for all Ch of Expr => Is_Whitespace (Ch));
+   function Word (Op : Operator) return String
+   is (case Op is
+         when Op_Not => Not_Word,
+         when Op_And => And_Word,
+         when Op_Or  => Or_Word,
+         when Op_Xor => Xor_Word);
+
+   --  A lexeme runs up to white space or a parenthesis.
+   subtype Delimiter is Character
+   with
+     Static_Predicate =>
+       Delimiter in White_Space | Group_Opener | Group_Closer;
+
+   --  Tightest first: not, then and, then or and xor together.
+   subtype Precedence_Level is Positive range 1 .. 3;
+
+   Precedence : constant array (Operator) of Precedence_Level :=
+     [Op_Not => 3, Op_And => 2, Op_Or | Op_Xor => 1];
+
+   Loosest : constant Precedence_Level := Precedence_Level'First;
+
+   Binary_Arity : constant := 2;
+   --  The values a binary operator takes off the evaluation stack.
+
+   Blank_Error : constant Char_Index := Char_Index'First;
+   --  Where a Blank expression refuses, whether or not it has a first
+   --  character.
 
    --  Every helper below reads Expr under this same bound, which is
    --  what keeps From + 1 and Last + 1 provably free of overflow: a
    --  256-character Expr can never push an index near Integer'Last.
    function Expr_OK (Expr : String) return Boolean
-   is (Expr'First = 1 and then Expr'Length <= Limits.Max_Tag_Expr_Length);
+   is (Expr'First = First_Position
+       and then Expr'Length <= Limits.Max_Tag_Expr_Length);
 
-   function Skip_Whitespace (Expr : String; From : Positive) return Positive
+   function Skip_White_Space (Expr : String; From : Positive) return Positive
    with
      Pre  => Expr_OK (Expr) and then From <= Expr'Last + 1,
      Post =>
-       Skip_Whitespace'Result in From .. Expr'Last + 1
-       and then (if Skip_Whitespace'Result <= Expr'Last
-                 then not Is_Whitespace (Expr (Skip_Whitespace'Result)))
+       Skip_White_Space'Result in From .. Expr'Last + 1
+       and then (if Skip_White_Space'Result <= Expr'Last
+                 then Expr (Skip_White_Space'Result) not in White_Space)
    is
       I : Positive := From;
    begin
-      while I <= Expr'Last and then Is_Whitespace (Expr (I)) loop
+      while I <= Expr'Last and then Expr (I) in White_Space loop
          pragma Loop_Invariant (I in From .. Expr'Last + 1);
          pragma Loop_Variant (Increases => I);
          I := I + 1;
       end loop;
       return I;
-   end Skip_Whitespace;
+   end Skip_White_Space;
 
    --  The last index of the delimiter-free run starting at From.
    function Run_End (Expr : String; From : Positive) return Positive
@@ -69,12 +88,12 @@ is
      Pre  =>
        Expr_OK (Expr)
        and then From <= Expr'Last
-       and then not Is_Delimiter (Expr (From)),
+       and then Expr (From) not in Delimiter,
      Post => Run_End'Result in From .. Expr'Last
    is
       I : Positive := From;
    begin
-      while I < Expr'Last and then not Is_Delimiter (Expr (I + 1)) loop
+      while I < Expr'Last and then Expr (I + 1) not in Delimiter loop
          pragma Loop_Invariant (I in From .. Expr'Last);
          pragma Loop_Variant (Increases => I);
          I := I + 1;
@@ -82,391 +101,492 @@ is
       return I;
    end Run_End;
 
-   type Run_Kind is (Kw_Not, Kw_And, Kw_Or, Kw_Xor, Run_Tag, Run_Bad);
+   ---------------------------------------------------------------------
+   --  The machine's vocabulary.
+   ---------------------------------------------------------------------
 
-   --  A keyword matches the WHOLE run, not a prefix of it, so "android"
-   --  is a bare word, never "and" followed by "roid".  A tag is '@'
-   --  plus one or more characters; '@' alone, with nothing after it,
-   --  is Run_Bad.
-   function Classify_Run
-     (Expr : String; First : Positive; Last : Positive) return Run_Kind
-   with Pre => Expr_OK (Expr) and then First <= Last and then Last <= Expr'Last
-   is
-   begin
-      if Expr (First .. Last) = "not" then
-         return Kw_Not;
-      elsif Expr (First .. Last) = "and" then
-         return Kw_And;
-      elsif Expr (First .. Last) = "or" then
-         return Kw_Or;
-      elsif Expr (First .. Last) = "xor" then
-         return Kw_Xor;
-      elsif Expr (First) = Scan.Tag_Mark and then Last > First then
-         return Run_Tag;
-      else
-         return Run_Bad;
-      end if;
-   end Classify_Run;
+   --  Want_Operand: at the start, and after "(", "not" or a binary
+   --  operator.  Want_Operator: after a tag or a ")".
+   type State is (Want_Operand, Want_Operator, Done, Refused);
 
-   --  The shunting-yard operator stack.  Left_Paren is a marker: it
-   --  carries no output token of its own, only the position of the
-   --  '(' that pushed it, for an unbalanced-parenthesis refusal.
-   type Op_Kind is (Left_Paren, K_Not, K_And, K_Or, K_Xor);
+   --  One event per lexeme, and Finish at the end of the expression.  A
+   --  delimiter-free run is a Tag_Name when it is '@' and at least one
+   --  more character, a Prefix or a Binary when it is exactly an
+   --  operator's Word ("android" is neither), and a Bad_Word otherwise.
+   type Event_Kind is
+     (E_Tag_Name, E_Prefix, E_Binary, E_Open, E_Close, E_Bad_Word, E_Finish);
 
-   type Op_Entry is record
-      Kind : Op_Kind := Left_Paren;
-      Pos  : Positive := 1;
+   --  A lexeme: its kind, the operator a Binary spells, and its first and
+   --  last index in Expr.  First is where a refusal of it points.  Only a
+   --  Binary reads Op: a Prefix is always "not".  The Finish event reads
+   --  only its Kind.
+   type Event is record
+      Kind  : Event_Kind := E_Finish;
+      Op    : Binary_Operator := Binary_Operator'First;
+      First : Char_Index := Char_Index'First;
+      Last  : Char_Count := Char_Count'First;
    end record;
 
-   type Op_Stack_Array is array (Token_Index) of Op_Entry;
+   type Guard_Kind is
+     (Always, In_Group);   --  a '(' is still open on the stack
 
-   --  Expect is True wherever the grammar wants an operand next (at
-   --  the start, after "(", "not", or a binary operator); False
-   --  wherever it wants a binary operator, ")", or the end of input.
-   --  Wait_Pos is the position of the last operator pushed while
-   --  setting Expect, so a trailing dangling operator can name itself.
+   --  Each command is one step of the shunting-yard.  The Refuse_*
+   --  commands record where the expression failed; so do the pushes
+   --  and emits that find their table full.
+   type Command is
+     (Nothing,
+      Emit_Tag,            --  the tag goes straight to the output
+      Push_Not,            --  "not" waits on the stack
+      Open_Group,          --  "(" waits on the stack
+      Push_Binary,         --  tighter-or-equal operators pop first
+      Close_Group,         --  pop to the matching "(", then drop it
+      Unwind,              --  pop every operator left
+      Refuse_Dangling,     --  at the operator still waiting for its operand
+      Refuse_Unclosed,     --  at the outermost "(" still open
+      Refuse_Stray_Close); --  at a ")" with no "(", after unwinding
+
+   package Req is new Sml.Request_Block (Command => Command, None => Nothing);
+
+   --  An operator stack entry: what was pushed, and where in Expr.
+   type Pending is record
+      Kind : Stacked := Left_Paren;
+      Pos  : Char_Index := Char_Index'First;
+   end record;
+
+   type Pending_Stack is array (Token_Index) of Pending;
+
+   --  The machine's context: the output being built, the operator stack
+   --  (1 .. Stack_Count), and Wait_Pos, the position of the last push, so
+   --  a trailing dangling operator can name itself.  Error is the first
+   --  refusal's position, No_Error while there is none.
    type Builder is record
-      Result   : Compiled;
-      Depth    : Token_Count := 0;
-      Stack    : Op_Stack_Array;
-      Expect   : Boolean := True;
-      Wait_Pos : Positive := 1;
-      Refused  : Boolean := False;
-      Error    : Natural := 0;
+      Requests    : Req.Block;
+      Result      : Compiled;
+      Stack_Count : Token_Count := Token_Count'First;
+      Stack       : Pending_Stack;
+      Wait_Pos    : Char_Index := Char_Index'First;
+      Error       : Char_Count := No_Error;
    end record;
 
-   procedure Refuse (B : in out Builder; Pos : Positive) is
+   function Kind_Of (Evt : Event) return Event_Kind
+   is (Evt.Kind);
+
+   function Evaluate (G : Guard_Kind; B : Builder; Evt : Event) return Boolean;
+
+   --  Records A as the pending command; the machine does nothing else.
+   procedure Execute (A : Command; B : in out Builder; Evt : Event);
+
+   package SM is new
+     Sml.Machines
+       (State       => State,
+        Event_Kind  => Event_Kind,
+        Event       => Event,
+        Context     => Builder,
+        Guard_Kind  => Guard_Kind,
+        Action_Kind => Command,
+        Kind_Of     => Kind_Of,
+        Evaluate    => Evaluate,
+        Execute     => Execute);
+
+   package Row_Ops is new SM.Operators (Always => Always, Nothing => Nothing);
+   use type Row_Ops.Ev, Row_Ops.Ev_Guard, Row_Ops.Ev_Built, Row_Ops.Source;
+
+   subtype Ev is Row_Ops.Ev;
+
+   Tag_Name : constant Ev := (Kind => E_Tag_Name);
+   Prefix   : constant Ev := (Kind => E_Prefix);
+   Binary   : constant Ev := (Kind => E_Binary);
+   Open     : constant Ev := (Kind => E_Open);
+   Close    : constant Ev := (Kind => E_Close);
+   Finish   : constant Ev := (Kind => E_Finish);
+
+   Rows : constant := 9;
+
+   --  Each row reads:  From + Event (Guard) / Command >= To.  Rows for
+   --  one state are tried top to bottom.  A lexeme no row takes -- a
+   --  tag, "not" or "(" where an operator is wanted, a binary operator
+   --  or ")" where an operand is wanted, and every Bad_Word -- refuses
+   --  at its own position.
+   --!format off
+   Table : constant SM.Transition_Table (1 .. Rows) :=
+     [
+      --  An operand is wanted.
+      Want_Operand  + Tag_Name          / Emit_Tag           >= Want_Operator,
+      Want_Operand  + Prefix            / Push_Not           >= Want_Operand,
+      Want_Operand  + Open              / Open_Group         >= Want_Operand,
+      Want_Operand  + Finish            / Refuse_Dangling    >= Refused,
+
+      --  An operator, a ")" or the end is wanted.
+      Want_Operator + Binary            / Push_Binary        >= Want_Operand,
+      Want_Operator + Close (In_Group)  / Close_Group        >= Want_Operator,
+      Want_Operator + Close             / Refuse_Stray_Close >= Refused,
+      Want_Operator + Finish (In_Group) / Refuse_Unclosed    >= Refused,
+      Want_Operator + Finish            / Unwind             >= Done];
+   --!format on
+
+   ---------------------------------------------------------------------
+   --  The stack work.
+   ---------------------------------------------------------------------
+
+   function Has_Error (B : Builder) return Boolean
+   is (B.Error /= No_Error);
+
+   --  The first refusal sticks; later ones are dropped.
+   procedure Refuse (B : in out Builder; Pos : Char_Count) is
    begin
-      if not B.Refused then
-         B.Refused := True;
+      if B.Error = No_Error then
          B.Error := Pos;
       end if;
    end Refuse;
 
-   procedure Push_Op (B : in out Builder; Kind : Op_Kind; Pos : Positive) is
+   --  Pushes Kind, which Pos pushed, or refuses at Pos when the stack is
+   --  full.  Pos is the new wait position either way.
+   procedure Push (B : in out Builder; Kind : Stacked; Pos : Char_Index) is
    begin
-      if B.Depth = Limits.Max_Tag_Expr_Tokens then
+      B.Wait_Pos := Pos;
+      if B.Stack_Count = Limits.Max_Tag_Expr_Tokens then
          Refuse (B, Pos);
-         return;
+      else
+         B.Stack_Count := B.Stack_Count + 1;
+         B.Stack (B.Stack_Count) := (Kind => Kind, Pos => Pos);
       end if;
-      B.Depth := B.Depth + 1;
-      B.Stack (B.Depth) := (Kind => Kind, Pos => Pos);
-   end Push_Op;
+   end Push;
 
-   procedure Emit (B : in out Builder; Tok : Token; Pos : Positive) is
+   --  Appends Tok to the output, or refuses at Pos when it is full.
+   procedure Emit (B : in out Builder; Tok : Token; Pos : Char_Index) is
    begin
       if B.Result.Count = Limits.Max_Tag_Expr_Tokens then
          Refuse (B, Pos);
-         return;
+      else
+         B.Result.Count := B.Result.Count + 1;
+         B.Result.Tokens (B.Result.Count) := Tok;
       end if;
-      B.Result.Count := B.Result.Count + 1;
-      B.Result.Tokens (B.Result.Count) := Tok;
    end Emit;
-
-   subtype Precedence_Level is Natural range 0 .. 3;
-
-   --  Tightest first: not, then and, then or and xor together.
-   function Precedence (Kind : Op_Kind) return Precedence_Level
-   is (case Kind is
-         when Left_Paren   => 0,
-         when K_Or | K_Xor => 1,
-         when K_And        => 2,
-         when K_Not        => 3);
-
-   function Op_Token (Kind : Op_Kind) return Token
-   is (case Kind is
-         when K_Not      => (Kind => Op_Not, First => 1, Last => 0),
-         when K_And      => (Kind => Op_And, First => 1, Last => 0),
-         when K_Or       => (Kind => Op_Or, First => 1, Last => 0),
-         when K_Xor      => (Kind => Op_Xor, First => 1, Last => 0),
-         when Left_Paren => (Kind => Tag, First => 1, Last => 0))
-   with Pre => Kind /= Left_Paren;
 
    procedure Pop_One (B : in out Builder)
    with
-     Pre  => B.Depth > 0 and then B.Stack (B.Depth).Kind /= Left_Paren,
-     Post => B.Depth = B.Depth'Old - 1 and then B.Stack = B.Stack'Old
+     Pre  =>
+       B.Stack_Count > 0 and then B.Stack (B.Stack_Count).Kind in Operator,
+     Post =>
+       B.Stack_Count = B.Stack_Count'Old - 1 and then B.Stack = B.Stack'Old
    is
-      Top : constant Op_Entry := B.Stack (B.Depth);
+      Top : constant Pending := B.Stack (B.Stack_Count);
    begin
-      B.Depth := B.Depth - 1;
-      Emit (B, Op_Token (Top.Kind), Top.Pos);
+      B.Stack_Count := B.Stack_Count - 1;
+      Emit (B, (Kind => Top.Kind, others => <>), Top.Pos);
    end Pop_One;
 
-   --  Pops every pending operator at least as tight as New_Prec, left
-   --  associativity's rule (equal precedence pops too).  A "not" left
-   --  pending from a prefix chain is tighter than every binary op, so
-   --  it always pops here, ahead of the binary operator being pushed.
-   procedure Reduce_For_Binary
-     (B : in out Builder; New_Prec : Precedence_Level) is
+   --  Pops every pending operator at least as tight as Down_To, left
+   --  associativity's rule (equal precedence pops too), and stops at a
+   --  "(".  A "not" left pending from a prefix chain is tighter than
+   --  every binary operator, so it always pops ahead of one.  With
+   --  Down_To = Loosest this pops back to the innermost "(", or empties
+   --  the stack.
+   procedure Pop_Operators (B : in out Builder; Down_To : Precedence_Level) is
    begin
-      while B.Depth > 0
-        and then B.Stack (B.Depth).Kind /= Left_Paren
-        and then Precedence (B.Stack (B.Depth).Kind) >= New_Prec
-        and then not B.Refused
+      while B.Stack_Count > 0
+        and then B.Stack (B.Stack_Count).Kind in Operator
+        and then Precedence (B.Stack (B.Stack_Count).Kind) >= Down_To
+        and then not Has_Error (B)
       loop
-         pragma Loop_Variant (Decreases => B.Depth);
+         pragma Loop_Variant (Decreases => B.Stack_Count);
          Pop_One (B);
       end loop;
-   end Reduce_For_Binary;
+   end Pop_Operators;
 
-   procedure Handle_Tag
-     (B : in out Builder; First : Positive; Last : Positive; Pos : Positive)
-   with Pre => First <= Last and then Last <= Limits.Max_Tag_Expr_Length
-   is
+   --  What First_Open_Paren answers when no "(" is open.
+   No_Open_Paren : constant Char_Count := 0;
+
+   --  The position of the outermost "(" still open, or No_Open_Paren
+   --  when none is.
+   function First_Open_Paren (B : Builder) return Char_Count is
    begin
-      if not B.Expect then
-         Refuse (B, Pos);
-         return;
-      end if;
-      Emit (B, (Kind => Tag, First => First, Last => Last), Pos);
-      B.Expect := False;
-   end Handle_Tag;
-
-   procedure Handle_LParen (B : in out Builder; Pos : Positive) is
-   begin
-      if not B.Expect then
-         Refuse (B, Pos);
-         return;
-      end if;
-      Push_Op (B, Left_Paren, Pos);
-      B.Wait_Pos := Pos;
-   end Handle_LParen;
-
-   --  A ")" with Expect still True closes an empty or dangling group
-   --  ("()" , "(not)", "(@a and)") -- the grammar's parentheses group
-   --  one expression, never nothing.  Otherwise it pops back to the
-   --  matching "(", or refuses when the stack has none left to find.
-   procedure Handle_RParen (B : in out Builder; Pos : Positive) is
-   begin
-      if B.Expect then
-         Refuse (B, Pos);
-         return;
-      end if;
-      while B.Depth > 0
-        and then B.Stack (B.Depth).Kind /= Left_Paren
-        and then not B.Refused
-      loop
-         pragma Loop_Variant (Decreases => B.Depth);
-         Pop_One (B);
-      end loop;
-      if B.Refused then
-         return;
-      end if;
-      if B.Depth = 0 then
-         Refuse (B, Pos);
-         return;
-      end if;
-      B.Depth := B.Depth - 1;
-      B.Expect := False;
-   end Handle_RParen;
-
-   procedure Handle_Not (B : in out Builder; Pos : Positive) is
-   begin
-      if not B.Expect then
-         Refuse (B, Pos);
-         return;
-      end if;
-      Push_Op (B, K_Not, Pos);
-      B.Wait_Pos := Pos;
-   end Handle_Not;
-
-   procedure Handle_Binary (B : in out Builder; Kind : Op_Kind; Pos : Positive)
-   is
-   begin
-      if B.Expect then
-         Refuse (B, Pos);
-         return;
-      end if;
-      Reduce_For_Binary (B, Precedence (Kind));
-      if B.Refused then
-         return;
-      end if;
-      Push_Op (B, Kind, Pos);
-      B.Expect := True;
-      B.Wait_Pos := Pos;
-   end Handle_Binary;
-
-   --  Everything but "(" and ")": a keyword or a tag, spanning the
-   --  whole delimiter-free run at I.
-   procedure Scan_Word (Expr : String; I : in out Positive; B : in out Builder)
-   with
-     Pre  =>
-       Expr_OK (Expr)
-       and then I in Expr'Range
-       and then not Is_Delimiter (Expr (I)),
-     Post => I > I'Old and then I <= Expr'Last + 1
-   is
-      Last : constant Positive := Run_End (Expr, I);
-      Kind : constant Run_Kind := Classify_Run (Expr, I, Last);
-   begin
-      case Kind is
-         when Kw_Not  =>
-            Handle_Not (B, I);
-
-         when Kw_And  =>
-            Handle_Binary (B, K_And, I);
-
-         when Kw_Or   =>
-            Handle_Binary (B, K_Or, I);
-
-         when Kw_Xor  =>
-            Handle_Binary (B, K_Xor, I);
-
-         when Run_Tag =>
-            Handle_Tag (B, I, Last, I);
-
-         when Run_Bad =>
-            Refuse (B, I);
-      end case;
-      I := Last + 1;
-   end Scan_Word;
-
-   --  One token at I, which whitespace already precedes.  Leaves I at
-   --  the next non-whitespace position, or past the end.
-   procedure Scan_Token
-     (Expr : String; I : in out Positive; B : in out Builder)
-   with
-     Pre  =>
-       Expr_OK (Expr)
-       and then I in Expr'Range
-       and then not Is_Whitespace (Expr (I)),
-     Post =>
-       I > I'Old
-       and then I <= Expr'Last + 1
-       and then (if I <= Expr'Last then not Is_Whitespace (Expr (I)))
-   is
-   begin
-      if Expr (I) = '(' then
-         Handle_LParen (B, I);
-         I := I + 1;
-      elsif Expr (I) = ')' then
-         Handle_RParen (B, I);
-         I := I + 1;
-      else
-         Scan_Word (Expr, I, B);
-      end if;
-      I := Skip_Whitespace (Expr, I);
-   end Scan_Token;
-
-   --  End of input.  A pending operand (a trailing operator) refuses
-   --  at the operator that is still waiting.  Otherwise every "("
-   --  still on the stack is unmatched -- the outermost one refuses --
-   --  and what remains is operators alone, unwound onto the output.
-   procedure Finish (B : in out Builder) is
-   begin
-      if B.Expect then
-         Refuse (B, B.Wait_Pos);
-         return;
-      end if;
-
-      for J in 1 .. B.Depth loop
-         pragma
-           Loop_Invariant
-             (for all K in 1 .. J - 1 => B.Stack (K).Kind /= Left_Paren);
-         if B.Stack (J).Kind = Left_Paren then
-            Refuse (B, B.Stack (J).Pos);
-            return;
+      for K in 1 .. B.Stack_Count loop
+         if B.Stack (K).Kind = Left_Paren then
+            return B.Stack (K).Pos;
          end if;
       end loop;
+      return No_Open_Paren;
+   end First_Open_Paren;
 
-      while B.Depth > 0 and then not B.Refused loop
-         pragma
-           Loop_Invariant
-             (for all K in 1 .. B.Depth => B.Stack (K).Kind /= Left_Paren);
-         pragma Loop_Variant (Decreases => B.Depth);
-         Pop_One (B);
+   --  Pops back to the innermost "(" and drops it.
+   procedure Close_Paren (B : in out Builder) is
+   begin
+      Pop_Operators (B, Loosest);
+      if B.Stack_Count > 0 then
+         B.Stack_Count := B.Stack_Count - 1;
+      end if;
+   end Close_Paren;
+
+   --  Performs the command the transition just requested.
+   procedure Perform (B : in out Builder; Evt : Event) is
+      Cmd : constant Command := B.Requests.Pending;
+   begin
+      B.Requests.Pending := Nothing;
+      case Cmd is
+         when Nothing            =>
+            null;
+
+         when Emit_Tag           =>
+            Emit
+              (B,
+               (Kind => Tag, First => Evt.First, Last => Evt.Last),
+               Evt.First);
+
+         when Push_Not           =>
+            Push (B, Op_Not, Evt.First);
+
+         when Open_Group         =>
+            Push (B, Left_Paren, Evt.First);
+
+         when Push_Binary        =>
+            Pop_Operators (B, Precedence (Evt.Op));
+            Push (B, Evt.Op, Evt.First);
+
+         when Close_Group        =>
+            Close_Paren (B);
+
+         when Unwind             =>
+            Pop_Operators (B, Loosest);
+
+         when Refuse_Dangling    =>
+            Refuse (B, B.Wait_Pos);
+
+         when Refuse_Unclosed    =>
+            Refuse (B, First_Open_Paren (B));
+
+         when Refuse_Stray_Close =>
+            --  Unwind first: when the output overflows while unwinding,
+            --  the refusal names the operator that overflowed it, not
+            --  this ")".
+            Pop_Operators (B, Loosest);
+            Refuse (B, Evt.First);
+      end case;
+   end Perform;
+
+   ---------------------------------------------------------------------
+   --  Guards and actions.
+   ---------------------------------------------------------------------
+
+   function Evaluate (G : Guard_Kind; B : Builder; Evt : Event) return Boolean
+   is
+      pragma Unreferenced (Evt);
+   begin
+      case G is
+         when Always   =>
+            return True;
+
+         when In_Group =>
+            return First_Open_Paren (B) /= No_Open_Paren;
+      end case;
+   end Evaluate;
+
+   procedure Execute (A : Command; B : in out Builder; Evt : Event) is
+      pragma Unreferenced (Evt);
+   begin
+      B.Requests.Pending := A;
+   end Execute;
+
+   ---------------------------------------------------------------------
+   --  The lexer and the driver.
+   ---------------------------------------------------------------------
+
+   --  The event of an operator word at First .. Last: "not" is a
+   --  Prefix, and a binary operator is a Binary that carries it.
+   function Operator_Event
+     (Op : Operator; First : Char_Index; Last : Char_Count) return Event
+   is (case Op is
+         when Op_Not          =>
+           (Kind => E_Prefix, First => First, Last => Last, others => <>),
+         when Binary_Operator =>
+           (Kind => E_Binary, Op => Op, First => First, Last => Last));
+
+   --  The event of the delimiter-free run Expr (First .. Last).
+   function Word_Event
+     (Expr : String; First : Positive; Last : Positive) return Event
+   with
+     Pre  => Expr_OK (Expr) and then First <= Last and then Last <= Expr'Last,
+     Post =>
+       Word_Event'Result.First = First and then Word_Event'Result.Last = Last
+   is
+   begin
+      for Op in Operator loop
+         if Expr (First .. Last) = Word (Op) then
+            return Operator_Event (Op, First, Last);
+         end if;
       end loop;
-   end Finish;
+      return
+        (Kind   =>
+           (if Expr (First) = Scan.Tag_Mark and then Last > First
+            then E_Tag_Name
+            else E_Bad_Word),
+         First  => First,
+         Last   => Last,
+         others => <>);
+   end Word_Event;
+
+   --  The lexeme that starts at Expr (I), which is not white space.
+   function Lexeme_At (Expr : String; I : Positive) return Event
+   is (case Expr (I) is
+         when Group_Opener =>
+           (Kind => E_Open, First => I, Last => I, others => <>),
+         when Group_Closer =>
+           (Kind => E_Close, First => I, Last => I, others => <>),
+         when others       => Word_Event (Expr, I, Run_End (Expr, I)))
+   with
+     Pre  =>
+       Expr_OK (Expr)
+       and then I in Expr'Range
+       and then Expr (I) not in White_Space,
+     Post =>
+       Lexeme_At'Result.First = I
+       and then Lexeme_At'Result.Last in I .. Expr'Last;
+
+   --  One lexeme through the machine: a lexeme no row takes refuses at
+   --  its own position; a taken one runs its command.
+   procedure Step (M : in out SM.Machine; B : in out Builder; Evt : Event) is
+      Handled : Boolean;
+   begin
+      B.Requests.Pending := Nothing;
+      SM.Process_Event (M, B, Evt, Handled);
+      if Handled then
+         Perform (B, Evt);
+      else
+         Refuse (B, Evt.First);
+      end if;
+   end Step;
+
+   --  Every lexeme of Expr, until one refuses.  Compile has already
+   --  refused a Blank Expr, so Expr holds at least one character.
+   procedure Read_Lexemes
+     (Expr : String; M : in out SM.Machine; B : in out Builder)
+   with Pre => Expr_OK (Expr) and then Expr'Length > 0
+   is
+      I : Positive := Skip_White_Space (Expr, Expr'First);
+   begin
+      while I <= Expr'Last and then not Has_Error (B) loop
+         pragma Loop_Invariant (Expr (I) not in White_Space);
+         pragma Loop_Variant (Increases => I);
+         declare
+            Evt : constant Event := Lexeme_At (Expr, I);
+         begin
+            Step (M, B, Evt);
+            I := Skip_White_Space (Expr, Evt.Last + 1);
+         end;
+      end loop;
+   end Read_Lexemes;
+
+   --  A refused Compiled naming the position Compile refused at.  A
+   --  Compiled value never touched by Compile at all -- its bare
+   --  default -- reports the same Valid = False through its own
+   --  field defaults, with no call here.
+   function Refused_At (Pos : Char_Count) return Compiled
+   is ((Valid => False, Error_Pos => Pos, others => <>));
+
+   --  The machine reached Done with no refusal: the output is the
+   --  postfix program.
+   function Result_Of (M : SM.Machine; B : Builder) return Compiled
+   is (if SM.State_Of (M) = Done and then not Has_Error (B)
+       then (B.Result with delta Valid => True, Error_Pos => No_Error)
+       else Refused_At (B.Error));
 
    function Valid (E : Compiled) return Boolean
    is (E.Valid);
 
    function Error (E : Compiled) return Natural
-   is (if E.Valid then 0 else E.Error_Pos);
+   is (if E.Valid then No_Error else E.Error_Pos);
 
    function Compile (Expr : String) return Compiled is
+      M : SM.Machine := SM.Make (Table, Initial => Want_Operand);
       B : Builder;
-      I : Positive;
    begin
-      if Is_Blank (Expr) then
-         return Refused_At (1);
+      if Blank (Expr) then
+         return Refused_At (Blank_Error);
       end if;
-
       B.Result.Text (1 .. Expr'Length) := Expr;
-
-      I := Skip_Whitespace (Expr, Expr'First);
-      while I <= Expr'Last and then not B.Refused loop
-         pragma Loop_Invariant (not Is_Whitespace (Expr (I)));
-         pragma Loop_Variant (Increases => I);
-         Scan_Token (Expr, I, B);
-      end loop;
-
-      if not B.Refused then
-         Finish (B);
+      Read_Lexemes (Expr, M, B);
+      if not Has_Error (B) then
+         Step (M, B, (Kind => E_Finish, others => <>));
       end if;
-
-      if B.Refused then
-         return Refused_At (B.Error);
-      end if;
-
-      return
-        (Valid     => True,
-         Error_Pos => 0,
-         Text      => B.Result.Text,
-         Count     => B.Result.Count,
-         Tokens    => B.Result.Tokens);
+      return Result_Of (M, B);
    end Compile;
 
-   --  A bounded stack machine, no recursion: Stack (1 .. Top) holds
-   --  the values produced so far.  Every access is guarded by Top
-   --  itself, so a Compiled value that (should never, but) does not
-   --  balance still evaluates safely instead of raising -- functional
-   --  correctness for a well-formed Compiled is the test suite's job,
-   --  not this loop's.  E.Count = 0 (never compiled, or refused) falls
-   --  out of the same guards as the empty, always-false expression.
-   function Eval (E : Compiled) return Boolean is
-      type Value_Stack is array (Token_Index) of Boolean;
+   ---------------------------------------------------------------------
+   --  Evaluation.
+   ---------------------------------------------------------------------
 
-      Stack : Value_Stack := [others => False];
-      Top   : Token_Count := 0;
+   type Value_Array is array (Token_Index) of Boolean;
+
+   --  Items (1 .. Used) holds the values produced so far.
+   type Value_Stack is record
+      Items : Value_Array := [others => False];
+      Used  : Token_Count := Token_Count'First;
+   end record;
+
+   --  L Op R, its operands in the order they were written.
+   function Combine
+     (L : Boolean; Op : Binary_Operator; R : Boolean) return Boolean
+   is (case Op is
+         when Op_And => L and then R,
+         when Op_Or  => L or else R,
+         when Op_Xor => L xor R);
+
+   procedure Push_Value (V : in out Value_Stack; Value : Boolean)
+   with Post => V.Used <= V.Used'Old + 1
+   is
+   begin
+      if V.Used < Limits.Max_Tag_Expr_Tokens then
+         V.Used := V.Used + 1;
+         V.Items (V.Used) := Value;
+      end if;
+   end Push_Value;
+
+   procedure Negate_Top (V : in out Value_Stack)
+   with Post => V.Used = V.Used'Old
+   is
+   begin
+      if V.Used > 0 then
+         V.Items (V.Used) := not V.Items (V.Used);
+      end if;
+   end Negate_Top;
+
+   procedure Combine_Top (V : in out Value_Stack; Op : Binary_Operator)
+   with Post => V.Used <= V.Used'Old
+   is
+   begin
+      if V.Used >= Binary_Arity then
+         V.Used := V.Used - 1;
+         V.Items (V.Used) :=
+           Combine (V.Items (V.Used), Op, V.Items (V.Used + 1));
+      end if;
+   end Combine_Top;
+
+   --  A bounded stack machine, no recursion.  Every access is guarded
+   --  by Used itself, so a Compiled value that (should never, but) does
+   --  not balance still evaluates safely instead of raising --
+   --  functional correctness for a well-formed Compiled is the test
+   --  suite's job, not this loop's.  E.Count = 0 (never compiled, or
+   --  refused) falls out of the same guards as the empty, always-false
+   --  expression.
+   function Eval (E : Compiled) return Boolean is
+      Values : Value_Stack;
    begin
       for I in 1 .. E.Count loop
-         pragma Loop_Invariant (Top <= I - 1);
+         pragma Loop_Invariant (Values.Used <= I - 1);
          case E.Tokens (I).Kind is
-            when Tag    =>
-               if Top < Limits.Max_Tag_Expr_Tokens then
-                  Top := Top + 1;
-                  Stack (Top) :=
-                    Has_Tag (E.Text (E.Tokens (I).First .. E.Tokens (I).Last));
-               end if;
+            when Tag             =>
+               Push_Value
+                 (Values,
+                  Has_Tag (E.Text (E.Tokens (I).First .. E.Tokens (I).Last)));
 
-            when Op_Not =>
-               if Top >= 1 then
-                  Stack (Top) := not Stack (Top);
-               end if;
+            when Op_Not          =>
+               Negate_Top (Values);
 
-            when Op_And =>
-               if Top >= 2 then
-                  Top := Top - 1;
-                  Stack (Top) := Stack (Top) and then Stack (Top + 1);
-               end if;
-
-            when Op_Or  =>
-               if Top >= 2 then
-                  Top := Top - 1;
-                  Stack (Top) := Stack (Top) or else Stack (Top + 1);
-               end if;
-
-            when Op_Xor =>
-               if Top >= 2 then
-                  Top := Top - 1;
-                  Stack (Top) := Stack (Top) xor Stack (Top + 1);
-               end if;
+            when Binary_Operator =>
+               Combine_Top (Values, E.Tokens (I).Kind);
          end case;
       end loop;
-
-      return (if Top >= 1 then Stack (1) else False);
+      return Values.Used > 0 and then Values.Items (Token_Index'First);
    end Eval;
 
 end Fabula.Tags;

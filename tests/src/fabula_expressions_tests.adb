@@ -229,30 +229,26 @@ package body Fabula_Expressions_Tests is
    end Render;
 
    procedure Check (Pattern : String; Text : String; Expect : String) is
-      Where    : constant String :=
+      Where  : constant String :=
         "pattern """ & Pattern & """, text """ & Text & """";
-      P        : Compiled;
-      Ok       : Boolean;
-      Captures : Capture_List;
-      Matched  : Boolean;
+      P      : constant Compiled := Compile (Pattern);
+      Result : constant Step_Match := Match (P, Text);
    begin
-      Compile (Pattern, P, Ok);
-      Assert (Ok, Where & ": the pattern must compile");
-      Match (P, Text, Captures, Matched);
+      Assert (Valid (P), Where & ": the pattern must compile");
       if Expect = No_Match then
-         Assert (not Matched, Where & ": expected no match");
+         Assert (not Result.Found, Where & ": expected no match");
          Assert
-           (Captures.Count = 0,
+           (Result.Captures.Count = 0,
             Where & ": a failed match must report no captures");
       else
-         Assert (Matched, Where & ": expected a match");
+         Assert (Result.Found, Where & ": expected a match");
          Assert
-           (Render (Text, Captures) = Expect,
+           (Render (Text, Result.Captures) = Expect,
             Where
             & ": expected captures """
             & Expect
             & """, got """
-            & Render (Text, Captures)
+            & Render (Text, Result.Captures)
             & """");
       end if;
    end Check;
@@ -265,19 +261,15 @@ package body Fabula_Expressions_Tests is
       end loop;
    end Run_Cases;
 
-   --  A refused pattern reports Ok = False and then matches nothing.
+   --  A refused pattern is not Valid, and then matches nothing.
    procedure Check_Refused (Pattern : String) is
-      Text     : constant String (1 .. Pattern'Length) := Pattern;
-      P        : Compiled;
-      Ok       : Boolean;
-      Captures : Capture_List;
-      Matched  : Boolean;
+      Text   : constant String (1 .. Pattern'Length) := Pattern;
+      P      : constant Compiled := Compile (Pattern);
+      Result : constant Step_Match := Match (P, Text);
    begin
-      Compile (Pattern, P, Ok);
-      Assert (not Ok, "pattern """ & Pattern & """ must be refused");
-      Match (P, Text, Captures, Matched);
+      Assert (not Valid (P), "pattern """ & Pattern & """ must be refused");
       Assert
-        (not Matched and then Captures.Count = 0,
+        (not Result.Found and then Result.Captures.Count = 0,
          "refused pattern """ & Pattern & """ must match nothing");
    end Check_Refused;
 
@@ -390,13 +382,12 @@ package body Fabula_Expressions_Tests is
 
    procedure Test_Uncompiled (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
-      P        : Compiled;
-      Captures : Capture_List;
-      Matched  : Boolean;
+      P      : Compiled;
+      Result : constant Step_Match := Match (P, "");
    begin
-      Match (P, "", Captures, Matched);
+      Assert (not Valid (P), "a pattern never compiled is not Valid");
       Assert
-        (not Matched and then Captures.Count = 0,
+        (not Result.Found and then Result.Captures.Count = 0,
          "a pattern that was never compiled must match nothing");
    end Test_Uncompiled;
 
