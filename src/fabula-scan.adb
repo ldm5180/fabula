@@ -1,3 +1,5 @@
+with Fabula.Line_Parts;
+
 package body Fabula.Scan
   with SPARK_Mode
 is
@@ -158,12 +160,19 @@ is
      (Line : String; First_Non_WS : Positive) return Natural
    with
      Pre  => First_Non_WS in Line'Range,
-     Post => Find_Content_End'Result in First_Non_WS .. Line'Last
+     Post =>
+       Find_Content_End'Result in First_Non_WS .. Line'Last
+       and then (for all J in Line'Range =>
+                   (if J > Find_Content_End'Result
+                    then Is_Whitespace (Line (J))))
    is
       Last : Natural := Line'Last;
    begin
       while Last >= First_Non_WS and then Is_Whitespace (Line (Last)) loop
          pragma Loop_Invariant (Last in First_Non_WS - 1 .. Line'Last);
+         pragma
+           Loop_Invariant
+             (for all J in Last .. Line'Last => Is_Whitespace (Line (J)));
          pragma Loop_Variant (Decreases => Last);
          Last := Last - 1;
       end loop;
@@ -181,11 +190,15 @@ is
       Content_End  : Natural;
    end record;
 
+   --  Only whitespace follows Content_End, so any character that is not
+   --  whitespace sits at or before it.
    function Context_Valid (Line : String; Ctx : Scan_Context) return Boolean
    is (Line'First = 1
        and then Line'Length <= Limits.Max_Line_Length
        and then Ctx.First_Non_WS in Line'Range
-       and then Ctx.Content_End in Ctx.First_Non_WS .. Line'Last);
+       and then Ctx.Content_End in Ctx.First_Non_WS .. Line'Last
+       and then (for all J in Ctx.Content_End + 1 .. Line'Last =>
+                   Is_Whitespace (Line (J))));
 
    function Header_Or_Step_Slice_OK
      (Line : String; Result : Classification) return Boolean
@@ -321,7 +334,7 @@ is
             and then Result.Body_Last <= Line'Last
             and then Result.Body_Last >= Result.Body_First
             and then Result.Body_First = Result.Indent + 1
-            and then Line (Result.Body_First) = '|',
+            and then Line (Result.Body_First) = Cell_Separator,
           when Doc_Fence              =>
             Result.Type_First <= Line'Last + 1
             and then Result.Type_Last <= Line'Last
@@ -346,18 +359,17 @@ is
    begin
       Found := False;
       Result := (Class => Blank, Indent => 0);
-      if Ctx.First_Non_WS + 2 <= Ctx.Content_End
-        and then Line (Ctx.First_Non_WS + 1) = Line (Ctx.First_Non_WS)
-        and then Line (Ctx.First_Non_WS + 2) = Line (Ctx.First_Non_WS)
-      then
+      if Line_Parts.Fence_At (Line, Ctx.First_Non_WS) then
          declare
             Kind       : constant Fence_Kind :=
-              (if Line (Ctx.First_Non_WS) = '"' then Quotes else Backticks);
+              (if Line (Ctx.First_Non_WS) = Quote_Fence
+               then Quotes
+               else Backticks);
             --  cwt's doc_string_type_from_token right-trims the whole
             --  line, then takes substr(3): the content type keeps any
             --  leading whitespace after the fence and loses only the
             --  trailing (`""" json` gives ` json`, not `json`).
-            Type_First : constant Positive := Ctx.First_Non_WS + 3;
+            Type_First : constant Positive := Ctx.First_Non_WS + Fence_Length;
          begin
             Result :=
               (Class      => Doc_Fence,
@@ -381,24 +393,24 @@ is
       Fence_Result : Classification;
    begin
       case Line (Ctx.First_Non_WS) is
-         when '@'       =>
+         when Tag_Mark                     =>
             return
               (Class      => Tag_Line,
                Indent     => Indent,
                Body_First => Ctx.First_Non_WS,
                Body_Last  => Ctx.Content_End);
 
-         when '|'       =>
+         when Cell_Separator               =>
             return
               (Class      => Table_Row,
                Indent     => Indent,
                Body_First => Ctx.First_Non_WS,
                Body_Last  => Ctx.Content_End);
 
-         when '#'       =>
+         when Comment_Mark                 =>
             return (Class => Comment, Indent => Indent);
 
-         when '"' | '`' =>
+         when Quote_Fence | Backtick_Fence =>
             Try_Doc_Fence (Line, Ctx, Fence_Found, Fence_Result);
             if Fence_Found then
                return Fence_Result;
@@ -409,7 +421,7 @@ is
                Body_First => Ctx.First_Non_WS,
                Body_Last  => Ctx.Content_End);
 
-         when others    =>
+         when others                       =>
             return
               (Class      => Description,
                Indent     => Indent,

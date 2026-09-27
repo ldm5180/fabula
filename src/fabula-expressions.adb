@@ -75,7 +75,7 @@ is
    --  Open groups never outnumber tokens, so a group push always fits.
 
    function Is_Word_Char (C : Character) return Boolean
-   is (C in 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_');
+   is (C in 'a' .. 'z' | 'A' .. 'Z' | Decimal_Digit | '_');
 
    function Literal_Token (First : Char_Index; Last : Char_Count) return Token
    is ((No_Token with delta First => First, Last => Last));
@@ -123,7 +123,7 @@ is
       for J in From + 1 .. Source'Last loop
          if Source (J) = '}' and then Source (J - 1) /= '\' then
             return Other or else not Has_Digit;
-         elsif Source (J) in '0' .. '9' then
+         elsif Source (J) in Decimal_Digit then
             Has_Digit := True;
          elsif Source (J) = ',' and then not Has_Comma then
             Has_Comma := True;
@@ -435,7 +435,7 @@ is
    --  names; Non_Break excludes the two line breaks its dot refuses.
    function In_Class (C : Character; Class : Char_Class) return Boolean
    is (case Class is
-         when Digit     => C in '0' .. '9',
+         when Digit     => C in Decimal_Digit,
          when Non_Space =>
            C not in ' ' | ASCII.HT | ASCII.LF | ASCII.VT | ASCII.FF | ASCII.CR,
          when Non_Break => C not in ASCII.LF | ASCII.CR,

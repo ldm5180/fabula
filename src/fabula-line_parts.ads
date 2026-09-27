@@ -3,6 +3,7 @@
 --  rule follows the reference interpreter's lexer; the parser's guards
 --  and its commands both read lines only through here.
 with Fabula.Limits;
+with Fabula.Scan;
 
 private package Fabula.Line_Parts
   with Pure, SPARK_Mode
@@ -52,13 +53,15 @@ is
    --  Doc-string fences.
    ---------------------------------------------------------------------
 
-   --  Three equal quote or backtick characters start at I.
+   --  A doc-string fence starts at I: Scan.Fence_Length equal quote or
+   --  backtick characters.  The one place this rule is written.
    function Fence_At (Line : String; I : Positive) return Boolean
-   is (Line'Length >= 3
-       and then I <= Line'Last - 2
-       and then (Line (I) = '"' or else Line (I) = '`')
-       and then Line (I + 1) = Line (I)
-       and then Line (I + 2) = Line (I))
+   is (Line'Length >= Scan.Fence_Length
+       and then I <= Line'Last - (Scan.Fence_Length - 1)
+       and then (Line (I) = Scan.Quote_Fence
+                 or else Line (I) = Scan.Backtick_Fence)
+       and then (for all K in I + 1 .. I + (Scan.Fence_Length - 1) =>
+                   Line (K) = Line (I)))
    with Pre => Is_Line (Line);
 
    --  The first fence run inside Line (From .. To), or 0.  The
@@ -71,7 +74,7 @@ is
      Post =>
        Fence_Run'Result = 0
        or else (Fence_Run'Result >= From
-                and then Fence_Run'Result + 2 <= To
+                and then Fence_Run'Result + (Scan.Fence_Length - 1) <= To
                 and then Fence_At (Line, Fence_Run'Result));
 
    ---------------------------------------------------------------------
@@ -79,7 +82,7 @@ is
    ---------------------------------------------------------------------
 
    function Is_Tag_Char (Ch : Character) return Boolean
-   is (Ch in 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9'
+   is (Ch in 'a' .. 'z' | 'A' .. 'Z' | Decimal_Digit
        or else Ch in '_' | '-' | '.' | '#' | '/' | ':' | '$' | '*' | '<' | '>'
        or else Ch in ''' | '|' | '%' | '^' | '&' | '!' | '?');
    --  The characters a tag may hold after its '@'.
@@ -89,12 +92,12 @@ is
    function Tags_Well_Formed
      (Line : String; From : Positive; To : Natural) return Boolean
    is (for all I in From .. To =>
-         (Line (I) = '@'
+         (Line (I) = Scan.Tag_Mark
           or else Is_Tag_Char (Line (I))
           or else Is_Space (Line (I)))
          and then (if (I = From or else Is_Space (Line (I - 1)))
                      and then not Is_Space (Line (I))
-                   then Line (I) = '@'))
+                   then Line (I) = Scan.Tag_Mark))
    with Pre => Is_Line (Line) and then From >= 1 and then To <= Line'Last;
 
    --  The first tag at or after From within Line (From .. To): an '@'

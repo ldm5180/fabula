@@ -1,5 +1,6 @@
 with Fabula.Check;
 with Fabula.Expand;
+with Fabula.Scan;
 
 package body Fabula.Format
   with SPARK_Mode
@@ -587,7 +588,7 @@ is
             In_Tag := False;
          elsif In_Tag then
             null;
-         elsif Text (I) = '@' then
+         elsif Text (I) = Scan.Tag_Mark then
             In_Tag := True;
          else
             return First_Token (Text (I .. Text'Last));

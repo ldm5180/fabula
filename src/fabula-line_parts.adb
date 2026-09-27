@@ -23,7 +23,7 @@ is
    function Fence_Run
      (Line : String; From : Positive; To : Natural) return Natural is
    begin
-      for I in From .. To - 2 loop
+      for I in From .. To - (Scan.Fence_Length - 1) loop
          if Fence_At (Line, I) then
             return I;
          end if;
@@ -41,7 +41,7 @@ is
          pragma Loop_Variant (Increases => First);
          First := First + 1;
       end loop;
-      if First > To or else Line (First) /= '@' then
+      if First > To or else Line (First) /= Scan.Tag_Mark then
          return (First => 1, Last => 0);
       end if;
       Last := First;
@@ -59,10 +59,10 @@ is
       Escaped : Boolean := False;
    begin
       for I in From .. To loop
-         if Line (I) = '|' and then not Escaped then
+         if Line (I) = Scan.Cell_Separator and then not Escaped then
             return (Text => Trimmed (Line, From, I - 1), Stop => I);
          end if;
-         Escaped := Line (I) = '\' and then not Escaped;
+         Escaped := Line (I) = Scan.Escape_Mark and then not Escaped;
       end loop;
       return (Text => Trimmed (Line, From, To), Stop => 0);
    end Next_Cell;

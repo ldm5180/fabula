@@ -30,6 +30,30 @@ is
    function Spelling (K : Step_Keyword) return String
    with Post => Spelling'Result'Length > 0;
 
+   ---------------------------------------------------------------------
+   --  Gherkin's grammar tokens, named once for every unit that reads or
+   --  writes feature-file text.
+   ---------------------------------------------------------------------
+
+   Tag_Mark : constant Character := '@';
+   --  Starts a tag: `@smoke`.
+
+   Cell_Separator : constant Character := '|';
+   --  Opens, separates and closes the cells of a table row.
+
+   Escape_Mark : constant Character := '\';
+   --  Inside a cell, makes the Cell_Separator after it part of the text.
+
+   Comment_Mark : constant Character := '#';
+   --  Starts a comment line.
+
+   Quote_Fence    : constant Character := '"';
+   Backtick_Fence : constant Character := '`';
+   --  The two characters a doc-string fence is made of.
+
+   Fence_Length : constant := 3;
+   --  A doc-string fence is this many equal fence characters in a row.
+
    type Fence_Kind is (Quotes, Backticks);
 
    subtype Length is Natural range 0 .. Limits.Max_Line_Length;
@@ -100,7 +124,7 @@ is
             and then Classify'Result.Body_Last <= Line'Last
             and then Classify'Result.Body_Last >= Classify'Result.Body_First
             and then Classify'Result.Body_First = Classify'Result.Indent + 1
-            and then Line (Classify'Result.Body_First) = '|',
+            and then Line (Classify'Result.Body_First) = Cell_Separator,
           when Doc_Fence              =>
             Classify'Result.Type_First <= Line'Last + 1
             and then Classify'Result.Type_Last <= Line'Last
