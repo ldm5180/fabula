@@ -30,9 +30,9 @@ is
    --  Each row reads:  From + Event (Guard) / Act >= To.  Rows for one
    --  state are tried top to bottom, so a guarded row takes its event
    --  before the rows below it.  A hook phase ends when its cursor finds
-   --  no further row; a scenario's steps end the same way.  Every act
-   --  writes Due, and an Ask_* act the request; the line above each
-   --  block names the other Work fields its acts write.
+   --  no further row; a scenario's steps end the same way.  Each act
+   --  does its own work, and an Ask_* act writes its request; the line
+   --  above each block names the guard flags its acts write.
    --!format off
    Table : constant SM.Transition_Table (1 .. Rows) :=
      [
@@ -74,13 +74,13 @@ is
       Step_After  + Hooks_Done               / Pass_Step >= Stepping,
 
       --  The scenario's after-hooks; an ignore there still drops it.
-      --  Writes: no Work field.
+      --  Writes: no guard flag.
       After + Hook_Due             / Ask_Hook       >= After,
       After + Hooks_Done (Dropped) / Drop_Entered   >= Walking,
       After + Hooks_Done           / Close_Scenario >= Walking,
 
       --  The run's After_All hooks.
-      --  Writes: no Work field.
+      --  Writes: no guard flag.
       Closing + Hook_Due                      / Ask_After_All    >= Closing,
       Closing + Hooks_Done (After_All_Failed) / Count_Hook_Error >= Finished,
       Closing + Hooks_Done                                       >= Finished];
@@ -91,7 +91,9 @@ is
    with Post => Started'Result.Count = Rows;
 
    ---------------------------------------------------------------------
-   --  The machine's guards and acts.
+   --  The machine's guards.  A guard reads the context and an act does
+   --  its work there; which event arrived is the table's business, so
+   --  neither reads Evt.
    ---------------------------------------------------------------------
 
    function Evaluate (G : Guard_Kind; Ctx : Work; Evt : Event) return Boolean
@@ -107,19 +109,21 @@ is
 
          when Skips_All         =>
             return
-              Ctx.Dry_Run
-              or else (Ctx.Before_All_Failed and then not Ctx.Continue);
+              Ctx.Opts.Dry_Run
+              or else (Ctx.Before_All_Failed
+                       and then not Ctx.Opts.Continue_On_Failure);
 
          when Unmatched         =>
-            return Ctx.Text_Ok and then not Ctx.Found;
+            return Ctx.Text.Ok and then not Ctx.Match.Found;
 
          when Must_Skip         =>
             return
               Ctx.Standing /= Running
-              or else (not Ctx.Continue and then not Ctx.Last_Passed);
+              or else (not Ctx.Opts.Continue_On_Failure
+                       and then not Ctx.Last_Passed);
 
          when Oversized         =>
-            return not Ctx.Text_Ok or else not Ctx.Args_Fit;
+            return not Ctx.Text.Ok or else not Ctx.Args_Fit;
 
          when Step_Failed       =>
             return Ctx.Step_Failed;
@@ -134,21 +138,6 @@ is
             return Ctx.After_All_Failed;
       end case;
    end Evaluate;
-
-   function Request_Of (A : Act) return Command
-   is (case A is
-         when Ask_Before_All => C_Before_All,
-         when Ask_After_All  => C_After_All,
-         when Ask_Hook       => C_Hook,
-         when Ask_Step       => C_Step,
-         when others         => C_None);
-
-   procedure Execute (A : Act; Ctx : in out Work; Evt : Event) is
-      pragma Unreferenced (Evt);
-   begin
-      Ctx.Due := A;
-      Ctx.Requests.Pending := Request_Of (A);
-   end Execute;
 
    ---------------------------------------------------------------------
    --  Options.
@@ -171,7 +160,7 @@ is
    ---------------------------------------------------------------------
 
    function State_Of (R : Runner) return State
-   is (SM.State_Of (R.Machine));
+   is (Bundle.State_Of (R.Run));
 
    --  Whether expression E holds for the tag set Set, whose members
    --  are tags of Doc.
@@ -190,24 +179,26 @@ is
 
    --  An untagged hook row runs for every scenario; a tagged one when
    --  its expression holds for the scenario's tags.
-   function Hook_Selected (R : Runner; I : Positive) return Boolean
+   function Hook_Selected (Ctx : Work; I : Positive) return Boolean
    is (not Reg.Has_Tag_Expr (Hooks, I)
-       or else (R.Doc /= null
+       or else (Ctx.Doc /= null
                 and then Tags.Valid (Reg.Tag_Expr (Hooks, I))
                 and then Selects
-                           (R.Doc.all, R.Tag_Set, Reg.Tag_Expr (Hooks, I))))
+                           (Ctx.Doc.all,
+                            Ctx.Tag_Set,
+                            Reg.Tag_Expr (Hooks, I))))
    with Pre => I in Hooks'Range;
 
-   --  The first row after R.Hook that runs in Phase, or No_Row.
-   function Next_Hook (R : Runner; Phase : Reg.Hook_Phase) return Natural
+   --  The first row after Ctx.Hook that runs in Phase, or No_Row.
+   function Next_Hook (Ctx : Work; Phase : Reg.Hook_Phase) return Natural
    with
      Post => Next_Hook'Result = No_Row or else Next_Hook'Result in Hooks'Range
    is
       function Runs_Next (I : Positive) return Boolean
       is (I in Hooks'Range
-          and then I > R.Hook
+          and then I > Ctx.Hook
           and then Reg.Phase_Of (Hooks, I) = Phase
-          and then Hook_Selected (R, I));
+          and then Hook_Selected (Ctx, I));
 
       function First_Next is new Searches.Find_First (Runs_Next);
    begin
@@ -218,13 +209,13 @@ is
    end Next_Hook;
 
    function Pending_Hook_Kind (R : Runner) return Reg.Hook_Kind
-   is (if R.Hook in Hooks'Range
-       then Reg.Kind_Of (Hooks, R.Hook)
+   is (if R.Run.Ctx.Hook in Hooks'Range
+       then Reg.Kind_Of (Hooks, R.Run.Ctx.Hook)
        else Reg.Hook_Kind'First);
 
    function Pending_Step_Kind (R : Runner) return Reg.Step_Kind
-   is (if R.Match.Index in Steps'Range
-       then Reg.Kind_Of (Steps, R.Match.Index)
+   is (if R.Run.Ctx.Match.Index in Steps'Range
+       then Reg.Kind_Of (Steps, R.Run.Ctx.Match.Index)
        else Reg.Step_Kind'First);
 
    ---------------------------------------------------------------------
@@ -332,43 +323,43 @@ is
 
    --  The -n patterns and the file:line selection keep the scenario.
    --  Both are checked before any hook runs.
-   function Passes_Filters (R : Runner) return Boolean
+   function Passes_Filters (Ctx : Work) return Boolean
    is (Line_Selected
-         (R.Lines, Scenario_Line (R.Doc.all, R.Scenario, R.Example))
+         (Ctx.Lines, Scenario_Line (Ctx.Doc.all, Ctx.Scenario, Ctx.Example))
        and then Names.Matches_Any
-                  (Scenario_Name (R.Doc.all, R.Scenario, R.Example),
-                   Name_Patterns (R.Opts)))
+                  (Scenario_Name (Ctx.Doc.all, Ctx.Scenario, Ctx.Example),
+                   Name_Patterns (Ctx.Opts)))
    with
      Pre =>
-       R.Doc /= null
-       and then R.Scenario in 1 .. Ast.Scenario_Count (R.Doc.all);
+       Ctx.Doc /= null
+       and then Ctx.Scenario in 1 .. Ast.Scenario_Count (Ctx.Doc.all);
 
    --  Moves to the next scenario position both filters keep.
-   procedure Seek_Scenario (R : in out Runner; Found : out Boolean) is
+   procedure Seek_Scenario (Ctx : in out Work; Found : out Boolean) is
       Next : Scenario_Position;
    begin
-      Found := R.Doc /= null;
+      Found := Ctx.Doc /= null;
       while Found loop
-         pragma Loop_Invariant (R.Doc /= null);
-         Next := Next_Position (R.Doc.all, R.Scenario, R.Example);
-         R.Scenario := Next.Scenario;
-         R.Example := Next.Example;
+         pragma Loop_Invariant (Ctx.Doc /= null);
+         Next := Next_Position (Ctx.Doc.all, Ctx.Scenario, Ctx.Example);
+         Ctx.Scenario := Next.Scenario;
+         Ctx.Example := Next.Example;
          Found := Next.Found;
-         exit when not Found or else Passes_Filters (R);
+         exit when not Found or else Passes_Filters (Ctx);
       end loop;
    end Seek_Scenario;
 
    --  The tag filter keeps the scenario; it is applied only after the
    --  scenario's before-hooks have run.  An untagged scenario evaluates
    --  the filter against the empty set.
-   function Filter_Selects (R : Runner) return Boolean
-   is (not R.Opts.Has_Filter
-       or else not Tags.Valid (R.Opts.Filter)
-       or else Selects (R.Doc.all, R.Tag_Set, R.Opts.Filter))
+   function Filter_Selects (Ctx : Work) return Boolean
+   is (not Ctx.Opts.Has_Filter
+       or else not Tags.Valid (Ctx.Opts.Filter)
+       or else Selects (Ctx.Doc.all, Ctx.Tag_Set, Ctx.Opts.Filter))
    with
      Pre =>
-       R.Doc /= null
-       and then R.Scenario in 1 .. Ast.Scenario_Count (R.Doc.all);
+       Ctx.Doc /= null
+       and then Ctx.Scenario in 1 .. Ast.Scenario_Count (Ctx.Doc.all);
 
    ---------------------------------------------------------------------
    --  Steps: the background's, then the scenario's own.
@@ -380,48 +371,48 @@ is
        else (others => <>));
 
    --  The step the step cursor stands on.
-   function Step_Of (R : Runner) return Ast.Step_Handle
-   is (Step_Walk.Step_Of (R.Walk));
+   function Step_Of (Ctx : Work) return Ast.Step_Handle
+   is (Step_Walk.Step_Of (Ctx.Walk));
 
    --  The outline row a scenario step substitutes from; a background
    --  step and a plain scenario's steps substitute nothing.
-   function Header_Of (R : Runner) return Ast.Examples_Row_Handle
-   is (if Step_Walk.State_Of (R.Walk) = Step_Walk.Background
+   function Header_Of (Ctx : Work) return Ast.Examples_Row_Handle
+   is (if Step_Walk.State_Of (Ctx.Walk) = Step_Walk.Background
        then Ast.No_Examples_Row
-       else Expand.Header_Row_Of (R.Example));
+       else Expand.Header_Row_Of (Ctx.Example));
 
-   function Data_Of (R : Runner) return Ast.Examples_Row_Handle
-   is (if Step_Walk.State_Of (R.Walk) = Step_Walk.Background
+   function Data_Of (Ctx : Work) return Ast.Examples_Row_Handle
+   is (if Step_Walk.State_Of (Ctx.Walk) = Step_Walk.Background
        then Ast.No_Examples_Row
-       else Expand.Data_Row_Of (R.Example));
+       else Expand.Data_Row_Of (Ctx.Example));
 
    --  Expands the current step, looks up its definition and checks it
    --  fits.  An undefined step reports its text as written.
-   procedure Resolve (R : in out Runner)
+   procedure Resolve (Ctx : in out Work)
    with
      Pre =>
-       R.Doc /= null and then Step_Of (R) in 1 .. Ast.Step_Count (R.Doc.all)
+       Ctx.Doc /= null
+       and then Step_Of (Ctx) in 1 .. Ast.Step_Count (Ctx.Doc.all)
    is
-      Node : constant Ast.Step_Node := Ast.Step (R.Doc.all, Step_Of (R));
+      Node : constant Ast.Step_Node := Ast.Step (Ctx.Doc.all, Step_Of (Ctx));
    begin
-      R.Text :=
-        Expand.Resolved (R.Doc.all, Node.Text, Header_Of (R), Data_Of (R));
-      R.Match := (others => <>);
-      if R.Text.Ok and then Tables_Valid then
-         R.Match := Reg.Find (Steps, Expand.Value (R.Text));
+      Ctx.Text :=
+        Expand.Resolved
+          (Ctx.Doc.all, Node.Text, Header_Of (Ctx), Data_Of (Ctx));
+      Ctx.Match := (others => <>);
+      if Ctx.Text.Ok and then Tables_Valid then
+         Ctx.Match := Reg.Find (Steps, Expand.Value (Ctx.Text));
       end if;
-      R.Ctx.Text_Ok := R.Text.Ok;
-      R.Ctx.Found := R.Match.Found;
-      R.Ctx.Args_Fit :=
-        Expand.Step_Fits (R.Doc.all, Node, Header_Of (R), Data_Of (R));
-      R.Ctx.Step_Failed := False;
-      R.Step_Outcome := (others => <>);
-      R.Frame.Step :=
+      Ctx.Args_Fit :=
+        Expand.Step_Fits (Ctx.Doc.all, Node, Header_Of (Ctx), Data_Of (Ctx));
+      Ctx.Step_Failed := False;
+      Ctx.Step_Outcome := (others => <>);
+      Ctx.Frame.Step :=
         Frames.To_Step
-          (if R.Match.Found
-           then Expand.Value (R.Text)
-           else Ast.Text (R.Doc.all, Node.Text));
-      R.Frame.Step_Line := Node.Line;
+          (if Ctx.Match.Found
+           then Expand.Value (Ctx.Text)
+           else Ast.Text (Ctx.Doc.all, Node.Text));
+      Ctx.Frame.Step_Line := Node.Line;
    end Resolve;
 
    --  Moves the step cursor to the scenario's next step; without a
@@ -429,20 +420,20 @@ is
    --  check after it never changes the answer, as the walk's step count
    --  came from this same document when the scenario opened.  It is
    --  there for the prover, which cannot see that from here.
-   procedure Move_Step_Cursor (R : in out Runner; Found : out Boolean)
+   procedure Move_Step_Cursor (Ctx : in out Work; Found : out Boolean)
    with
      Post =>
        (if Found
         then
-          R.Doc /= null
-          and then Step_Of (R) in 1 .. Ast.Step_Count (R.Doc.all))
+          Ctx.Doc /= null
+          and then Step_Of (Ctx) in 1 .. Ast.Step_Count (Ctx.Doc.all))
    is
    begin
-      Step_Walk.Next (R.Walk);
+      Step_Walk.Next (Ctx.Walk);
       Found :=
-        Step_Walk.Found (R.Walk)
-        and then R.Doc /= null
-        and then Step_Of (R) in 1 .. Ast.Step_Count (R.Doc.all);
+        Step_Walk.Found (Ctx.Walk)
+        and then Ctx.Doc /= null
+        and then Step_Of (Ctx) in 1 .. Ast.Step_Count (Ctx.Doc.all);
    end Move_Step_Cursor;
 
    --  The frame's step, cleared outside step execution.
@@ -452,54 +443,45 @@ is
       F.Step_Line := No_Line;
    end Clear_Step;
 
-   procedure Seek_Step (R : in out Runner; Found : out Boolean) is
+   procedure Seek_Step (Ctx : in out Work; Found : out Boolean) is
    begin
-      Move_Step_Cursor (R, Found);
+      Move_Step_Cursor (Ctx, Found);
       if Found then
-         Resolve (R);
+         Resolve (Ctx);
       else
-         Clear_Step (R.Frame);
+         Clear_Step (Ctx.Frame);
       end if;
    end Seek_Step;
 
    --  Builds the step request's arguments from the resolved step.
-   procedure Assemble (R : in out Runner) is
+   procedure Assemble (Ctx : in out Work) is
    begin
-      if R.Doc = null
-        or else Step_Of (R) not in 1 .. Ast.Step_Count (R.Doc.all)
+      if Ctx.Doc = null
+        or else Step_Of (Ctx) not in 1 .. Ast.Step_Count (Ctx.Doc.all)
       then
          return;
       end if;
-      R.Step_Arguments :=
+      Ctx.Step_Arguments :=
         Args.Make
-          (Expand.Value (R.Text),
-           R.Match.Captures,
-           (Doc        => R.Doc,
-            Doc_String => Ast.Step (R.Doc.all, Step_Of (R)).Doc,
-            Table      => Ast.Step (R.Doc.all, Step_Of (R)).Table,
-            Header_Row => Header_Of (R),
-            Data_Row   => Data_Of (R)));
+          (Expand.Value (Ctx.Text),
+           Ctx.Match.Captures,
+           (Doc        => Ctx.Doc,
+            Doc_String => Ast.Step (Ctx.Doc.all, Step_Of (Ctx)).Doc,
+            Table      => Ast.Step (Ctx.Doc.all, Step_Of (Ctx)).Table,
+            Header_Row => Header_Of (Ctx),
+            Data_Row   => Data_Of (Ctx)));
    end Assemble;
 
    ---------------------------------------------------------------------
    --  The core's acts.
    ---------------------------------------------------------------------
 
-   procedure Notify (R : in out Runner; N : Notice) is
+   --  N waits for the shell, which reads it and resumes.
+   procedure Notify (Ctx : in out Work; N : Notice) is
    begin
-      R.Note := N;
-      R.Noticed := True;
+      Ctx.Note := N;
+      Ctx.Noticed := True;
    end Notify;
-
-   --  A new scenario's flags: selected, running, no step failed yet.
-   function Fresh_Scenario (Ctx : Work) return Work
-   is ((Ctx
-        with delta
-          Selected    => True,
-          Ignored     => False,
-          Standing    => Running,
-          Last_Passed => True,
-          Step_Failed => False));
 
    --  The frame keeps its file and feature; scenario and step go.
    function Feature_Only (F : Frames.Frame) return Frames.Frame
@@ -508,42 +490,54 @@ is
         Feature_Line => F.Feature_Line,
         others       => <>));
 
+   --  A new scenario's context: selected, running, no step failed or
+   --  counted yet, no walk, and a frame with only the feature.
+   function Fresh_Scenario (Ctx : Work) return Work
+   is ((Ctx
+        with delta
+          Selected         => True,
+          Ignored          => False,
+          Standing         => Running,
+          Last_Passed      => True,
+          Step_Failed      => False,
+          Tally            => (others => <>),
+          Scenario_Outcome => (others => <>),
+          Walk             => Step_Walk.Empty,
+          Frame            => Feature_Only (Ctx.Frame)));
+
    --  The scenario's tags and frame, whether the tag filter keeps it,
    --  and the walk over its steps.
-   procedure Load_Scenario (R : in out Runner) is
+   procedure Load_Scenario (Ctx : in out Work) is
    begin
-      if R.Doc /= null
-        and then R.Scenario in 1 .. Ast.Scenario_Count (R.Doc.all)
+      if Ctx.Doc /= null
+        and then Ctx.Scenario in 1 .. Ast.Scenario_Count (Ctx.Doc.all)
       then
-         R.Tag_Set :=
+         Ctx.Tag_Set :=
            Expand.Effective_Tags
-             (R.Doc.all, R.Scenario, Expand.Block_Of (R.Example));
-         R.Frame.Scenario :=
-           Frames.To_Name (Scenario_Name (R.Doc.all, R.Scenario, R.Example));
-         R.Frame.Scenario_Line :=
-           Scenario_Line (R.Doc.all, R.Scenario, R.Example);
-         R.Ctx.Selected := Filter_Selects (R);
-         R.Walk :=
+             (Ctx.Doc.all, Ctx.Scenario, Expand.Block_Of (Ctx.Example));
+         Ctx.Frame.Scenario :=
+           Frames.To_Name
+             (Scenario_Name (Ctx.Doc.all, Ctx.Scenario, Ctx.Example));
+         Ctx.Frame.Scenario_Line :=
+           Scenario_Line (Ctx.Doc.all, Ctx.Scenario, Ctx.Example);
+         Ctx.Selected := Filter_Selects (Ctx);
+         Ctx.Walk :=
            Step_Walk.Started
-             (Shared     => Background_Steps (R.Doc.all),
-              Mine       => Ast.Scenario (R.Doc.all, R.Scenario).Steps,
-              Step_Count => Ast.Step_Count (R.Doc.all));
+             (Shared     => Background_Steps (Ctx.Doc.all),
+              Mine       => Ast.Scenario (Ctx.Doc.all, Ctx.Scenario).Steps,
+              Step_Count => Ast.Step_Count (Ctx.Doc.all));
       end if;
    end Load_Scenario;
 
-   procedure Open (R : in out Runner) is
+   procedure Open (Ctx : in out Work) is
    begin
-      R.Ctx := Fresh_Scenario (R.Ctx);
-      R.Tally := (others => <>);
-      R.Scenario_Outcome := (others => <>);
-      R.Walk := Step_Walk.Empty;
-      R.Frame := Feature_Only (R.Frame);
-      Load_Scenario (R);
+      Ctx := Fresh_Scenario (Ctx);
+      Load_Scenario (Ctx);
       Notify
-        (R,
+        (Ctx,
          (Kind     => Scenario_Opened,
-          Scenario => R.Scenario,
-          Data_Row => Expand.Data_Row_Of (R.Example),
+          Scenario => Ctx.Scenario,
+          Data_Row => Expand.Data_Row_Of (Ctx.Example),
           others   => <>));
    end Open;
 
@@ -553,154 +547,191 @@ is
       Ctx.Standing := Disposition'Max (Ctx.Standing, Skipped);
    end Skip;
 
-   procedure Enter (R : in out Runner) is
+   procedure Enter (Ctx : in out Work) is
    begin
       Notify
-        (R,
+        (Ctx,
          (Kind     => Scenario_Entered,
           Entered  => True,
-          Scenario => R.Scenario,
-          Data_Row => Expand.Data_Row_Of (R.Example),
+          Scenario => Ctx.Scenario,
+          Data_Row => Expand.Data_Row_Of (Ctx.Example),
           others   => <>));
    end Enter;
 
    procedure Close_Step_As
-     (R : in out Runner; Status : Results.Status; Cause : Step_Cause) is
+     (Ctx : in out Work; Status : Results.Status; Cause : Step_Cause) is
    begin
-      Results.Add_Step (R.Tally, Status);
-      R.Ctx.Last_Passed := Status = Results.Passed;
+      Results.Add_Step (Ctx.Tally, Status);
+      Ctx.Last_Passed := Status = Results.Passed;
       Notify
-        (R,
+        (Ctx,
          (Kind     => Step_Closed,
           Status   => Status,
           Dropped  => False,
           Entered  => True,
           Cause    => Cause,
-          Scenario => R.Scenario,
-          Data_Row => Expand.Data_Row_Of (R.Example),
-          Step     => Step_Of (R),
-          Outcome  => R.Step_Outcome));
+          Scenario => Ctx.Scenario,
+          Data_Row => Expand.Data_Row_Of (Ctx.Example),
+          Step     => Step_Of (Ctx),
+          Outcome  => Ctx.Step_Outcome));
    end Close_Step_As;
 
-   procedure Refuse (R : in out Runner) is
+   procedure Refuse (Ctx : in out Work) is
    begin
-      Check.Record_Failure (R.Step_Outcome, Too_Long_Message);
-      Close_Step_As (R, Results.Failed, Too_Long_Expansion);
+      Check.Record_Failure (Ctx.Step_Outcome, Too_Long_Message);
+      Close_Step_As (Ctx, Results.Failed, Too_Long_Expansion);
    end Refuse;
 
    --  A scenario fails on its own failure or on a failed or undefined
    --  step; otherwise a skip leaves it skipped.
-   function Scenario_Status (R : Runner) return Results.Status
-   is (if R.Ctx.Standing = Failed
-         or else Results.Counted (R.Tally.Steps (Results.Failed))
-         or else Results.Counted (R.Tally.Steps (Results.Undefined))
+   function Scenario_Status (Ctx : Work) return Results.Status
+   is (if Ctx.Standing = Failed
+         or else Results.Counted (Ctx.Tally.Steps (Results.Failed))
+         or else Results.Counted (Ctx.Tally.Steps (Results.Undefined))
        then Results.Failed
-       elsif R.Ctx.Standing = Skipped
+       elsif Ctx.Standing = Skipped
        then Results.Skipped
        else Results.Passed);
 
-   procedure Close (R : in out Runner) is
-      Status : constant Results.Status := Scenario_Status (R);
+   procedure Close (Ctx : in out Work) is
+      Status : constant Results.Status := Scenario_Status (Ctx);
    begin
-      R.Totals.Steps := Results.Sum (R.Totals.Steps, R.Tally.Steps);
-      Results.Add_Scenario (R.Totals, Status);
+      Ctx.Totals.Steps := Results.Sum (Ctx.Totals.Steps, Ctx.Tally.Steps);
+      Results.Add_Scenario (Ctx.Totals, Status);
       Notify
-        (R,
+        (Ctx,
          (Kind     => Scenario_Closed,
           Status   => Status,
           Entered  => True,
-          Scenario => R.Scenario,
-          Data_Row => Expand.Data_Row_Of (R.Example),
-          Outcome  => R.Scenario_Outcome,
+          Scenario => Ctx.Scenario,
+          Data_Row => Expand.Data_Row_Of (Ctx.Example),
+          Outcome  => Ctx.Scenario_Outcome,
           others   => <>));
    end Close;
 
-   procedure Drop (R : in out Runner; Entered : Boolean) is
+   procedure Drop (Ctx : in out Work; Entered : Boolean) is
    begin
       Notify
-        (R,
+        (Ctx,
          (Kind     => Scenario_Closed,
           Dropped  => True,
           Entered  => Entered,
-          Scenario => R.Scenario,
-          Data_Row => Expand.Data_Row_Of (R.Example),
+          Scenario => Ctx.Scenario,
+          Data_Row => Expand.Data_Row_Of (Ctx.Example),
           others   => <>));
    end Drop;
 
-   --  The Document is released: nothing in R designates it any more.
-   procedure Release (R : in out Runner) is
+   --  The Document is released: nothing in Ctx designates it any more.
+   procedure Release (Ctx : in out Work) is
    begin
-      R.Doc := null;
-      R.Scenario := Ast.No_Scenario;
-      R.Example := Expand.No_Example;
-      R.Walk := Step_Walk.Empty;
-      R.Step_Arguments := Args.Make ("", (others => <>));
+      Ctx.Doc := null;
+      Ctx.Scenario := Ast.No_Scenario;
+      Ctx.Example := Expand.No_Example;
+      Ctx.Walk := Step_Walk.Empty;
+      Ctx.Step_Arguments := Args.Make ("", (others => <>));
    end Release;
 
-   procedure Perform (R : in out Runner) is
+   --  Each request act writes its own command; a step's request also
+   --  carries the step's arguments.  No other act writes one: every
+   --  event fires with no command pending, since Advance stops at one
+   --  and the shell's answer clears it.
+   procedure Ask_Shell (A : Request_Act; Ctx : in out Work) is
    begin
-      case R.Ctx.Due is
-         when Nothing | Ask_Before_All | Ask_After_All | Ask_Hook =>
+      case A is
+         when Ask_Before_All =>
+            Ctx.Requests.Pending := C_Before_All;
+
+         when Ask_After_All  =>
+            Ctx.Requests.Pending := C_After_All;
+
+         when Ask_Hook       =>
+            Ctx.Requests.Pending := C_Hook;
+
+         when Ask_Step       =>
+            Assemble (Ctx);
+            Ctx.Requests.Pending := C_Step;
+      end case;
+   end Ask_Shell;
+
+   procedure Run_Scenario_Act (A : Scenario_Act; Ctx : in out Work) is
+   begin
+      case A is
+         when Open_Scenario  =>
+            Open (Ctx);
+
+         when Enter_Scenario =>
+            Enter (Ctx);
+
+         when Enter_Skipped  =>
+            Skip (Ctx);
+            Enter (Ctx);
+
+         when Close_Scenario =>
+            Close (Ctx);
+
+         when Drop_Unentered =>
+            Drop (Ctx, Entered => False);
+
+         when Drop_Entered   =>
+            Drop (Ctx, Entered => True);
+      end case;
+   end Run_Scenario_Act;
+
+   procedure Run_Step_Act (A : Step_Act; Ctx : in out Work) is
+   begin
+      case A is
+         when Mark_Undefined =>
+            Close_Step_As (Ctx, Results.Undefined, No_Definition);
+
+         when Skip_Step      =>
+            Close_Step_As (Ctx, Results.Skipped, Not_Run);
+
+         when Refuse_Step    =>
+            Refuse (Ctx);
+
+         when Fail_Step      =>
+            Close_Step_As (Ctx, Results.Failed, Executed);
+
+         when Pass_Step      =>
+            Close_Step_As (Ctx, Results.Passed, Executed);
+      end case;
+   end Run_Step_Act;
+
+   procedure Run_Feature_Act (A : Feature_Act; Ctx : in out Work) is
+   begin
+      case A is
+         when Close_Feature    =>
+            Release (Ctx);
+
+         when Count_Hook_Error =>
+            Results.Add_Hook_Error (Ctx.Totals);
+      end case;
+   end Run_Feature_Act;
+
+   procedure Execute (A : Act; Ctx : in out Work; Evt : Event) is
+      pragma Unreferenced (Evt);
+   begin
+      case A is
+         when Nothing      =>
             null;
 
-         when Ask_Step                                            =>
-            Assemble (R);
+         when Request_Act  =>
+            Ask_Shell (A, Ctx);
 
-         when Open_Scenario                                       =>
-            Open (R);
+         when Scenario_Act =>
+            Run_Scenario_Act (A, Ctx);
 
-         when Enter_Scenario                                      =>
-            Enter (R);
+         when Step_Act     =>
+            Run_Step_Act (A, Ctx);
 
-         when Enter_Skipped                                       =>
-            Skip (R.Ctx);
-            Enter (R);
-
-         when Mark_Undefined                                      =>
-            Close_Step_As (R, Results.Undefined, No_Definition);
-
-         when Skip_Step                                           =>
-            Close_Step_As (R, Results.Skipped, Not_Run);
-
-         when Refuse_Step                                         =>
-            Refuse (R);
-
-         when Fail_Step                                           =>
-            Close_Step_As (R, Results.Failed, Executed);
-
-         when Pass_Step                                           =>
-            Close_Step_As (R, Results.Passed, Executed);
-
-         when Close_Scenario                                      =>
-            Close (R);
-
-         when Drop_Unentered                                      =>
-            Drop (R, Entered => False);
-
-         when Drop_Entered                                        =>
-            Drop (R, Entered => True);
-
-         when Close_Feature                                       =>
-            Release (R);
-
-         when Count_Hook_Error                                    =>
-            Results.Add_Hook_Error (R.Totals);
+         when Feature_Act  =>
+            Run_Feature_Act (A, Ctx);
       end case;
-   end Perform;
+   end Execute;
 
    ---------------------------------------------------------------------
    --  The engine loop.
    ---------------------------------------------------------------------
-
-   procedure Fire (R : in out Runner; Kind : Event_Kind; Handled : out Boolean)
-   is
-   begin
-      R.Ctx.Due := Nothing;
-      SM.Process_Event (R.Machine, R.Ctx, (Kind => Kind), Handled);
-      if Handled then
-         Perform (R);
-      end if;
-   end Fire;
 
    --  One machine step from the cursor of the current state; Moved is
    --  False where only the shell can move the runner on.
@@ -711,20 +742,28 @@ is
       Moved := False;
       case Fact.Cursor is
          when Hook_Cursor     =>
-            R.Hook := Next_Hook (R, Fact.Phase);
-            Fire
-              (R,
-               (if R.Hook /= No_Row then E_Hook_Due else E_Hooks_Done),
+            R.Run.Ctx.Hook := Next_Hook (R.Run.Ctx, Fact.Phase);
+            Bundle.Process_Event
+              (R.Run,
+               (Kind =>
+                  (if R.Run.Ctx.Hook /= No_Row
+                   then E_Hook_Due
+                   else E_Hooks_Done)),
                Moved);
 
          when Scenario_Cursor =>
-            Seek_Scenario (R, Found);
-            Fire
-              (R, (if Found then E_Scenario_Due else E_Scenarios_Done), Moved);
+            Seek_Scenario (R.Run.Ctx, Found);
+            Bundle.Process_Event
+              (R.Run,
+               (Kind => (if Found then E_Scenario_Due else E_Scenarios_Done)),
+               Moved);
 
          when Step_Cursor     =>
-            Seek_Step (R, Found);
-            Fire (R, (if Found then E_Step_Due else E_Steps_Done), Moved);
+            Seek_Step (R.Run.Ctx, Found);
+            Bundle.Process_Event
+              (R.Run,
+               (Kind => (if Found then E_Step_Due else E_Steps_Done)),
+               Moved);
 
          when Shell_Moves     =>
             null;
@@ -737,8 +776,8 @@ is
       Moved : Boolean := True;
    begin
       while Moved
-        and then not R.Noticed
-        and then R.Ctx.Requests.Pending = C_None
+        and then not R.Run.Ctx.Noticed
+        and then R.Run.Ctx.Requests.Pending = C_None
       loop
          Move (R, Moved);
       end loop;
@@ -748,7 +787,7 @@ is
    procedure Trigger (R : in out Runner; Kind : Event_Kind) is
       Handled : Boolean;
    begin
-      Fire (R, Kind, Handled);
+      Bundle.Process_Event (R.Run, (Kind => Kind), Handled);
       if Handled then
          Advance (R);
       end if;
@@ -761,15 +800,8 @@ is
    procedure Start_Run (R : out Runner; Opts : Options) is
    begin
       R :=
-        (Machine => Started,
-         Ctx     =>
-           (Continue => Opts.Continue_On_Failure,
-            Dry_Run  => Opts.Dry_Run,
-            others   => <>),
-         Opts    => Opts,
-         Doc     => null,
-         Lines   => All_Lines,
-         others  => <>);
+        (Run =>
+           (Count => Rows, M => Started, Ctx => (Opts => Opts, others => <>)));
       Advance (R);
    end Start_Run;
 
@@ -779,99 +811,100 @@ is
       File  : String;
       Lines : Line_Selection) is
    begin
-      R.Doc := Doc;
-      R.Lines := Lines;
-      R.Scenario := Ast.No_Scenario;
-      R.Example := Expand.No_Example;
-      R.Frame := (others => <>);
-      R.Frame.File := Frames.To_Path (File);
-      R.Frame.Feature :=
+      R.Run.Ctx.Doc := Doc;
+      R.Run.Ctx.Lines := Lines;
+      R.Run.Ctx.Scenario := Ast.No_Scenario;
+      R.Run.Ctx.Example := Expand.No_Example;
+      R.Run.Ctx.Frame := (others => <>);
+      R.Run.Ctx.Frame.File := Frames.To_Path (File);
+      R.Run.Ctx.Frame.Feature :=
         Frames.To_Name (Ast.Text (Doc.all, Ast.Feature (Doc.all).Head.Name));
-      R.Frame.Feature_Line := Ast.Feature (Doc.all).Head.Line;
+      R.Run.Ctx.Frame.Feature_Line := Ast.Feature (Doc.all).Head.Line;
       Trigger (R, E_Feature);
    end Start_Feature;
 
    procedure Note_Parse_Error (R : in out Runner) is
    begin
-      Results.Add_Parse_Error (R.Totals);
+      Results.Add_Parse_Error (R.Run.Ctx.Totals);
    end Note_Parse_Error;
 
    procedure Finish_Run (R : in out Runner) is
    begin
-      R.Frame := (others => <>);
+      R.Run.Ctx.Frame := (others => <>);
       Trigger (R, E_Finish);
    end Finish_Run;
 
+   --  The shell has read the notice.
    procedure Resume (R : in out Runner) is
    begin
-      R.Noticed := False;
+      R.Run.Ctx.Noticed := False;
       Advance (R);
    end Resume;
 
-   procedure Fail_Scenario (R : in out Runner; Outcome : Check.Outcome) is
+   procedure Fail_Scenario (Ctx : in out Work; Outcome : Check.Outcome) is
    begin
-      R.Ctx.Standing := Failed;
-      R.Scenario_Outcome := Outcome;
+      Ctx.Standing := Failed;
+      Ctx.Scenario_Outcome := Outcome;
    end Fail_Scenario;
 
    --  A skip, an ignore or a scenario failure, from any hook or step.
-   procedure Take_Order (R : in out Runner; Outcome : Check.Outcome) is
+   procedure Take_Order (Ctx : in out Work; Outcome : Check.Outcome) is
    begin
       case Outcome.Order is
          when Check.Continue        =>
             null;
 
          when Check.Skip_Scenario   =>
-            Skip (R.Ctx);
+            Skip (Ctx);
 
          when Check.Ignore_Scenario =>
-            R.Ctx.Ignored := True;
+            Ctx.Ignored := True;
 
          when Check.Fail_Scenario   =>
-            Fail_Scenario (R, Outcome);
+            Fail_Scenario (Ctx, Outcome);
       end case;
    end Take_Order;
 
    --  A step's own outcome, or a step hook's: a failure fails the step.
-   procedure Take_Step_Outcome (R : in out Runner; Outcome : Check.Outcome) is
+   procedure Take_Step_Outcome (Ctx : in out Work; Outcome : Check.Outcome) is
    begin
       if not Outcome.Passing then
-         R.Ctx.Step_Failed := True;
-         R.Step_Outcome := Outcome;
+         Ctx.Step_Failed := True;
+         Ctx.Step_Outcome := Outcome;
       end if;
-      Take_Order (R, Outcome);
+      Take_Order (Ctx, Outcome);
    end Take_Step_Outcome;
 
    --  A scenario hook's outcome: a failure fails the scenario itself.
-   procedure Take_Scenario_Outcome (R : in out Runner; Outcome : Check.Outcome)
+   procedure Take_Scenario_Outcome (Ctx : in out Work; Outcome : Check.Outcome)
    is
    begin
       if not Outcome.Passing then
-         Fail_Scenario (R, Outcome);
+         Fail_Scenario (Ctx, Outcome);
       end if;
-      Take_Order (R, Outcome);
+      Take_Order (Ctx, Outcome);
    end Take_Scenario_Outcome;
 
    --  A hook's outcome goes where its phase says: an all-hook phase
    --  remembers a failure, a scenario hook's reaches the scenario, a
    --  step hook's the step.
    procedure Take_Hook_Outcome
-     (R : in out Runner; Phase : Reg.Hook_Phase; Outcome : Check.Outcome) is
+     (Ctx : in out Work; Phase : Reg.Hook_Phase; Outcome : Check.Outcome) is
    begin
       case Phase is
          when Reg.Run_Start                         =>
-            R.Ctx.Before_All_Failed :=
-              R.Ctx.Before_All_Failed or else not Outcome.Passing;
+            Ctx.Before_All_Failed :=
+              Ctx.Before_All_Failed or else not Outcome.Passing;
 
          when Reg.Run_End                           =>
-            R.Ctx.After_All_Failed :=
-              R.Ctx.After_All_Failed or else not Outcome.Passing;
+            Ctx.After_All_Failed :=
+              Ctx.After_All_Failed or else not Outcome.Passing;
 
          when Reg.Scenario_Start | Reg.Scenario_End =>
-            Take_Scenario_Outcome (R, Outcome);
+            Take_Scenario_Outcome (Ctx, Outcome);
 
          when Reg.Step_Start | Reg.Step_End         =>
-            Take_Step_Outcome (R, Outcome);
+            Take_Step_Outcome (Ctx, Outcome);
       end case;
    end Take_Hook_Outcome;
 
@@ -880,17 +913,17 @@ is
    procedure Post_Hook_Result (R : in out Runner; Outcome : Check.Outcome) is
       Fact : constant State_Fact := Facts (State_Of (R));
    begin
-      R.Ctx.Requests.Pending := C_None;
+      R.Run.Ctx.Requests.Pending := C_None;
       if Fact.Cursor = Hook_Cursor then
-         Take_Hook_Outcome (R, Fact.Phase, Outcome);
+         Take_Hook_Outcome (R.Run.Ctx, Fact.Phase, Outcome);
       end if;
       Advance (R);
    end Post_Hook_Result;
 
    procedure Post_Step_Result (R : in out Runner; Outcome : Check.Outcome) is
    begin
-      R.Ctx.Requests.Pending := C_None;
-      Take_Step_Outcome (R, Outcome);
+      R.Run.Ctx.Requests.Pending := C_None;
+      Take_Step_Outcome (R.Run.Ctx, Outcome);
       Trigger (R, E_Posted);
    end Post_Step_Result;
 

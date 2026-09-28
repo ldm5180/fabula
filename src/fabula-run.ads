@@ -18,6 +18,7 @@ with Fabula.Texts;
 private with Fabula.Expand;
 private with Fabula.Step_Walk;
 private with Sml.Machines;
+private with Sml.Machines.Bundled;
 private with Sml.Request_Block;
 
 generic
@@ -313,8 +314,9 @@ private
       Before_All_Failed,   --  a Before_All hook failed
       After_All_Failed);   --  an After_All hook failed
 
-   --  What a transition asks the core to do.  The Ask_* acts are the
-   --  shell's requests; the rest are the core's own bookkeeping.
+   --  What a transition does.  The Ask_* acts are the shell's requests;
+   --  the rest are the core's own bookkeeping.  The acts are declared
+   --  in groups, so each group below is a range.
    type Act is
      (Nothing,
       Ask_Before_All,
@@ -324,34 +326,75 @@ private
       Open_Scenario,
       Enter_Scenario,
       Enter_Skipped,
+      Close_Scenario,
+      Drop_Unentered,
+      Drop_Entered,
       Mark_Undefined,
       Skip_Step,
       Refuse_Step,
       Fail_Step,
       Pass_Step,
-      Close_Scenario,
-      Drop_Unentered,
-      Drop_Entered,
       Close_Feature,
       Count_Hook_Error);
 
-   --  The machine context: the request block, the act the last
-   --  transition asked for, and every flag the guards read.
+   --  The acts that ask the shell to run a hook or a step.
+   subtype Request_Act is Act range Ask_Before_All .. Ask_Step;
+
+   --  The acts that open, enter, close or drop a scenario.
+   subtype Scenario_Act is Act range Open_Scenario .. Drop_Entered;
+
+   --  The acts that close a step without running it, or after it ran.
+   subtype Step_Act is Act range Mark_Undefined .. Pass_Step;
+
+   --  The feature's and the whole run's bookkeeping.
+   subtype Feature_Act is Act range Close_Feature .. Count_Hook_Error;
+
+   --  The machine context: every field the guards read and the acts
+   --  write.  Hook is the row last requested in the current hook phase,
+   --  No_Row at its start.  Scenario and Example walk the feature; Walk
+   --  walks one scenario's steps.  Tally counts this scenario's steps
+   --  until it closes, so a dropped one counts none.
    type Work is record
-      Requests          : Req.Block;
-      Due               : Act := Nothing;
-      Continue          : Boolean := False;
-      Dry_Run           : Boolean := False;
+      --  The run's options, loaded once by Start_Run.
+      Opts : Options;
+
+      --  This feature, and the scenario filter's lines.
+      Doc   : Args.Document_Access;
+      Lines : Line_Selection;
+
+      --  What waits for the shell: one request, or one notice.
+      Requests : Req.Block;
+      Noticed  : Boolean := False;
+      Note     : Notice;
+
+      --  What the shell reads with a request or a notice.
+      Frame          : Frames.Frame;
+      Hook           : Natural := No_Row;
+      Match          : Reg.Match_Result;
+      Step_Arguments : Args.List;
+
+      --  The run.
+      Totals            : Results.Counts;
       Before_All_Failed : Boolean := False;
       After_All_Failed  : Boolean := False;
-      Selected          : Boolean := True;
-      Ignored           : Boolean := False;
-      Standing          : Disposition := Running;
-      Last_Passed       : Boolean := True;
-      Text_Ok           : Boolean := False;
-      Found             : Boolean := False;
-      Args_Fit          : Boolean := False;
-      Step_Failed       : Boolean := False;
+
+      --  The scenario walk: where it stands, and how the scenario stands.
+      Scenario         : Ast.Scenario_Handle := Ast.No_Scenario;
+      Example          : Expand.Example_Ref;
+      Tag_Set          : Expand.Tag_Set;
+      Selected         : Boolean := True;
+      Ignored          : Boolean := False;
+      Standing         : Disposition := Running;
+      Scenario_Outcome : Check.Outcome;
+      Tally            : Results.Counts;
+
+      --  The step walk: the step, and what resolving it found.
+      Walk         : Step_Walk.Walk := Step_Walk.Empty;
+      Text         : Expand.Text_Result;
+      Args_Fit     : Boolean := False;
+      Last_Passed  : Boolean := True;
+      Step_Failed  : Boolean := False;
+      Step_Outcome : Check.Outcome;
    end record;
 
    function Kind_Of (Evt : Event) return Event_Kind
@@ -359,7 +402,7 @@ private
 
    function Evaluate (G : Guard_Kind; Ctx : Work; Evt : Event) return Boolean;
 
-   --  Records A; an Ask_* act also becomes the pending request.
+   --  Does A's work on Ctx; an Ask_* act also writes its request.
    procedure Execute (A : Act; Ctx : in out Work; Evt : Event);
 
    package SM is new
@@ -374,83 +417,66 @@ private
         Evaluate    => Evaluate,
         Execute     => Execute);
 
+   package Bundle is new SM.Bundled;
+
    Rows : constant := 32;
    --  The transition table's length; a Runner embeds a machine of it.
 
-   --  Hook is the row last requested in the current hook phase, No_Row
-   --  at its start.  Scenario and Example walk the feature; Walk walks
-   --  one scenario's steps.  Tally counts this scenario's steps until it
-   --  closes, so a dropped one counts none.
+   --  The machine and its context, in one object: nothing of the run
+   --  is kept beside the machine.
    type Runner is record
-      Machine          : SM.Machine (Rows);
-      Ctx              : Work;
-      Opts             : Options;
-      Doc              : Args.Document_Access;
-      Lines            : Line_Selection;
-      Frame            : Frames.Frame;
-      Totals           : Results.Counts;
-      Tally            : Results.Counts;
-      Noticed          : Boolean := False;
-      Note             : Notice;
-      Hook             : Natural := No_Row;
-      Scenario         : Ast.Scenario_Handle := Ast.No_Scenario;
-      Example          : Expand.Example_Ref;
-      Tag_Set          : Expand.Tag_Set;
-      Walk             : Step_Walk.Walk := Step_Walk.Empty;
-      Text             : Expand.Text_Result;
-      Match            : Reg.Match_Result;
-      Step_Arguments   : Args.List;
-      Step_Outcome     : Check.Outcome;
-      Scenario_Outcome : Check.Outcome;
+      Run : Bundle.Instance (Rows);
    end record;
 
    function Next_Request (R : Runner) return Command
-   is (R.Ctx.Requests.Pending);
+   is (R.Run.Ctx.Requests.Pending);
 
    function Has_Notice (R : Runner) return Boolean
-   is (R.Noticed);
+   is (R.Run.Ctx.Noticed);
 
    function Between_Features (R : Runner) return Boolean
-   is (SM.State_Of (R.Machine) = Ready
-       and then not R.Noticed
-       and then R.Ctx.Requests.Pending = C_None);
+   is (Bundle.State_Of (R.Run) = Ready
+       and then not R.Run.Ctx.Noticed
+       and then R.Run.Ctx.Requests.Pending = C_None);
 
    function Run_Finished (R : Runner) return Boolean
-   is (SM.State_Of (R.Machine) = Finished);
+   is (Bundle.State_Of (R.Run) = Finished);
 
    function Waiting_For (R : Runner) return Wait_Kind
-   is (if R.Noticed and then R.Ctx.Requests.Pending /= C_None
+   is (if R.Run.Ctx.Noticed and then R.Run.Ctx.Requests.Pending /= C_None
        then Clash
-       elsif R.Noticed
+       elsif R.Run.Ctx.Noticed
        then Notice_Wait
        else
-         (case R.Ctx.Requests.Pending is
+         (case R.Run.Ctx.Requests.Pending is
             when C_Step                     => Step_Wait,
             when C_Before_All | C_After_All => All_Hook_Wait,
             when C_Hook                     => Hook_Wait,
             when C_None                     =>
-              (if SM.State_Of (R.Machine) in Ready | Finished
+              (if Bundle.State_Of (R.Run) in Ready | Finished
                then Idle
                else Stuck)));
 
    function Current_Notice (R : Runner) return Notice
-   is (R.Note);
+   is (R.Run.Ctx.Note);
 
    function Pending_Hook (R : Runner) return Natural
-   is (if R.Ctx.Requests.Pending in C_Before_All | C_After_All | C_Hook
-       then R.Hook
+   is (if R.Run.Ctx.Requests.Pending in C_Before_All | C_After_All | C_Hook
+       then R.Run.Ctx.Hook
        else No_Row);
 
    function Pending_Step (R : Runner) return Natural
-   is (if R.Ctx.Requests.Pending = C_Step then R.Match.Index else No_Row);
+   is (if R.Run.Ctx.Requests.Pending = C_Step
+       then R.Run.Ctx.Match.Index
+       else No_Row);
 
    function Step_Args (R : Runner) return Args.List
-   is (R.Step_Arguments);
+   is (R.Run.Ctx.Step_Arguments);
 
    function Current_Frame (R : Runner) return Frames.Frame
-   is (R.Frame);
+   is (R.Run.Ctx.Frame);
 
    function Counts_Of (R : Runner) return Results.Counts
-   is (R.Totals);
+   is (R.Run.Ctx.Totals);
 
 end Fabula.Run;
