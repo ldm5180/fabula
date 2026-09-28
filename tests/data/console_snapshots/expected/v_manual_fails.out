@@ -1,0 +1,32 @@
+Feature: Set Scenario manual to fail  example/features/11_manual_fails.feature:1
+
+[   VERBOSE   ] ----------------------------------
+[   VERBOSE   ] Scenario Start 'Steps are skipped' - File: example/features/11_manual_fails.feature:4
+[   VERBOSE   ] No tags given, continuing
+Scenario: Steps are skipped  example/features/11_manual_fails.feature:4
+[   SKIPPED   ] Given An empty box  example/features/11_manual_fails.feature:5
+[   SKIPPED   ] When I place 1 x "apple" in it  example/features/11_manual_fails.feature:6
+[   SKIPPED   ] Then The box contains 1 item  example/features/11_manual_fails.feature:7
+Example of Fabula.Check.Fail to bring a scenario to fail before running it
+[   VERBOSE   ] Scenario end
+[   VERBOSE   ] ----------------------------------
+
+
+[   VERBOSE   ] ----------------------------------
+[   VERBOSE   ] Scenario Start 'Steps aren't skipped' - File: example/features/11_manual_fails.feature:10
+[   VERBOSE   ] No tags given, continuing
+Scenario: Steps aren't skipped  example/features/11_manual_fails.feature:10
+[   PASSED    ] Given An empty box  example/features/11_manual_fails.feature:11
+[   PASSED    ] When I place 1 x "apple" in it  example/features/11_manual_fails.feature:12
+[   PASSED    ] Then The box contains 1 item  example/features/11_manual_fails.feature:13
+Example of Fabula.Check.Fail to bring a scenario to fail after running it
+[   VERBOSE   ] Scenario end
+[   VERBOSE   ] ----------------------------------
+
+
+Failed Scenarios:
+Steps are skipped  example/features/11_manual_fails.feature:4
+Steps aren't skipped  example/features/11_manual_fails.feature:10
+
+2 Scenarios (2 failed)
+6 Steps (3 skipped, 3 passed)

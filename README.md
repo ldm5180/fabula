@@ -295,16 +295,21 @@ make ci         # all of the above, cheapest first
    recapture-check` re-runs both oracle builds over every golden and
    compares byte for byte, reproducing all 22.
 3. **Fabula's own expectations** (`tests/data/fabula_only/`,
-   `tests/data/json_snapshots/`): behavior the reference interpreter
-   cannot vouch for. It turns a bad number into `0` instead of failing
-   the step, and its JSON report differs from fabula's in two named
-   fields. `make fabula-only` checks that a bad count fails its step
-   and adds nothing, runs `json_report_check.py` (2/2: a valid JSON
-   report for a scenario dropped before and after entry), and runs
-   `json_snapshot_check.py` (7/7: fabula's JSON report byte for byte,
-   across several features, no feature, no scenario element, dropped
-   scenarios and both report targets). This is regression evidence
-   against fabula's own earlier output, not oracle output.
+   `tests/data/json_snapshots/`, `tests/data/console_snapshots/`):
+   behavior the reference interpreter cannot vouch for. It turns a bad
+   number into `0` instead of failing the step, and its JSON report
+   differs from fabula's in two named fields. `make fabula-only` checks
+   that a bad count fails its step and adds nothing, runs
+   `json_report_check.py` (2/2: a valid JSON report for a scenario
+   dropped before and after entry), runs `json_snapshot_check.py`
+   (7/7: fabula's JSON report byte for byte, across several features,
+   no feature, no scenario element, dropped scenarios and both report
+   targets), and runs `console_snapshot_check.py` (24/24: the console
+   reporter's stdout and exit status byte for byte, under -v, -q, -d,
+   -t, -n, -c, a file:line selection and the startup refusals). This
+   is regression evidence against fabula's own earlier output, not
+   oracle output: the reference interpreter's console output under
+   these flags is not captured anywhere in this repo.
 
 `make demo` runs the full `example/features/` suite (after
 `make fabula-only`) and checks the summary counts against the

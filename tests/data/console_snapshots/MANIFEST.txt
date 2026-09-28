@@ -1,0 +1,93 @@
+# Console snapshots: regression snapshots of fabula's own console
+# output, NOT oracle output.  Each run gets one file under expected/,
+# <name>.out, holding the exact stdout bytes the RELEASE example
+# binary wrote, and tools/console_snapshot_check.py compares every
+# run with its file and its exit status, byte for byte.  fabula
+# writes all console output to stdout, so a run with any stderr bytes
+# fails outright.  The byte gate (tools/byte_gate.py) runs the same
+# binary with no flags at all; these snapshots cover the console
+# reporter under -v, -q, -d, -t, -n, -c, a file:line selection and
+# the startup refusals.
+#
+# One run per line:  name | exit status | argument | argument ...
+#   name         the base of name.out under expected/
+#   exit status  the run's expected exit code
+# Arguments are repo-relative; every run starts in the repo root.
+
+# -v on a feature with a skipped, an undefined, an ignored and an
+# outline scenario -- the widest single-file spread of verbose lines.
+v_tags                     | 1 | -v | example/features/4_tags.feature
+
+# -q on the same file: only the failed-scenarios trailer and the
+# summary survive.
+q_tags                     | 1 | -q | example/features/4_tags.feature
+
+# -d and -d -v: -d checks that each step is defined and runs none of
+# them (fabula-cli.ads's own --dry-run description); a defined step
+# still reports SKIPPED and an undefined one still reports UNDEFINED,
+# exactly as d_tags.out shows.
+d_tags                     | 1 | -d | example/features/4_tags.feature
+d_v_tags                   | 1 | -d | -v | example/features/4_tags.feature
+
+# -v and -c -v on a fixture built for -c: a not-skipped scenario whose
+# second step fails, with two steps after it.  Under -v alone those two
+# steps are SKIPPED; under -c -v they still run.
+v_continue                 | 1 | -v | tests/data/console_snapshots/features/continue_on_failure.feature
+c_v_continue               | 1 | -c | -v | tests/data/console_snapshots/features/continue_on_failure.feature
+
+# -v -q and -q -v on the same fixture: -v wins over -q regardless of
+# order (fabula-cli.ads:108: "Verbose wins whatever the order."), so
+# both match the plain -v run above byte for byte.
+v_q_continue               | 1 | -v | -q | tests/data/console_snapshots/features/continue_on_failure.feature
+q_v_continue               | 1 | -q | -v | tests/data/console_snapshots/features/continue_on_failure.feature
+
+# -t @important -v on 5_tagged_hooks.feature: the tag filter drops the
+# first scenario before entry, so its verbose block never opens the
+# scenario header at all.
+t_important_v_tagged_hooks | 0 | -t | @important | -v | example/features/5_tagged_hooks.feature
+
+# -t "not @skip" -v on 4_tags.feature: the multi-line verbose tag
+# check, wrapped onto a second line, for every scenario the filter
+# keeps and drops.
+t_not_skip_v_tags          | 0 | -t | not @skip | -v | example/features/4_tags.feature
+
+# -n Apple -v on 4_tags.feature: the name filter keeps one scenario.
+n_apple_v_tags             | 0 | -n | Apple | -v | example/features/4_tags.feature
+
+# A file:line selection with -v (4_tags.feature:28): a different
+# selection path to the same single scenario -n Apple keeps above.
+v_tags_line_28             | 0 | -v | example/features/4_tags.feature:28
+
+# -v on 11_manual_fails.feature: Fabula.Check.Fail called manually,
+# both before and after a scenario's steps run.
+v_manual_fails             | 1 | -v | example/features/11_manual_fails.feature
+
+# -v on 3_background.feature: a Background block's steps folded into
+# two scenarios.
+v_background               | 0 | -v | example/features/3_background.feature
+
+# -v on a fixture with no reference-interpreter corpus counterpart: a
+# scenario an After hook drops once its own steps already streamed.
+v_dropped_after_entry      | 0 | -v | tests/data/fixtures/scenario_dropped_after_entry.feature
+
+# -v on a fixture with a failing step and an undefined step in the
+# same feature.
+v_failing_undefined        | 1 | -v | tests/data/fixtures/failing_undefined.feature
+
+# A missing feature path: Files.Missing stays exit-0 (Program.adb's
+# own Discover_Status_Fails comment), with nothing discovered to run.
+missing_feature            | 0 | tests/data/fixtures/does_not_exist.feature
+
+# not_feature and bad_line_number: two more file-path statuses, both
+# exit-1 unlike Missing (Program.adb's Discover_Status_Fails names
+# every status but Found and Missing).
+not_feature                | 1 | README.md
+bad_line_number            | 1 | example/features/4_tags.feature:0
+
+# Startup refusals: each stops before any feature loads, so the
+# argument list is the flag alone.
+unknown_flag               | 1 | --bogus-flag
+tags_missing_value         | 1 | -t
+name_missing_value         | 1 | -n
+bad_tag_expression         | 1 | -t | @a and
+help                       | 0 | -h

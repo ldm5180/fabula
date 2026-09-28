@@ -1,0 +1,27 @@
+Feature: A scenario dropped after it entered  tests/data/fixtures/scenario_dropped_after_entry.feature:1
+
+[   VERBOSE   ] ----------------------------------
+[   VERBOSE   ] Scenario Start 'Ignored after all its steps ran' - File: tests/data/fixtures/scenario_dropped_after_entry.feature:8
+[   VERBOSE   ] No tags given, continuing
+Scenario: Ignored after all its steps ran  tests/data/fixtures/scenario_dropped_after_entry.feature:8
+[   PASSED    ] Given An empty box  tests/data/fixtures/scenario_dropped_after_entry.feature:9
+[   PASSED    ] When I place 1 x "apple" in it  tests/data/fixtures/scenario_dropped_after_entry.feature:10
+[   PASSED    ] Then The box contains 1 item  tests/data/fixtures/scenario_dropped_after_entry.feature:11
+[   VERBOSE   ] Scenario end
+[   VERBOSE   ] ----------------------------------
+
+
+[   VERBOSE   ] ----------------------------------
+[   VERBOSE   ] Scenario Start 'A normal scenario runs after it' - File: tests/data/fixtures/scenario_dropped_after_entry.feature:13
+[   VERBOSE   ] No tags given, continuing
+Scenario: A normal scenario runs after it  tests/data/fixtures/scenario_dropped_after_entry.feature:13
+[   PASSED    ] Given An empty box  tests/data/fixtures/scenario_dropped_after_entry.feature:14
+[   PASSED    ] When I place 1 x "banana" in it  tests/data/fixtures/scenario_dropped_after_entry.feature:15
+[   PASSED    ] Then The box contains 1 item  tests/data/fixtures/scenario_dropped_after_entry.feature:16
+[   VERBOSE   ] Scenario end
+[   VERBOSE   ] ----------------------------------
+
+
+
+1 Scenario (1 passed)
+3 Steps (3 passed)

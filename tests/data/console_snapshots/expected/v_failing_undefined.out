@@ -1,0 +1,31 @@
+Feature: A failing step and an undefined step  tests/data/fixtures/failing_undefined.feature:1
+
+[   VERBOSE   ] ----------------------------------
+[   VERBOSE   ] Scenario Start 'The step fails' - File: tests/data/fixtures/failing_undefined.feature:3
+[   VERBOSE   ] No tags given, continuing
+Scenario: The step fails  tests/data/fixtures/failing_undefined.feature:3
+[   PASSED    ] Given An empty box  tests/data/fixtures/failing_undefined.feature:4
+[   PASSED    ] When I place 1 x "apple" in it  tests/data/fixtures/failing_undefined.feature:5
+Value 1 is not equal to 2
+[   FAILED    ] Then The box contains 2 items  tests/data/fixtures/failing_undefined.feature:6
+[   VERBOSE   ] Scenario end
+[   VERBOSE   ] ----------------------------------
+
+
+[   VERBOSE   ] ----------------------------------
+[   VERBOSE   ] Scenario Start 'The step is undefined' - File: tests/data/fixtures/failing_undefined.feature:8
+[   VERBOSE   ] No tags given, continuing
+Scenario: The step is undefined  tests/data/fixtures/failing_undefined.feature:8
+[   PASSED    ] Given An empty box  tests/data/fixtures/failing_undefined.feature:9
+[   UNDEFINED ] When Nobody registered this step at all  tests/data/fixtures/failing_undefined.feature:10
+[   SKIPPED   ] Then The box contains 1 item  tests/data/fixtures/failing_undefined.feature:11
+[   VERBOSE   ] Scenario end
+[   VERBOSE   ] ----------------------------------
+
+
+Failed Scenarios:
+The step fails  tests/data/fixtures/failing_undefined.feature:3
+The step is undefined  tests/data/fixtures/failing_undefined.feature:8
+
+2 Scenarios (2 failed)
+6 Steps (1 failed, 1 undefined, 1 skipped, 3 passed)
