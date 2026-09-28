@@ -1,0 +1,26 @@
+Feature: Scenarios with tags  example/features/5_tagged_hooks.feature:1
+
+[   VERBOSE   ] ----------------------------------
+[   VERBOSE   ] Scenario Start 'We want to ship cucumbers' - File: example/features/5_tagged_hooks.feature:4
+[   VERBOSE   ] Scenario tags '@ship'
+                checked against tag expression '@important' -> 'False', stopping scenario
+[   VERBOSE   ] Scenario ignored
+[   VERBOSE   ] Scenario end
+[   VERBOSE   ] ----------------------------------
+
+[   VERBOSE   ] ----------------------------------
+[   VERBOSE   ] Scenario Start 'Important items must be shipped immediately' - File: example/features/5_tagged_hooks.feature:10
+[   VERBOSE   ] Scenario tags '@important'
+                checked against tag expression '@important' -> 'True', continuing with scenario
+Scenario: Important items must be shipped immediately  example/features/5_tagged_hooks.feature:10
+[   PASSED    ] Given An empty box  example/features/5_tagged_hooks.feature:11
+[   PASSED    ] When I place 2 x "important items" in it  example/features/5_tagged_hooks.feature:12
+[   PASSED    ] Then The box contains 2 item  example/features/5_tagged_hooks.feature:13
+The box is shipped! 
+[   VERBOSE   ] Scenario end
+[   VERBOSE   ] ----------------------------------
+
+
+
+1 Scenario (1 passed)
+3 Steps (3 passed)

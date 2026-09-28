@@ -1,0 +1,14 @@
+fabula: a Cucumber/Gherkin test runner
+usage: <binary> [<file>.feature | <file>.feature:LINE... | <dir>]... [options]
+
+options:
+  -h, --help                   print this help and exit
+  -q, --quiet                  print only errors and the summary
+  -v, --verbose                print extra detail as a scenario runs
+  -d, --dry-run                check steps are defined; run none of them
+  -c, --continue-on-failure    keep running a scenario's steps after one fails
+  -t, --tags <EXPRESSION>      run only scenarios the tag expression selects
+  -n, --name <PATTERN>         run only scenarios whose name matches; ':' separates
+                               several patterns, '*' and '?' wildcard
+  --exclude-file <SUFFIX>      skip a discovered file whose path ends in SUFFIX
+  --report-json [FILE]         write a JSON report to FILE, or to stdout

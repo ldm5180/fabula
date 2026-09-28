@@ -1,0 +1,47 @@
+Feature: Scenarios with tags  example/features/4_tags.feature:2
+
+Scenario: Tomatoes  example/features/4_tags.feature:4
+[   SKIPPED   ] Given An empty box  example/features/4_tags.feature:5
+[   SKIPPED   ] When I place 5 x "Tomatoes" in it  example/features/4_tags.feature:6
+[   SKIPPED   ] Then The box contains 5 items  example/features/4_tags.feature:7
+
+Scenario: This will be skipped  example/features/4_tags.feature:10
+[   SKIPPED   ] Given An empty box  example/features/4_tags.feature:11
+[   SKIPPED   ] When I place 1 x "whatever" in it  example/features/4_tags.feature:12
+
+Scenario: This will be skipped too  example/features/4_tags.feature:15
+[   SKIPPED   ] Given An empty box  example/features/4_tags.feature:16
+[   SKIPPED   ] When I place 1 x "whatever" in it  example/features/4_tags.feature:17
+[   UNDEFINED ] Then This is an undefined step even when we use skip  example/features/4_tags.feature:18
+
+Scenario: Apple  example/features/4_tags.feature:28
+[   SKIPPED   ] Given An empty box  example/features/4_tags.feature:29
+[   SKIPPED   ] When I place 2 x "apple" in it  example/features/4_tags.feature:30
+[   SKIPPED   ] Then The box contains 2 items  example/features/4_tags.feature:31
+
+Scenario: Apples and Bananas  example/features/4_tags.feature:34
+[   SKIPPED   ] Given An empty box  example/features/4_tags.feature:35
+[   SKIPPED   ] When I place 2 x "apple" in it  example/features/4_tags.feature:36
+[   SKIPPED   ] And I place 2 x "banana" in it  example/features/4_tags.feature:37
+[   SKIPPED   ] Then The box contains 4 items  example/features/4_tags.feature:38
+
+Scenario Outline: Lets put "orange" into the box  example/features/4_tags.feature:48
+[   SKIPPED   ] Given An empty box  example/features/4_tags.feature:41
+[   SKIPPED   ] When I place 1 x "orange" in it  example/features/4_tags.feature:42
+[   SKIPPED   ] Then The box contains 1 items  example/features/4_tags.feature:43
+
+Scenario Outline: Lets put "oranges" into the box  example/features/4_tags.feature:53
+[   SKIPPED   ] Given An empty box  example/features/4_tags.feature:41
+[   SKIPPED   ] When I place 3 x "oranges" in it  example/features/4_tags.feature:42
+[   SKIPPED   ] Then The box contains 3 items  example/features/4_tags.feature:43
+
+Scenario Outline: Lets put "some stuff" into the box  example/features/4_tags.feature:54
+[   SKIPPED   ] Given An empty box  example/features/4_tags.feature:41
+[   SKIPPED   ] When I place 1 x "some stuff" in it  example/features/4_tags.feature:42
+[   SKIPPED   ] Then The box contains 1 items  example/features/4_tags.feature:43
+
+Failed Scenarios:
+This will be skipped too  example/features/4_tags.feature:15
+
+8 Scenarios (1 failed, 7 skipped)
+24 Steps (1 undefined, 23 skipped)

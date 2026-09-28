@@ -1,0 +1,20 @@
+Feature: Continuing past a failing step  tests/data/console_snapshots/features/continue_on_failure.feature:1
+
+[   VERBOSE   ] ----------------------------------
+[   VERBOSE   ] Scenario Start 'A failing assertion part way through' - File: tests/data/console_snapshots/features/continue_on_failure.feature:3
+[   VERBOSE   ] No tags given, continuing
+Scenario: A failing assertion part way through  tests/data/console_snapshots/features/continue_on_failure.feature:3
+[   PASSED    ] Given An empty box  tests/data/console_snapshots/features/continue_on_failure.feature:4
+Value 0 is not equal to 1
+[   FAILED    ] Then The box contains 1 item  tests/data/console_snapshots/features/continue_on_failure.feature:5
+[   SKIPPED   ] When I place 1 x "apple" in it  tests/data/console_snapshots/features/continue_on_failure.feature:6
+[   SKIPPED   ] Then The box contains 1 item  tests/data/console_snapshots/features/continue_on_failure.feature:7
+[   VERBOSE   ] Scenario end
+[   VERBOSE   ] ----------------------------------
+
+
+Failed Scenarios:
+A failing assertion part way through  tests/data/console_snapshots/features/continue_on_failure.feature:3
+
+1 Scenario (1 failed)
+4 Steps (1 failed, 2 skipped, 1 passed)

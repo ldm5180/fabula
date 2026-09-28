@@ -1,0 +1,30 @@
+Feature: We always need apples!  example/features/3_background.feature:1
+
+[   VERBOSE   ] ----------------------------------
+[   VERBOSE   ] Scenario Start 'Apples Apples Apples' - File: example/features/3_background.feature:7
+[   VERBOSE   ] No tags given, continuing
+Scenario: Apples Apples Apples  example/features/3_background.feature:7
+[   PASSED    ] Given An empty box  example/features/3_background.feature:4
+[   PASSED    ] When I place 1 x "apple" in it  example/features/3_background.feature:5
+[   PASSED    ] When I place 1 x "apple" in it  example/features/3_background.feature:8
+[   PASSED    ] Then The box contains 2 items  example/features/3_background.feature:9
+[   VERBOSE   ] Scenario end
+[   VERBOSE   ] ----------------------------------
+
+
+[   VERBOSE   ] ----------------------------------
+[   VERBOSE   ] Scenario Start 'Apples and Bananas' - File: example/features/3_background.feature:11
+[   VERBOSE   ] No tags given, continuing
+Scenario: Apples and Bananas  example/features/3_background.feature:11
+[   PASSED    ] Given An empty box  example/features/3_background.feature:4
+[   PASSED    ] When I place 1 x "apple" in it  example/features/3_background.feature:5
+[   PASSED    ] When I place 1 x "apple" in it  example/features/3_background.feature:12
+[   PASSED    ] And I place 1 x "banana" in it  example/features/3_background.feature:13
+[   PASSED    ] Then The box contains 3 items  example/features/3_background.feature:14
+[   VERBOSE   ] Scenario end
+[   VERBOSE   ] ----------------------------------
+
+
+
+2 Scenarios (2 passed)
+9 Steps (9 passed)
