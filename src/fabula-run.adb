@@ -17,137 +17,97 @@ is
 
    subtype Ev is Op.Ev;
 
-   Hook_Due       : constant Ev := (Kind => E_Hook_Due);
-   Hooks_Done     : constant Ev := (Kind => E_Hooks_Done);
-   Step_Due       : constant Ev := (Kind => E_Step_Due);
-   Steps_Done     : constant Ev := (Kind => E_Steps_Done);
-   Scenario_Due   : constant Ev := (Kind => E_Scenario_Due);
-   Scenarios_Done : constant Ev := (Kind => E_Scenarios_Done);
-   Feature        : constant Ev := (Kind => E_Feature);
-   Finish         : constant Ev := (Kind => E_Finish);
-   Hook_Posted    : constant Ev := (Kind => E_Hook_Posted);
-   Step_Posted    : constant Ev := (Kind => E_Step_Posted);
+   Tick        : constant Ev := (Kind => E_Tick);
+   Feature     : constant Ev := (Kind => E_Feature);
+   Finish      : constant Ev := (Kind => E_Finish);
+   Hook_Posted : constant Ev := (Kind => E_Hook_Posted);
+   Step_Posted : constant Ev := (Kind => E_Step_Posted);
 
    --  Each row reads:  From + Event (Guard) / Act >= To.  Rows for one
    --  state are tried top to bottom, so a guarded row takes its event
-   --  before the rows below it.  A hook phase ends when its cursor finds
-   --  no further row; a scenario's steps end the same way.  Each act
-   --  does its own work, and an Ask_* act writes its request.  Each
+   --  before the rows below it.  The runner fires Tick until a request
+   --  or a notice waits; Ready, Step_Body and Finished take no Tick, as
+   --  only the shell moves the run on from them.  A hook state asks for
+   --  its phase's next hook while one is due, and its lower Tick rows
+   --  run once none is.  Seek_Scenario and Next_Step move a walk, and
+   --  the check state after each branches on what the walk found.  Each
+   --  act does its own work, and an Ask_* act writes its request.  Each
    --  hook state's Hook_Posted row names the act for its phase, so the
    --  row decides where a hook's outcome goes.  The line above each
    --  block names the guard flags its acts write.
    --!format off
    Table : constant SM.Transition_Table (1 .. Rows) :=
      [
-      --  The run's Before_All hooks; then features, one at a time.
-      --  Writes: Before_All_Failed, Selected, Ignored, Standing,
+      --  The run's Before_All hooks.
+      --  Writes: Before_All_Failed.
+      Opening + Tick (Run_Start_Due)     / Ask_Run_Start_Hook >= Opening,
+      Opening + Hook_Posted              / Take_Run_Start     >= Opening,
+      Opening + Tick (Before_All_Failed) / Count_Hook_Error   >= Ready,
+      Opening + Tick                                          >= Ready,
+
+      --  Then features, one at a time, and each feature's scenarios.
+      --  Writes: Scenario_Found, Selected, Ignored, Standing,
       --  Last_Passed, Step_Failed.
-      Opening + Hook_Due                       / Ask_Before_All   >= Opening,
-      Opening + Hook_Posted                    / Take_Run_Start   >= Opening,
-      Opening + Hooks_Done (Before_All_Failed) / Count_Hook_Error >= Ready,
-      Opening + Hooks_Done                                        >= Ready,
-      Ready   + Feature                                           >= Walking,
-      Ready   + Finish                                            >= Closing,
-      Walking + Scenario_Due                   / Open_Scenario    >= Before,
-      Walking + Scenarios_Done                 / Close_Feature    >= Ready,
+      Ready          + Feature               / Open_Feature  >= Walking,
+      Ready          + Finish                / Begin_Closing >= Closing,
+      Walking        + Tick                  / Seek_Scenario >= Scenario_Check,
+      Scenario_Check + Tick (Scenario_Found) / Open_Scenario >= Before,
+      Scenario_Check + Tick                  / Close_Feature >= Ready,
 
       --  One scenario: its before-hooks, then its steps.  The tag
       --  filter and an ignore both drop it once the hooks have run.
-      --  Writes: Standing, Ignored, Last_Passed.
-      Before   + Hook_Due               / Ask_Hook            >= Before,
-      Before   + Hook_Posted            / Take_Scenario_Start >= Before,
-      Before   + Hooks_Done (Dropped)   / Drop_Unentered      >= Walking,
-      Before   + Hooks_Done (Skips_All) / Enter_Skipped       >= Stepping,
-      Before   + Hooks_Done             / Enter_Scenario      >= Stepping,
-      Stepping + Step_Due (Dropped)     / Drop_Entered        >= Walking,
-      Stepping + Step_Due (Unmatched)   / Mark_Undefined      >= Stepping,
-      Stepping + Step_Due (Must_Skip)   / Skip_Step           >= Stepping,
-      Stepping + Step_Due (Oversized)   / Refuse_Step         >= Stepping,
-      Stepping + Step_Due                                     >= Step_Before,
-      Stepping + Steps_Done (Dropped)   / Drop_Entered        >= Walking,
-      Stepping + Steps_Done (Failing)   / Close_Scenario      >= Walking,
-      Stepping + Steps_Done                                   >= After,
+      --  Writes: Standing, Ignored.
+      Before + Tick (Scenario_Start_Due) / Ask_Scenario_Start_Hook >= Before,
+      Before + Hook_Posted               / Take_Scenario_Start     >= Before,
+      Before + Tick (Dropped)            / Drop_Unentered          >= Walking,
+      Before + Tick (Skips_All)          / Enter_Skipped           >= Stepping,
+      Before + Tick                      / Enter_Scenario          >= Stepping,
+
+      --  Each step in turn, and what becomes of it; with none left,
+      --  the scenario's after-hooks.  The Unmatched, Must_Skip and
+      --  Oversized guards hold only when there is a step.
+      --  Writes: Has_Step, Text, Match, Args_Fit, Step_Failed,
+      --  Last_Passed.
+      Stepping   + Tick             / Next_Step      >= Step_Check,
+      Step_Check + Tick (Dropped)   / Drop_Entered   >= Walking,
+      Step_Check + Tick (Unmatched) / Mark_Undefined >= Stepping,
+      Step_Check + Tick (Must_Skip) / Skip_Step      >= Stepping,
+      Step_Check + Tick (Oversized) / Refuse_Step    >= Stepping,
+      Step_Check + Tick (Has_Step)  / Begin_Step     >= Step_Before,
+      Step_Check + Tick (Failing)   / Close_Scenario >= Walking,
+      Step_Check + Tick             / Begin_After    >= After,
 
       --  One step: its before-step hooks, its body, its after-step
       --  hooks.  A failed before-step hook closes it at once.
       --  Writes: Step_Failed, Standing, Ignored, Last_Passed.
-      Step_Before + Hook_Due                 / Ask_Hook         >= Step_Before,
-      Step_Before + Hook_Posted              / Take_Step_Start  >= Step_Before,
-      Step_Before + Hooks_Done (Step_Failed) / Fail_Step        >= Stepping,
-      Step_Before + Hooks_Done               / Ask_Step         >= Step_Body,
-      Step_Body   + Step_Posted              / Take_Step_Result >= Step_After,
-      Step_After  + Hook_Due                 / Ask_Hook         >= Step_After,
-      Step_After  + Hook_Posted              / Take_Step_End    >= Step_After,
-      Step_After  + Hooks_Done (Step_Failed) / Fail_Step        >= Stepping,
-      Step_After  + Hooks_Done               / Pass_Step        >= Stepping,
+      Step_Before + Tick (Step_Start_Due) / Ask_Step_Start_Hook >= Step_Before,
+      Step_Before + Hook_Posted           / Take_Step_Start     >= Step_Before,
+      Step_Before + Tick (Step_Failed)    / Fail_Step           >= Stepping,
+      Step_Before + Tick                  / Ask_Step            >= Step_Body,
+      Step_Body   + Step_Posted           / Take_Step_Result    >= Step_After,
+      Step_After  + Tick (Step_End_Due)   / Ask_Step_End_Hook   >= Step_After,
+      Step_After  + Hook_Posted           / Take_Step_End       >= Step_After,
+      Step_After  + Tick (Step_Failed)    / Fail_Step           >= Stepping,
+      Step_After  + Tick                  / Pass_Step           >= Stepping,
 
       --  The scenario's after-hooks; an ignore there still drops it.
       --  Writes: Standing, Ignored.
-      After + Hook_Due             / Ask_Hook          >= After,
-      After + Hook_Posted          / Take_Scenario_End >= After,
-      After + Hooks_Done (Dropped) / Drop_Entered      >= Walking,
-      After + Hooks_Done           / Close_Scenario    >= Walking,
+      After + Tick (Scenario_End_Due) / Ask_Scenario_End_Hook >= After,
+      After + Hook_Posted             / Take_Scenario_End     >= After,
+      After + Tick (Dropped)          / Drop_Entered          >= Walking,
+      After + Tick                    / Close_Scenario        >= Walking,
 
       --  The run's After_All hooks.
       --  Writes: After_All_Failed.
-      Closing + Hook_Due                      / Ask_After_All    >= Closing,
-      Closing + Hook_Posted                   / Take_Run_End     >= Closing,
-      Closing + Hooks_Done (After_All_Failed) / Count_Hook_Error >= Finished,
-      Closing + Hooks_Done                                       >= Finished];
+      Closing + Tick (Run_End_Due)      / Ask_Run_End_Hook >= Closing,
+      Closing + Hook_Posted             / Take_Run_End     >= Closing,
+      Closing + Tick (After_All_Failed) / Count_Hook_Error >= Finished,
+      Closing + Tick                                       >= Finished];
    --!format on
 
    function Started return SM.Machine
    is (SM.Make (Table, Initial => Opening))
    with Post => Started'Result.Count = Rows;
-
-   ---------------------------------------------------------------------
-   --  The machine's guards.  A guard reads the context and an act does
-   --  its work there; which event arrived is the table's business, so
-   --  neither reads Evt.
-   ---------------------------------------------------------------------
-
-   function Evaluate (G : Guard_Kind; Ctx : Work; Evt : Event) return Boolean
-   is
-      pragma Unreferenced (Evt);
-   begin
-      case G is
-         when Always            =>
-            return True;
-
-         when Dropped           =>
-            return Ctx.Ignored or else not Ctx.Selected;
-
-         when Skips_All         =>
-            return
-              Ctx.Opts.Dry_Run
-              or else (Ctx.Before_All_Failed
-                       and then not Ctx.Opts.Continue_On_Failure);
-
-         when Unmatched         =>
-            return Ctx.Text.Ok and then not Ctx.Match.Found;
-
-         when Must_Skip         =>
-            return
-              Ctx.Standing /= Running
-              or else (not Ctx.Opts.Continue_On_Failure
-                       and then not Ctx.Last_Passed);
-
-         when Oversized         =>
-            return not Ctx.Text.Ok or else not Ctx.Args_Fit;
-
-         when Step_Failed       =>
-            return Ctx.Step_Failed;
-
-         when Failing           =>
-            return Ctx.Standing = Failed;
-
-         when Before_All_Failed =>
-            return Ctx.Before_All_Failed;
-
-         when After_All_Failed  =>
-            return Ctx.After_All_Failed;
-      end case;
-   end Evaluate;
 
    ---------------------------------------------------------------------
    --  Options.
@@ -168,9 +128,6 @@ is
    ---------------------------------------------------------------------
    --  Hooks: the cursor walks the table in order, one phase at a time.
    ---------------------------------------------------------------------
-
-   function State_Of (R : Runner) return State
-   is (Bundle.State_Of (R.Run));
 
    --  Whether expression E holds for the tag set Set, whose members
    --  are tags of Doc.
@@ -217,6 +174,76 @@ is
       end if;
       return First_Next (Hooks'First, Hooks'Last);
    end Next_Hook;
+
+   ---------------------------------------------------------------------
+   --  The machine's guards.  A guard reads the context and an act does
+   --  its work there; which event arrived is the table's business, so
+   --  neither reads Evt.
+   ---------------------------------------------------------------------
+
+   --  The hook phase each *_Due guard asks about.
+   Phase_Of : constant array (Hook_Due) of Reg.Hook_Phase :=
+     [Run_Start_Due      => Reg.Run_Start,
+      Scenario_Start_Due => Reg.Scenario_Start,
+      Step_Start_Due     => Reg.Step_Start,
+      Step_End_Due       => Reg.Step_End,
+      Scenario_End_Due   => Reg.Scenario_End,
+      Run_End_Due        => Reg.Run_End];
+
+   function Evaluate (G : Guard_Kind; Ctx : Work; Evt : Event) return Boolean
+   is
+      pragma Unreferenced (Evt);
+   begin
+      case G is
+         when Always            =>
+            return True;
+
+         when Hook_Due          =>
+            return Next_Hook (Ctx, Phase_Of (G)) /= No_Row;
+
+         when Scenario_Found    =>
+            return Ctx.Scenario_Found;
+
+         when Has_Step          =>
+            return Ctx.Has_Step;
+
+         when Dropped           =>
+            return Ctx.Ignored or else not Ctx.Selected;
+
+         when Skips_All         =>
+            return
+              Ctx.Opts.Dry_Run
+              or else (Ctx.Before_All_Failed
+                       and then not Ctx.Opts.Continue_On_Failure);
+
+         when Unmatched         =>
+            return
+              Ctx.Has_Step and then Ctx.Text.Ok and then not Ctx.Match.Found;
+
+         when Must_Skip         =>
+            return
+              Ctx.Has_Step
+              and then (Ctx.Standing /= Running
+                        or else (not Ctx.Opts.Continue_On_Failure
+                                 and then not Ctx.Last_Passed));
+
+         when Oversized         =>
+            return
+              Ctx.Has_Step and then (not Ctx.Text.Ok or else not Ctx.Args_Fit);
+
+         when Step_Failed       =>
+            return Ctx.Step_Failed;
+
+         when Failing           =>
+            return Ctx.Standing = Failed;
+
+         when Before_All_Failed =>
+            return Ctx.Before_All_Failed;
+
+         when After_All_Failed  =>
+            return Ctx.After_All_Failed;
+      end case;
+   end Evaluate;
 
    function Pending_Hook_Kind (R : Runner) return Reg.Hook_Kind
    is (if R.Run.Ctx.Hook in Hooks'Range
@@ -344,11 +371,12 @@ is
        Ctx.Doc /= null
        and then Ctx.Scenario in 1 .. Ast.Scenario_Count (Ctx.Doc.all);
 
-   --  Moves to the next scenario position both filters keep.
-   procedure Seek_Scenario (Ctx : in out Work; Found : out Boolean) is
-      Next : Scenario_Position;
+   --  Moves to the next scenario position both filters keep, and says in
+   --  Scenario_Found whether there was one.
+   procedure Move_Scenario_Cursor (Ctx : in out Work) is
+      Found : Boolean := Ctx.Doc /= null;
+      Next  : Scenario_Position;
    begin
-      Found := Ctx.Doc /= null;
       while Found loop
          pragma Loop_Invariant (Ctx.Doc /= null);
          Next := Next_Position (Ctx.Doc.all, Ctx.Scenario, Ctx.Example);
@@ -357,7 +385,8 @@ is
          Found := Next.Found;
          exit when not Found or else Passes_Filters (Ctx);
       end loop;
-   end Seek_Scenario;
+      Ctx.Scenario_Found := Found;
+   end Move_Scenario_Cursor;
 
    --  The tag filter keeps the scenario; it is applied only after the
    --  scenario's before-hooks have run.  An untagged scenario evaluates
@@ -453,7 +482,11 @@ is
       F.Step_Line := No_Line;
    end Clear_Step;
 
-   procedure Seek_Step (Ctx : in out Work; Found : out Boolean) is
+   --  Moves to the scenario's next step and resolves it, and says in
+   --  Has_Step whether there was one.  With none left, the frame's step
+   --  is cleared before the after-hooks see it.
+   procedure Seek_Step (Ctx : in out Work) is
+      Found : Boolean;
    begin
       Move_Step_Cursor (Ctx, Found);
       if Found then
@@ -461,6 +494,7 @@ is
       else
          Clear_Step (Ctx.Frame);
       end if;
+      Ctx.Has_Step := Found;
    end Seek_Step;
 
    --  Builds the step request's arguments from the resolved step.
@@ -501,10 +535,12 @@ is
         others       => <>));
 
    --  A new scenario's context: selected, running, no step failed or
-   --  counted yet, no walk, and a frame with only the feature.
+   --  counted yet, no walk, a frame with only the feature, and its
+   --  before-hooks to walk from the hook table's first row.
    function Fresh_Scenario (Ctx : Work) return Work
    is ((Ctx
         with delta
+          Hook             => No_Row,
           Selected         => True,
           Ignored          => False,
           Standing         => Running,
@@ -631,6 +667,21 @@ is
           others   => <>));
    end Drop;
 
+   --  A new feature: the scenario walk starts before its first
+   --  scenario, and the frame holds only the file and the feature.
+   procedure Load_Feature (Ctx : in out Work) is
+   begin
+      Ctx.Scenario := Ast.No_Scenario;
+      Ctx.Example := Expand.No_Example;
+      Ctx.Frame := (File => Ctx.File, others => <>);
+      if Ctx.Doc /= null then
+         Ctx.Frame.Feature :=
+           Frames.To_Name
+             (Ast.Text (Ctx.Doc.all, Ast.Feature (Ctx.Doc.all).Head.Name));
+         Ctx.Frame.Feature_Line := Ast.Feature (Ctx.Doc.all).Head.Line;
+      end if;
+   end Load_Feature;
+
    --  The Document is released: nothing in Ctx designates it any more.
    procedure Release (Ctx : in out Work) is
    begin
@@ -641,24 +692,35 @@ is
       Ctx.Step_Arguments := Args.Make ("", (others => <>));
    end Release;
 
-   --  Each request act writes its own command; a step's request also
-   --  carries the step's arguments.  No other act writes one: every
-   --  event fires with no command pending, since Advance stops at one
-   --  and the shell's answer clears it before it fires Hook_Posted or
-   --  Step_Posted.
+   --  The hook phase each hook request act asks for.
+   Phase_Asked : constant array (Hook_Request) of Reg.Hook_Phase :=
+     [Ask_Run_Start_Hook      => Reg.Run_Start,
+      Ask_Scenario_Start_Hook => Reg.Scenario_Start,
+      Ask_Step_Start_Hook     => Reg.Step_Start,
+      Ask_Step_End_Hook       => Reg.Step_End,
+      Ask_Scenario_End_Hook   => Reg.Scenario_End,
+      Ask_Run_End_Hook        => Reg.Run_End];
+
+   --  The command each hook request act writes: the all-hooks run on
+   --  the run's own context, the others on the scenario's.
+   Command_Of : constant array (Hook_Request) of Command :=
+     [Ask_Run_Start_Hook => C_Before_All,
+      Ask_Run_End_Hook   => C_After_All,
+      others             => C_Hook];
+
+   --  Each request act writes its own command; a hook's request also
+   --  names its row, and a step's carries the step's arguments.  No
+   --  other act writes one: every event fires with no command pending,
+   --  since Advance stops at one and the shell's answer clears it
+   --  before it fires Hook_Posted or Step_Posted.
    procedure Ask_Shell (A : Request_Act; Ctx : in out Work) is
    begin
       case A is
-         when Ask_Before_All =>
-            Ctx.Requests.Pending := C_Before_All;
+         when Hook_Request =>
+            Ctx.Hook := Next_Hook (Ctx, Phase_Asked (A));
+            Ctx.Requests.Pending := Command_Of (A);
 
-         when Ask_After_All  =>
-            Ctx.Requests.Pending := C_After_All;
-
-         when Ask_Hook       =>
-            Ctx.Requests.Pending := C_Hook;
-
-         when Ask_Step       =>
+         when Ask_Step     =>
             Assemble (Ctx);
             Ctx.Requests.Pending := C_Step;
       end case;
@@ -710,26 +772,34 @@ is
 
    --  Each act applies the posted outcome as its phase requires: an
    --  all-hook phase remembers a failure, a scenario hook's reaches the
-   --  scenario, a step hook's and the step body's the step.
+   --  scenario, a step hook's and the step body's the step.  The step
+   --  body's result enters Step_After, whose hooks start from the hook
+   --  table's first row.
    procedure Take_Result (A : Result_Act; Ctx : in out Work) is
    begin
       case A is
-         when Take_Run_Start                                     =>
+         when Take_Run_Start                          =>
             Ctx.Before_All_Failed :=
               Ctx.Before_All_Failed or else not Ctx.Answer.Passing;
 
-         when Take_Run_End                                       =>
+         when Take_Run_End                            =>
             Ctx.After_All_Failed :=
               Ctx.After_All_Failed or else not Ctx.Answer.Passing;
 
-         when Take_Scenario_Start | Take_Scenario_End            =>
+         when Take_Scenario_Start | Take_Scenario_End =>
             Take_Scenario_Outcome (Ctx);
 
-         when Take_Step_Start | Take_Step_End | Take_Step_Result =>
+         when Take_Step_Start | Take_Step_End         =>
             Take_Step_Outcome (Ctx);
+
+         when Take_Step_Result                        =>
+            Take_Step_Outcome (Ctx);
+            Ctx.Hook := No_Row;
       end case;
    end Take_Result;
 
+   --  Open_Scenario and Begin_After enter a hook state, so each starts
+   --  its hooks from the hook table's first row.
    procedure Run_Scenario_Act (A : Scenario_Act; Ctx : in out Work) is
    begin
       case A is
@@ -743,6 +813,9 @@ is
             Skip (Ctx);
             Enter (Ctx);
 
+         when Begin_After    =>
+            Ctx.Hook := No_Row;
+
          when Close_Scenario =>
             Close (Ctx);
 
@@ -754,9 +827,17 @@ is
       end case;
    end Run_Scenario_Act;
 
+   --  Begin_Step enters Step_Before, so it starts the before-step hooks
+   --  from the hook table's first row.
    procedure Run_Step_Act (A : Step_Act; Ctx : in out Work) is
    begin
       case A is
+         when Next_Step      =>
+            Seek_Step (Ctx);
+
+         when Begin_Step     =>
+            Ctx.Hook := No_Row;
+
          when Mark_Undefined =>
             Close_Step_As (Ctx, Results.Undefined, No_Definition);
 
@@ -774,11 +855,23 @@ is
       end case;
    end Run_Step_Act;
 
+   --  Begin_Closing clears the frame and enters Closing, so it starts
+   --  the After_All hooks from the hook table's first row.
    procedure Run_Feature_Act (A : Feature_Act; Ctx : in out Work) is
    begin
       case A is
+         when Open_Feature     =>
+            Load_Feature (Ctx);
+
+         when Seek_Scenario    =>
+            Move_Scenario_Cursor (Ctx);
+
          when Close_Feature    =>
             Release (Ctx);
+
+         when Begin_Closing    =>
+            Ctx.Frame := (others => <>);
+            Ctx.Hook := No_Row;
 
          when Count_Hook_Error =>
             Results.Add_Hook_Error (Ctx.Totals);
@@ -813,53 +906,16 @@ is
    --  The engine loop.
    ---------------------------------------------------------------------
 
-   --  One machine step from the cursor of the current state; Moved is
-   --  False where only the shell can move the runner on.
-   procedure Move (R : in out Runner; Moved : out Boolean) is
-      Fact  : constant State_Fact := Facts (State_Of (R));
-      Found : Boolean;
-   begin
-      Moved := False;
-      case Fact.Cursor is
-         when Hook_Cursor     =>
-            R.Run.Ctx.Hook := Next_Hook (R.Run.Ctx, Fact.Phase);
-            Bundle.Process_Event
-              (R.Run,
-               (Kind =>
-                  (if R.Run.Ctx.Hook /= No_Row
-                   then E_Hook_Due
-                   else E_Hooks_Done)),
-               Moved);
-
-         when Scenario_Cursor =>
-            Seek_Scenario (R.Run.Ctx, Found);
-            Bundle.Process_Event
-              (R.Run,
-               (Kind => (if Found then E_Scenario_Due else E_Scenarios_Done)),
-               Moved);
-
-         when Step_Cursor     =>
-            Seek_Step (R.Run.Ctx, Found);
-            Bundle.Process_Event
-              (R.Run,
-               (Kind => (if Found then E_Step_Due else E_Steps_Done)),
-               Moved);
-
-         when Shell_Moves     =>
-            null;
-      end case;
-   end Move;
-
-   --  Runs the machine until a request or a notice waits for the shell,
-   --  or only the shell can move it on.
+   --  Fires Tick until a request or a notice waits for the shell, or
+   --  no row takes it: only the shell can move the runner on from there.
    procedure Advance (R : in out Runner) is
-      Moved : Boolean := True;
+      Handled : Boolean := True;
    begin
-      while Moved
+      while Handled
         and then not R.Run.Ctx.Noticed
         and then R.Run.Ctx.Requests.Pending = C_None
       loop
-         Move (R, Moved);
+         Bundle.Process_Event (R.Run, (Kind => E_Tick), Handled);
       end loop;
    end Advance;
 
@@ -891,15 +947,11 @@ is
       File  : String;
       Lines : Line_Selection) is
    begin
+      --  Only this event's facts: Open_Feature starts the walk and the
+      --  frame from them.
       R.Run.Ctx.Doc := Doc;
       R.Run.Ctx.Lines := Lines;
-      R.Run.Ctx.Scenario := Ast.No_Scenario;
-      R.Run.Ctx.Example := Expand.No_Example;
-      R.Run.Ctx.Frame := (others => <>);
-      R.Run.Ctx.Frame.File := Frames.To_Path (File);
-      R.Run.Ctx.Frame.Feature :=
-        Frames.To_Name (Ast.Text (Doc.all, Ast.Feature (Doc.all).Head.Name));
-      R.Run.Ctx.Frame.Feature_Line := Ast.Feature (Doc.all).Head.Line;
+      R.Run.Ctx.File := Frames.To_Path (File);
       Trigger (R, E_Feature);
    end Start_Feature;
 
@@ -910,7 +962,6 @@ is
 
    procedure Finish_Run (R : in out Runner) is
    begin
-      R.Run.Ctx.Frame := (others => <>);
       Trigger (R, E_Finish);
    end Finish_Run;
 

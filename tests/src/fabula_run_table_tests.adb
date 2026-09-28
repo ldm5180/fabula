@@ -226,6 +226,66 @@ package body Fabula_Run_Table_Tests is
    end Test_Step_Cursor;
 
    ---------------------------------------------------------------------
+   --  Each hook phase walks the hook table from its first row.  The
+   --  table lists the phases in reverse, so a phase that went on from
+   --  the row the phase before it stopped at would skip its own hook.
+   ---------------------------------------------------------------------
+
+   Two_By_Two_Doc : constant Lines :=
+     [+"Feature: two by two",
+      +"  Scenario: first",
+      +"    Given a passing step",
+      +"    Then a passing step",
+      +"  Scenario: second",
+      +"    Given a passing step",
+      +"    Then a passing step"];
+
+   Two_By_Two_Trace : constant Lines :=
+     [+"before_all start_note",
+      +"open first",
+      +"hook open_note",
+      +"enter first",
+      +"hook step_in",
+      +"step pass",
+      +"hook step_out",
+      +"passed a passing step",
+      +"hook step_in",
+      +"step pass",
+      +"hook step_out",
+      +"passed a passing step",
+      +"hook close_note",
+      +"close passed first",
+      +"open second",
+      +"hook open_note",
+      +"enter second",
+      +"hook step_in",
+      +"step pass",
+      +"hook step_out",
+      +"passed a passing step",
+      +"hook step_in",
+      +"step pass",
+      +"hook step_out",
+      +"passed a passing step",
+      +"hook close_note",
+      +"close passed second",
+      +"after_all end_note"];
+
+   procedure Test_Hook_Phases (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Log : Trace;
+      R   : Reversed_Run.Runner;
+   begin
+      Reversed.Run_One
+        (Two_By_Two_Doc, (others => <>), Reversed_Run.All_Lines, Log, R);
+      Assert_Trace (Log, Two_By_Two_Trace);
+      Assert_Counts
+        (Reversed_Run.Counts_Of (R),
+         (Scenarios => [Passed => 2, others => 0],
+          Steps     => [Passed => 4, others => 0],
+          others    => 0));
+   end Test_Hook_Phases;
+
+   ---------------------------------------------------------------------
    --  What the runner waits for, at each kind of pause.
    ---------------------------------------------------------------------
 
@@ -299,6 +359,8 @@ package body Fabula_Run_Table_Tests is
         (T, Test_Drop_Entry'Access, "a drop's notice says if it was entered");
       Register_Routine
         (T, Test_Step_Cursor'Access, "background steps, then the scenario's");
+      Register_Routine
+        (T, Test_Hook_Phases'Access, "each hook phase walks the whole table");
       Register_Routine
         (T, Test_Waiting_For'Access, "what the runner waits for, per pause");
    end Register_Tests;
