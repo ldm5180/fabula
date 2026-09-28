@@ -16,7 +16,9 @@ with Fabula.Searches;
 with Fabula.Tags;
 with Fabula.Texts;
 private with Fabula.Expand;
+private with Fabula.Step_Walk;
 private with Sml.Machines;
+private with Sml.Machines.Bundled;
 private with Sml.Request_Block;
 
 generic
@@ -232,14 +234,18 @@ private
    package Req is new Sml.Request_Block (Command => Command, None => C_None);
 
    --  Opening and Closing run the all-hooks; Ready waits between
-   --  features and Walking between one feature's scenarios.  A step
+   --  features and Walking between one feature's scenarios, which
+   --  Scenario_Check keeps or ends.  Stepping moves to the next step,
+   --  and Step_Check decides what becomes of it; a step that runs
    --  passes through Step_Before, Step_Body and Step_After.
    type State is
      (Opening,
       Ready,
       Walking,
+      Scenario_Check,
       Before,
       Stepping,
+      Step_Check,
       Step_Before,
       Step_Body,
       Step_After,
@@ -247,110 +253,167 @@ private
       Closing,
       Finished);
 
-   --  The *_Due events come from the core's cursors; Feature and
-   --  Finish from the shell's calls; Posted from a step body's outcome.
+   --  Tick is the core's own: the runner fires it until a request or a
+   --  notice waits, and the table decides what it does.  Feature and
+   --  Finish come from the shell's calls; Hook_Posted and Step_Posted
+   --  from the shell's answer, once it has written the outcome to
+   --  Answer.
    type Event_Kind is
-     (E_Hook_Due,
-      E_Hooks_Done,
-      E_Step_Due,
-      E_Steps_Done,
-      E_Scenario_Due,
-      E_Scenarios_Done,
-      E_Feature,
-      E_Finish,
-      E_Posted);
+     (E_Tick, E_Feature, E_Finish, E_Hook_Posted, E_Step_Posted);
 
    type Event is record
-      Kind : Event_Kind := E_Posted;
+      Kind : Event_Kind := E_Tick;
    end record;
-
-   --  What the cursor of each state walks, and for a hook state, the
-   --  phase of the hook rows it walks.  Only the shell moves the runner
-   --  on from the other states.
-   type Cursor_Kind is
-     (Hook_Cursor, Scenario_Cursor, Step_Cursor, Shell_Moves);
-
-   type State_Fact (Cursor : Cursor_Kind := Shell_Moves) is record
-      case Cursor is
-         when Hook_Cursor =>
-            Phase : Reg.Hook_Phase;
-
-         when others =>
-            null;
-      end case;
-   end record;
-
-   Facts : constant array (State) of State_Fact :=
-     [Opening     => (Hook_Cursor, Reg.Run_Start),
-      Ready       => (Cursor => Shell_Moves),
-      Walking     => (Cursor => Scenario_Cursor),
-      Before      => (Hook_Cursor, Reg.Scenario_Start),
-      Stepping    => (Cursor => Step_Cursor),
-      Step_Before => (Hook_Cursor, Reg.Step_Start),
-      Step_Body   => (Cursor => Shell_Moves),
-      Step_After  => (Hook_Cursor, Reg.Step_End),
-      After       => (Hook_Cursor, Reg.Scenario_End),
-      Closing     => (Hook_Cursor, Reg.Run_End),
-      Finished    => (Cursor => Shell_Moves)];
 
    --  How the scenario stands so far.  A skip never undoes a failure,
    --  so a new standing is the greater of the old and the new.
    type Disposition is (Running, Skipped, Failed);
 
+   --  The *_Due guards hold while a hook row of their phase is still to
+   --  run; each is named after its phase in Reg.Hook_Phase.
    type Guard_Kind is
      (Always,
+      Run_Start_Due,
+      Scenario_Start_Due,
+      Step_Start_Due,
+      Step_End_Due,
+      Scenario_End_Due,
+      Run_End_Due,
+      Scenario_Found,      --  the scenario walk found a scenario
+      Has_Step,            --  the step walk found a step
       Dropped,             --  ignored, or left out by the tag filter
       Skips_All,           --  a dry run, or a failed Before_All in a run
       --                       that stops on failure: no step runs
-      Unmatched,           --  no step definition matches the text
-      Must_Skip,           --  the scenario skips or failed, or a step
-      --                       before this one did not pass and the run
-      --                       stops there
-      Oversized,           --  the expansion does not fit
+      Unmatched,           --  a step, and no step definition matches it
+      Must_Skip,           --  a step, and the scenario skips or failed,
+      --                       or a step before it did not pass and the
+      --                       run stops there
+      Oversized,           --  a step whose expansion does not fit
       Step_Failed,         --  a step hook or the body failed the step
       Failing,             --  the scenario itself failed
       Before_All_Failed,   --  a Before_All hook failed
       After_All_Failed);   --  an After_All hook failed
 
-   --  What a transition asks the core to do.  The Ask_* acts are the
-   --  shell's requests; the rest are the core's own bookkeeping.
+   --  The guards that ask whether a hook of one phase is still to run.
+   subtype Hook_Due is Guard_Kind range Run_Start_Due .. Run_End_Due;
+
+   --  What a transition does.  The Ask_* acts are the shell's requests,
+   --  and the Take_* acts apply its answers; the rest are the core's own
+   --  bookkeeping.  Each hook phase has its own Ask_* and Take_* act,
+   --  named after it.  The acts are declared in groups, so each group
+   --  below is a range.
    type Act is
      (Nothing,
-      Ask_Before_All,
-      Ask_After_All,
-      Ask_Hook,
+      Ask_Run_Start_Hook,
+      Ask_Scenario_Start_Hook,
+      Ask_Step_Start_Hook,
+      Ask_Step_End_Hook,
+      Ask_Scenario_End_Hook,
+      Ask_Run_End_Hook,
       Ask_Step,
+      Take_Run_Start,
+      Take_Run_End,
+      Take_Scenario_Start,
+      Take_Scenario_End,
+      Take_Step_Start,
+      Take_Step_End,
+      Take_Step_Result,
       Open_Scenario,
       Enter_Scenario,
       Enter_Skipped,
+      Begin_After,
+      Close_Scenario,
+      Drop_Unentered,
+      Drop_Entered,
+      Next_Step,
+      Begin_Step,
       Mark_Undefined,
       Skip_Step,
       Refuse_Step,
       Fail_Step,
       Pass_Step,
-      Close_Scenario,
-      Drop_Unentered,
-      Drop_Entered,
+      Open_Feature,
+      Seek_Scenario,
       Close_Feature,
+      Begin_Closing,
       Count_Hook_Error);
 
-   --  The machine context: the request block, the act the last
-   --  transition asked for, and every flag the guards read.
+   --  The acts that ask the shell to run a hook or a step.
+   subtype Request_Act is Act range Ask_Run_Start_Hook .. Ask_Step;
+
+   --  The acts that ask for the next hook row of one phase.
+   subtype Hook_Request is Act range Ask_Run_Start_Hook .. Ask_Run_End_Hook;
+
+   --  The acts that apply the shell's posted outcome: one for each hook
+   --  phase, and one for a step's body.
+   subtype Result_Act is Act range Take_Run_Start .. Take_Step_Result;
+
+   --  The acts that open, enter, close or drop a scenario.
+   subtype Scenario_Act is Act range Open_Scenario .. Drop_Entered;
+
+   --  The acts that move to a step, start it, or close it without
+   --  running it or after it ran.
+   subtype Step_Act is Act range Next_Step .. Pass_Step;
+
+   --  The feature's and the whole run's bookkeeping.
+   subtype Feature_Act is Act range Open_Feature .. Count_Hook_Error;
+
+   --  The machine context: every field the guards read and the acts
+   --  write.  Hook is the row last requested in the current hook phase;
+   --  the act that enters a hook state sets it to No_Row.  Scenario and
+   --  Example walk the feature; Walk walks one scenario's steps.  Tally
+   --  counts this scenario's steps until it closes, so a dropped one
+   --  counts none.  The runner fires Tick itself.
    type Work is record
-      Requests          : Req.Block;
-      Due               : Act := Nothing;
-      Continue          : Boolean := False;
-      Dry_Run           : Boolean := False;
+      --  The run's options, loaded once by Start_Run.
+      Opts : Options;
+
+      --  This feature, and the scenario filter's lines, written by the
+      --  shell before E_Feature.
+      Doc   : Args.Document_Access;
+      Lines : Line_Selection;
+      File  : Frames.Path_Text;
+
+      --  A hook's or a step's outcome, written by the shell before
+      --  E_Hook_Posted or E_Step_Posted.
+      Answer : Check.Outcome;
+
+      --  What waits for the shell: one request, or one notice.
+      Requests : Req.Block;
+      Noticed  : Boolean := False;
+      Note     : Notice;
+
+      --  What the shell reads with a request or a notice.
+      Frame          : Frames.Frame;
+      Hook           : Natural := No_Row;
+      Match          : Reg.Match_Result;
+      Step_Arguments : Args.List;
+
+      --  The run.
+      Totals            : Results.Counts;
       Before_All_Failed : Boolean := False;
       After_All_Failed  : Boolean := False;
-      Selected          : Boolean := True;
-      Ignored           : Boolean := False;
-      Standing          : Disposition := Running;
-      Last_Passed       : Boolean := True;
-      Text_Ok           : Boolean := False;
-      Found             : Boolean := False;
-      Args_Fit          : Boolean := False;
-      Step_Failed       : Boolean := False;
+
+      --  The scenario walk: where it stands, and how the scenario stands.
+      Scenario         : Ast.Scenario_Handle := Ast.No_Scenario;
+      Example          : Expand.Example_Ref;
+      Scenario_Found   : Boolean := False;
+      Tag_Set          : Expand.Tag_Set;
+      Selected         : Boolean := True;
+      Ignored          : Boolean := False;
+      Standing         : Disposition := Running;
+      Scenario_Outcome : Check.Outcome;
+      Tally            : Results.Counts;
+
+      --  The step walk: the step, whether there is one, and what
+      --  resolving it found.
+      Walk         : Step_Walk.Walk := Step_Walk.Empty;
+      Has_Step     : Boolean := False;
+      Text         : Expand.Text_Result;
+      Args_Fit     : Boolean := False;
+      Last_Passed  : Boolean := True;
+      Step_Failed  : Boolean := False;
+      Step_Outcome : Check.Outcome;
    end record;
 
    function Kind_Of (Evt : Event) return Event_Kind
@@ -358,7 +421,7 @@ private
 
    function Evaluate (G : Guard_Kind; Ctx : Work; Evt : Event) return Boolean;
 
-   --  Records A; an Ask_* act also becomes the pending request.
+   --  Does A's work on Ctx; an Ask_* act also writes its request.
    procedure Execute (A : Act; Ctx : in out Work; Evt : Event);
 
    package SM is new
@@ -373,88 +436,66 @@ private
         Evaluate    => Evaluate,
         Execute     => Execute);
 
-   Rows : constant := 32;
+   package Bundle is new SM.Bundled;
+
+   Rows : constant := 39;
    --  The transition table's length; a Runner embeds a machine of it.
 
-   --  Which part of a scenario's steps the step cursor is in: none has
-   --  run yet, the background's, or the scenario's own.
-   type Step_Segment is (Not_Started, Background, Own);
-
-   --  Hook is the row last requested in the current hook phase, No_Row
-   --  at its start.  Scenario and Example walk the feature; Segment and
-   --  Step walk one scenario's steps.  Tally counts this scenario's
-   --  steps until it closes, so a dropped one counts none.
+   --  The machine and its context, in one object: nothing of the run
+   --  is kept beside the machine.
    type Runner is record
-      Machine          : SM.Machine (Rows);
-      Ctx              : Work;
-      Opts             : Options;
-      Doc              : Args.Document_Access;
-      Lines            : Line_Selection;
-      Frame            : Frames.Frame;
-      Totals           : Results.Counts;
-      Tally            : Results.Counts;
-      Noticed          : Boolean := False;
-      Note             : Notice;
-      Hook             : Natural := No_Row;
-      Scenario         : Ast.Scenario_Handle := Ast.No_Scenario;
-      Example          : Expand.Example_Ref;
-      Tag_Set          : Expand.Tag_Set;
-      Segment          : Step_Segment := Not_Started;
-      Step             : Ast.Step_Handle := Ast.No_Step;
-      Text             : Expand.Text_Result;
-      Match            : Reg.Match_Result;
-      Step_Arguments   : Args.List;
-      Step_Outcome     : Check.Outcome;
-      Scenario_Outcome : Check.Outcome;
+      Run : Bundle.Instance (Rows);
    end record;
 
    function Next_Request (R : Runner) return Command
-   is (R.Ctx.Requests.Pending);
+   is (R.Run.Ctx.Requests.Pending);
 
    function Has_Notice (R : Runner) return Boolean
-   is (R.Noticed);
+   is (R.Run.Ctx.Noticed);
 
    function Between_Features (R : Runner) return Boolean
-   is (SM.State_Of (R.Machine) = Ready
-       and then not R.Noticed
-       and then R.Ctx.Requests.Pending = C_None);
+   is (Bundle.State_Of (R.Run) = Ready
+       and then not R.Run.Ctx.Noticed
+       and then R.Run.Ctx.Requests.Pending = C_None);
 
    function Run_Finished (R : Runner) return Boolean
-   is (SM.State_Of (R.Machine) = Finished);
+   is (Bundle.State_Of (R.Run) = Finished);
 
    function Waiting_For (R : Runner) return Wait_Kind
-   is (if R.Noticed and then R.Ctx.Requests.Pending /= C_None
+   is (if R.Run.Ctx.Noticed and then R.Run.Ctx.Requests.Pending /= C_None
        then Clash
-       elsif R.Noticed
+       elsif R.Run.Ctx.Noticed
        then Notice_Wait
        else
-         (case R.Ctx.Requests.Pending is
+         (case R.Run.Ctx.Requests.Pending is
             when C_Step                     => Step_Wait,
             when C_Before_All | C_After_All => All_Hook_Wait,
             when C_Hook                     => Hook_Wait,
             when C_None                     =>
-              (if SM.State_Of (R.Machine) in Ready | Finished
+              (if Bundle.State_Of (R.Run) in Ready | Finished
                then Idle
                else Stuck)));
 
    function Current_Notice (R : Runner) return Notice
-   is (R.Note);
+   is (R.Run.Ctx.Note);
 
    function Pending_Hook (R : Runner) return Natural
-   is (if R.Ctx.Requests.Pending in C_Before_All | C_After_All | C_Hook
-       then R.Hook
+   is (if R.Run.Ctx.Requests.Pending in C_Before_All | C_After_All | C_Hook
+       then R.Run.Ctx.Hook
        else No_Row);
 
    function Pending_Step (R : Runner) return Natural
-   is (if R.Ctx.Requests.Pending = C_Step then R.Match.Index else No_Row);
+   is (if R.Run.Ctx.Requests.Pending = C_Step
+       then R.Run.Ctx.Match.Index
+       else No_Row);
 
    function Step_Args (R : Runner) return Args.List
-   is (R.Step_Arguments);
+   is (R.Run.Ctx.Step_Arguments);
 
    function Current_Frame (R : Runner) return Frames.Frame
-   is (R.Frame);
+   is (R.Run.Ctx.Frame);
 
    function Counts_Of (R : Runner) return Results.Counts
-   is (R.Totals);
+   is (R.Run.Ctx.Totals);
 
 end Fabula.Run;

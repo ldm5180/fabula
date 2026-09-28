@@ -111,6 +111,181 @@ package body Fabula_Run_Table_Tests is
    end Test_Drop_Entry;
 
    ---------------------------------------------------------------------
+   --  The step cursor: the background's steps, then the scenario's
+   --  own, whichever of the two a scenario has.  Each step traces its
+   --  scenario's line and its own, and the next scenario starts again
+   --  from the background.
+   ---------------------------------------------------------------------
+
+   Both_Doc : constant Lines :=
+     [+"Feature: both",
+      +"  Background:",
+      +"    Given I place 1 x shared",
+      +"    And I place 2 x shared",
+      +"  Scenario: first",
+      +"    Given I place 3 x mine",
+      +"    Then I place 4 x mine",
+      +"  Scenario: second",
+      +"    Given I place 5 x mine"];
+
+   Both_Trace : constant Lines :=
+     [+"open first",
+      +"enter first",
+      +"step place 1 shared @5:3",
+      +"passed I place 1 x shared",
+      +"step place 2 shared @5:4",
+      +"passed I place 2 x shared",
+      +"step place 3 mine @5:6",
+      +"passed I place 3 x mine",
+      +"step place 4 mine @5:7",
+      +"passed I place 4 x mine",
+      +"close passed first",
+      +"open second",
+      +"enter second",
+      +"step place 1 shared @8:3",
+      +"passed I place 1 x shared",
+      +"step place 2 shared @8:4",
+      +"passed I place 2 x shared",
+      +"step place 5 mine @8:9",
+      +"passed I place 5 x mine",
+      +"close passed second"];
+
+   Shared_Only_Doc : constant Lines :=
+     [+"Feature: shared only",
+      +"  Background:",
+      +"    Given I place 1 x shared",
+      +"    And I place 2 x shared",
+      +"  Scenario: none of its own"];
+
+   Shared_Only_Trace : constant Lines :=
+     [+"open none of its own",
+      +"enter none of its own",
+      +"step place 1 shared @5:3",
+      +"passed I place 1 x shared",
+      +"step place 2 shared @5:4",
+      +"passed I place 2 x shared",
+      +"close passed none of its own"];
+
+   Own_Only_Doc : constant Lines :=
+     [+"Feature: own only",
+      +"  Scenario: mine",
+      +"    Given I place 1 x mine",
+      +"    Then I place 2 x mine"];
+
+   Own_Only_Trace : constant Lines :=
+     [+"open mine",
+      +"enter mine",
+      +"step place 1 mine @2:3",
+      +"passed I place 1 x mine",
+      +"step place 2 mine @2:4",
+      +"passed I place 2 x mine",
+      +"close passed mine"];
+
+   Neither_Doc : constant Lines :=
+     [+"Feature: neither", +"  Scenario: no step at all"];
+
+   Neither_Trace : constant Lines :=
+     [+"open no step at all",
+      +"enter no step at all",
+      +"close passed no step at all"];
+
+   procedure Test_Step_Cursor (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Log : Trace;
+      R   : Bare_Run.Runner;
+   begin
+      Bare.Run_One (Both_Doc, (others => <>), Bare_Run.All_Lines, Log, R);
+      Assert_Trace (Log, Both_Trace);
+      Assert_Counts
+        (Bare_Run.Counts_Of (R),
+         (Scenarios => [Passed => 2, others => 0],
+          Steps     => [Passed => 7, others => 0],
+          others    => 0));
+      Bare.Run_One
+        (Shared_Only_Doc, (others => <>), Bare_Run.All_Lines, Log, R);
+      Assert_Trace (Log, Shared_Only_Trace);
+      Assert_Counts
+        (Bare_Run.Counts_Of (R),
+         (Scenarios => [Passed => 1, others => 0],
+          Steps     => [Passed => 2, others => 0],
+          others    => 0));
+      Bare.Run_One (Own_Only_Doc, (others => <>), Bare_Run.All_Lines, Log, R);
+      Assert_Trace (Log, Own_Only_Trace);
+      Assert_Counts
+        (Bare_Run.Counts_Of (R),
+         (Scenarios => [Passed => 1, others => 0],
+          Steps     => [Passed => 2, others => 0],
+          others    => 0));
+      Bare.Run_One (Neither_Doc, (others => <>), Bare_Run.All_Lines, Log, R);
+      Assert_Trace (Log, Neither_Trace);
+      Assert_Counts
+        (Bare_Run.Counts_Of (R),
+         (Scenarios => [Passed => 1, others => 0],
+          Steps     => [others => 0],
+          others    => 0));
+   end Test_Step_Cursor;
+
+   ---------------------------------------------------------------------
+   --  Each hook phase walks the hook table from its first row.  The
+   --  table lists the phases in reverse, so a phase that went on from
+   --  the row the phase before it stopped at would skip its own hook.
+   ---------------------------------------------------------------------
+
+   Two_By_Two_Doc : constant Lines :=
+     [+"Feature: two by two",
+      +"  Scenario: first",
+      +"    Given a passing step",
+      +"    Then a passing step",
+      +"  Scenario: second",
+      +"    Given a passing step",
+      +"    Then a passing step"];
+
+   Two_By_Two_Trace : constant Lines :=
+     [+"before_all start_note",
+      +"open first",
+      +"hook open_note",
+      +"enter first",
+      +"hook step_in",
+      +"step pass",
+      +"hook step_out",
+      +"passed a passing step",
+      +"hook step_in",
+      +"step pass",
+      +"hook step_out",
+      +"passed a passing step",
+      +"hook close_note",
+      +"close passed first",
+      +"open second",
+      +"hook open_note",
+      +"enter second",
+      +"hook step_in",
+      +"step pass",
+      +"hook step_out",
+      +"passed a passing step",
+      +"hook step_in",
+      +"step pass",
+      +"hook step_out",
+      +"passed a passing step",
+      +"hook close_note",
+      +"close passed second",
+      +"after_all end_note"];
+
+   procedure Test_Hook_Phases (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Log : Trace;
+      R   : Reversed_Run.Runner;
+   begin
+      Reversed.Run_One
+        (Two_By_Two_Doc, (others => <>), Reversed_Run.All_Lines, Log, R);
+      Assert_Trace (Log, Two_By_Two_Trace);
+      Assert_Counts
+        (Reversed_Run.Counts_Of (R),
+         (Scenarios => [Passed => 2, others => 0],
+          Steps     => [Passed => 4, others => 0],
+          others    => 0));
+   end Test_Hook_Phases;
+
+   ---------------------------------------------------------------------
    --  What the runner waits for, at each kind of pause.
    ---------------------------------------------------------------------
 
@@ -182,6 +357,10 @@ package body Fabula_Run_Table_Tests is
          "must-skip and undefined, all four combinations");
       Register_Routine
         (T, Test_Drop_Entry'Access, "a drop's notice says if it was entered");
+      Register_Routine
+        (T, Test_Step_Cursor'Access, "background steps, then the scenario's");
+      Register_Routine
+        (T, Test_Hook_Phases'Access, "each hook phase walks the whole table");
       Register_Routine
         (T, Test_Waiting_For'Access, "what the runner waits for, per pause");
    end Register_Tests;

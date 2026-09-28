@@ -89,6 +89,17 @@ package Fabula_Run_Fixture is
       Before_Step >= Step_In,
       After_Step >= Step_Out];
 
+   --  One hook per phase, each phase's row above the phase before it:
+   --  a phase that starts its walk where the last phase stopped finds
+   --  no row of its own.
+   Reversed_Hooks : constant Hook_Table :=
+     [After_All >= End_Note,
+      After >= Close_Note,
+      After_Step >= Step_Out,
+      Before_Step >= Step_In,
+      Before >= Open_Note,
+      Before_All >= Start_Note];
+
    --  The reference interpreter's example hooks, and their mirrors.
    Control_Hooks : constant Hook_Table :=
      [Before ("@skip") >= Open_Skip,
@@ -142,6 +153,8 @@ package Fabula_Run_Fixture is
      Fabula.Run (Reg => Box, Steps => Box_Steps, Hooks => No_Hooks);
    package Lifecycle_Run is new
      Fabula.Run (Reg => Box, Steps => Box_Steps, Hooks => Lifecycle_Hooks);
+   package Reversed_Run is new
+     Fabula.Run (Reg => Box, Steps => Box_Steps, Hooks => Reversed_Hooks);
    package Control_Run is new
      Fabula.Run (Reg => Box, Steps => Box_Steps, Hooks => Control_Hooks);
    package Noted_Run is new
@@ -162,6 +175,12 @@ package Fabula_Run_Fixture is
    package Lifecycle is new
      Fabula_Run_Script.Shell
        (Lifecycle_Run,
+        Hook_Outcome,
+        Step_Outcome,
+        Step_Note);
+   package Reversed is new
+     Fabula_Run_Script.Shell
+       (Reversed_Run,
         Hook_Outcome,
         Step_Outcome,
         Step_Note);

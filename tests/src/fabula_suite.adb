@@ -25,6 +25,7 @@ with Fabula_Run_Table_Tests;
 with Fabula_Run_Tests;
 with Fabula_Scan_Tests;
 with Fabula_Searches_Tests;
+with Fabula_Step_Walk_Tests;
 with Fabula_Stepless_Tests;
 with Fabula_Tags_Tests;
 with Fabula_Texts_Tests;
@@ -89,6 +90,8 @@ package body Fabula_Suite is
         new Fabula_Args_Tests.Test;
       Names_Test       : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Names_Tests.Test;
+      Step_Walk_Test   : constant AUnit.Test_Cases.Test_Case_Access :=
+        new Fabula_Step_Walk_Tests.Test;
       Run_Test         : constant AUnit.Test_Cases.Test_Case_Access :=
         new Fabula_Run_Tests.Test;
       Run_Select_Test  : constant AUnit.Test_Cases.Test_Case_Access :=
@@ -110,6 +113,7 @@ package body Fabula_Suite is
       AUnit.Test_Suites.Add_Test (Result, Numbers_Test);
       AUnit.Test_Suites.Add_Test (Result, Args_Test);
       AUnit.Test_Suites.Add_Test (Result, Names_Test);
+      AUnit.Test_Suites.Add_Test (Result, Step_Walk_Test);
       AUnit.Test_Suites.Add_Test (Result, Run_Test);
       AUnit.Test_Suites.Add_Test (Result, Run_Select_Test);
       AUnit.Test_Suites.Add_Test (Result, Run_Table_Test);
