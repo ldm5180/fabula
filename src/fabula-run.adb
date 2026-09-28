@@ -7,10 +7,10 @@ is
 
    use type Ast.Scenario_Handle;
    use type Ast.Scenario_Kind;
-   use type Ast.Step_Handle;
    use type Expand.Walk_Status;
    use type Reg.Hook_Phase;
    use type Results.Status;
+   use type Step_Walk.Segment;
 
    package Op is new SM.Operators (Always => Always, Nothing => Nothing);
    use type Op.Ev, Op.Ev_Guard, Op.Ev_Built, Op.Source;
@@ -379,75 +379,30 @@ is
        then Ast.Background (Doc).Steps
        else (others => <>));
 
-   function Has_Steps (Steps : Ast.Step_Range) return Boolean
-   is (Steps.First <= Steps.Last);
-
-   --  Moves Segment and Step to the scenario's next step: the
-   --  background's steps first, then the scenario's own.
-   procedure Next_Step_Position
-     (Doc     : Ast.Document;
-      S       : Ast.Scenario_Index;
-      Segment : in out Step_Segment;
-      Step    : in out Ast.Step_Handle;
-      Found   : out Boolean)
-   with
-     Pre  => S <= Ast.Scenario_Count (Doc),
-     Post => (if Found then Step in 1 .. Ast.Step_Count (Doc))
-   is
-      Shared : constant Ast.Step_Range := Background_Steps (Doc);
-      Mine   : constant Ast.Step_Range := Ast.Scenario (Doc, S).Steps;
-   begin
-      Found := False;
-      case Segment is
-         when Not_Started =>
-            if Has_Steps (Shared) then
-               Segment := Background;
-               Step := Shared.First;
-            elsif Has_Steps (Mine) then
-               Segment := Own;
-               Step := Mine.First;
-            else
-               return;
-            end if;
-
-         when Background  =>
-            if Step < Shared.Last then
-               Step := Step + 1;
-            elsif Has_Steps (Mine) then
-               Segment := Own;
-               Step := Mine.First;
-            else
-               return;
-            end if;
-
-         when Own         =>
-            if Step < Mine.Last then
-               Step := Step + 1;
-            else
-               return;
-            end if;
-      end case;
-      Found := Step in 1 .. Ast.Step_Count (Doc);
-   end Next_Step_Position;
+   --  The step the step cursor stands on.
+   function Step_Of (R : Runner) return Ast.Step_Handle
+   is (Step_Walk.Step_Of (R.Walk));
 
    --  The outline row a scenario step substitutes from; a background
    --  step and a plain scenario's steps substitute nothing.
    function Header_Of (R : Runner) return Ast.Examples_Row_Handle
-   is (if R.Segment = Background
+   is (if Step_Walk.State_Of (R.Walk) = Step_Walk.Background
        then Ast.No_Examples_Row
        else Expand.Header_Row_Of (R.Example));
 
    function Data_Of (R : Runner) return Ast.Examples_Row_Handle
-   is (if R.Segment = Background
+   is (if Step_Walk.State_Of (R.Walk) = Step_Walk.Background
        then Ast.No_Examples_Row
        else Expand.Data_Row_Of (R.Example));
 
    --  Expands the current step, looks up its definition and checks it
    --  fits.  An undefined step reports its text as written.
    procedure Resolve (R : in out Runner)
-   with Pre => R.Doc /= null and then R.Step in 1 .. Ast.Step_Count (R.Doc.all)
+   with
+     Pre =>
+       R.Doc /= null and then Step_Of (R) in 1 .. Ast.Step_Count (R.Doc.all)
    is
-      Node : constant Ast.Step_Node := Ast.Step (R.Doc.all, R.Step);
+      Node : constant Ast.Step_Node := Ast.Step (R.Doc.all, Step_Of (R));
    begin
       R.Text :=
         Expand.Resolved (R.Doc.all, Node.Text, Header_Of (R), Data_Of (R));
@@ -469,24 +424,25 @@ is
       R.Frame.Step_Line := Node.Line;
    end Resolve;
 
-   --  Moves the step cursor; without a scenario nothing is found.
+   --  Moves the step cursor to the scenario's next step; without a
+   --  scenario nothing is found.  The walk decides Found.  The range
+   --  check after it never changes the answer, as the walk's step count
+   --  came from this same document when the scenario opened.  It is
+   --  there for the prover, which cannot see that from here.
    procedure Move_Step_Cursor (R : in out Runner; Found : out Boolean)
    with
      Post =>
        (if Found
-        then R.Doc /= null and then R.Step in 1 .. Ast.Step_Count (R.Doc.all))
+        then
+          R.Doc /= null
+          and then Step_Of (R) in 1 .. Ast.Step_Count (R.Doc.all))
    is
-      Segment : Step_Segment := R.Segment;
-      Step    : Ast.Step_Handle := R.Step;
    begin
-      Found := False;
-      if R.Doc /= null
-        and then R.Scenario in 1 .. Ast.Scenario_Count (R.Doc.all)
-      then
-         Next_Step_Position (R.Doc.all, R.Scenario, Segment, Step, Found);
-         R.Segment := Segment;
-         R.Step := Step;
-      end if;
+      Step_Walk.Next (R.Walk);
+      Found :=
+        Step_Walk.Found (R.Walk)
+        and then R.Doc /= null
+        and then Step_Of (R) in 1 .. Ast.Step_Count (R.Doc.all);
    end Move_Step_Cursor;
 
    --  The frame's step, cleared outside step execution.
@@ -509,7 +465,8 @@ is
    --  Builds the step request's arguments from the resolved step.
    procedure Assemble (R : in out Runner) is
    begin
-      if R.Doc = null or else R.Step not in 1 .. Ast.Step_Count (R.Doc.all)
+      if R.Doc = null
+        or else Step_Of (R) not in 1 .. Ast.Step_Count (R.Doc.all)
       then
          return;
       end if;
@@ -518,8 +475,8 @@ is
           (Expand.Value (R.Text),
            R.Match.Captures,
            (Doc        => R.Doc,
-            Doc_String => Ast.Step (R.Doc.all, R.Step).Doc,
-            Table      => Ast.Step (R.Doc.all, R.Step).Table,
+            Doc_String => Ast.Step (R.Doc.all, Step_Of (R)).Doc,
+            Table      => Ast.Step (R.Doc.all, Step_Of (R)).Table,
             Header_Row => Header_Of (R),
             Data_Row   => Data_Of (R)));
    end Assemble;
@@ -551,8 +508,8 @@ is
         Feature_Line => F.Feature_Line,
         others       => <>));
 
-   --  The scenario's tags and frame, and whether the tag filter keeps
-   --  it.
+   --  The scenario's tags and frame, whether the tag filter keeps it,
+   --  and the walk over its steps.
    procedure Load_Scenario (R : in out Runner) is
    begin
       if R.Doc /= null
@@ -566,6 +523,11 @@ is
          R.Frame.Scenario_Line :=
            Scenario_Line (R.Doc.all, R.Scenario, R.Example);
          R.Ctx.Selected := Filter_Selects (R);
+         R.Walk :=
+           Step_Walk.Started
+             (Shared     => Background_Steps (R.Doc.all),
+              Mine       => Ast.Scenario (R.Doc.all, R.Scenario).Steps,
+              Step_Count => Ast.Step_Count (R.Doc.all));
       end if;
    end Load_Scenario;
 
@@ -574,8 +536,7 @@ is
       R.Ctx := Fresh_Scenario (R.Ctx);
       R.Tally := (others => <>);
       R.Scenario_Outcome := (others => <>);
-      R.Segment := Not_Started;
-      R.Step := Ast.No_Step;
+      R.Walk := Step_Walk.Empty;
       R.Frame := Feature_Only (R.Frame);
       Load_Scenario (R);
       Notify
@@ -617,7 +578,7 @@ is
           Cause    => Cause,
           Scenario => R.Scenario,
           Data_Row => Expand.Data_Row_Of (R.Example),
-          Step     => R.Step,
+          Step     => Step_Of (R),
           Outcome  => R.Step_Outcome));
    end Close_Step_As;
 
@@ -672,7 +633,7 @@ is
       R.Doc := null;
       R.Scenario := Ast.No_Scenario;
       R.Example := Expand.No_Example;
-      R.Step := Ast.No_Step;
+      R.Walk := Step_Walk.Empty;
       R.Step_Arguments := Args.Make ("", (others => <>));
    end Release;
 

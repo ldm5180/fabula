@@ -18,6 +18,7 @@ with Fabula.Registry;
 with Fabula.Results;
 with Fabula.Run;
 with Fabula.Scan;
+with Fabula.Step_Walk;
 with Fabula.Tags;
 with Fabula.Texts;
 
@@ -61,6 +62,9 @@ is
 
    Empty_Slice_Is_Empty : constant Boolean :=
      Fabula.Ast.Length (Fabula.Ast.Empty_Slice) = Fabula.Ast.No_Characters;
+
+   Empty_Walk_Finds_None : constant Boolean :=
+     not Fabula.Step_Walk.Found (Fabula.Step_Walk.Empty);
 
    --  One parse of a two-line feature, as the shell will run it: proves
    --  Start, Feed and Finish callable under their contracts, and

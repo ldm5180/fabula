@@ -16,6 +16,7 @@ with Fabula.Searches;
 with Fabula.Tags;
 with Fabula.Texts;
 private with Fabula.Expand;
+private with Fabula.Step_Walk;
 private with Sml.Machines;
 private with Sml.Request_Block;
 
@@ -376,14 +377,10 @@ private
    Rows : constant := 32;
    --  The transition table's length; a Runner embeds a machine of it.
 
-   --  Which part of a scenario's steps the step cursor is in: none has
-   --  run yet, the background's, or the scenario's own.
-   type Step_Segment is (Not_Started, Background, Own);
-
    --  Hook is the row last requested in the current hook phase, No_Row
-   --  at its start.  Scenario and Example walk the feature; Segment and
-   --  Step walk one scenario's steps.  Tally counts this scenario's
-   --  steps until it closes, so a dropped one counts none.
+   --  at its start.  Scenario and Example walk the feature; Walk walks
+   --  one scenario's steps.  Tally counts this scenario's steps until it
+   --  closes, so a dropped one counts none.
    type Runner is record
       Machine          : SM.Machine (Rows);
       Ctx              : Work;
@@ -399,8 +396,7 @@ private
       Scenario         : Ast.Scenario_Handle := Ast.No_Scenario;
       Example          : Expand.Example_Ref;
       Tag_Set          : Expand.Tag_Set;
-      Segment          : Step_Segment := Not_Started;
-      Step             : Ast.Step_Handle := Ast.No_Step;
+      Walk             : Step_Walk.Walk := Step_Walk.Empty;
       Text             : Expand.Text_Result;
       Match            : Reg.Match_Result;
       Step_Arguments   : Args.List;
