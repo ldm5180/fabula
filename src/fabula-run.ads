@@ -250,7 +250,8 @@ private
       Finished);
 
    --  The *_Due events come from the core's cursors; Feature and
-   --  Finish from the shell's calls; Posted from a step body's outcome.
+   --  Finish from the shell's calls; Hook_Posted and Step_Posted from
+   --  the shell's answer, once it has written the outcome to Answer.
    type Event_Kind is
      (E_Hook_Due,
       E_Hooks_Done,
@@ -260,10 +261,11 @@ private
       E_Scenarios_Done,
       E_Feature,
       E_Finish,
-      E_Posted);
+      E_Hook_Posted,
+      E_Step_Posted);
 
    type Event is record
-      Kind : Event_Kind := E_Posted;
+      Kind : Event_Kind := E_Step_Posted;
    end record;
 
    --  What the cursor of each state walks, and for a hook state, the
@@ -314,15 +316,23 @@ private
       Before_All_Failed,   --  a Before_All hook failed
       After_All_Failed);   --  an After_All hook failed
 
-   --  What a transition does.  The Ask_* acts are the shell's requests;
-   --  the rest are the core's own bookkeeping.  The acts are declared
-   --  in groups, so each group below is a range.
+   --  What a transition does.  The Ask_* acts are the shell's requests,
+   --  and the Take_* acts apply its answers; the rest are the core's own
+   --  bookkeeping.  The acts are declared in groups, so each group below
+   --  is a range.
    type Act is
      (Nothing,
       Ask_Before_All,
       Ask_After_All,
       Ask_Hook,
       Ask_Step,
+      Take_Run_Start,
+      Take_Run_End,
+      Take_Scenario_Start,
+      Take_Scenario_End,
+      Take_Step_Start,
+      Take_Step_End,
+      Take_Step_Result,
       Open_Scenario,
       Enter_Scenario,
       Enter_Skipped,
@@ -339,6 +349,10 @@ private
 
    --  The acts that ask the shell to run a hook or a step.
    subtype Request_Act is Act range Ask_Before_All .. Ask_Step;
+
+   --  The acts that apply the shell's posted outcome: one for each hook
+   --  phase, named after it, and one for a step's body.
+   subtype Result_Act is Act range Take_Run_Start .. Take_Step_Result;
 
    --  The acts that open, enter, close or drop a scenario.
    subtype Scenario_Act is Act range Open_Scenario .. Drop_Entered;
@@ -361,6 +375,10 @@ private
       --  This feature, and the scenario filter's lines.
       Doc   : Args.Document_Access;
       Lines : Line_Selection;
+
+      --  A hook's or a step's outcome, written by the shell before
+      --  E_Hook_Posted or E_Step_Posted.
+      Answer : Check.Outcome;
 
       --  What waits for the shell: one request, or one notice.
       Requests : Req.Block;
@@ -419,7 +437,7 @@ private
 
    package Bundle is new SM.Bundled;
 
-   Rows : constant := 32;
+   Rows : constant := 38;
    --  The transition table's length; a Runner embeds a machine of it.
 
    --  The machine and its context, in one object: nothing of the run

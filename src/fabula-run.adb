@@ -25,20 +25,25 @@ is
    Scenarios_Done : constant Ev := (Kind => E_Scenarios_Done);
    Feature        : constant Ev := (Kind => E_Feature);
    Finish         : constant Ev := (Kind => E_Finish);
-   Posted         : constant Ev := (Kind => E_Posted);
+   Hook_Posted    : constant Ev := (Kind => E_Hook_Posted);
+   Step_Posted    : constant Ev := (Kind => E_Step_Posted);
 
    --  Each row reads:  From + Event (Guard) / Act >= To.  Rows for one
    --  state are tried top to bottom, so a guarded row takes its event
    --  before the rows below it.  A hook phase ends when its cursor finds
    --  no further row; a scenario's steps end the same way.  Each act
-   --  does its own work, and an Ask_* act writes its request; the line
-   --  above each block names the guard flags its acts write.
+   --  does its own work, and an Ask_* act writes its request.  Each
+   --  hook state's Hook_Posted row names the act for its phase, so the
+   --  row decides where a hook's outcome goes.  The line above each
+   --  block names the guard flags its acts write.
    --!format off
    Table : constant SM.Transition_Table (1 .. Rows) :=
      [
       --  The run's Before_All hooks; then features, one at a time.
-      --  Writes: Selected, Ignored, Standing, Last_Passed, Step_Failed.
+      --  Writes: Before_All_Failed, Selected, Ignored, Standing,
+      --  Last_Passed, Step_Failed.
       Opening + Hook_Due                       / Ask_Before_All   >= Opening,
+      Opening + Hook_Posted                    / Take_Run_Start   >= Opening,
       Opening + Hooks_Done (Before_All_Failed) / Count_Hook_Error >= Ready,
       Opening + Hooks_Done                                        >= Ready,
       Ready   + Feature                                           >= Walking,
@@ -48,40 +53,45 @@ is
 
       --  One scenario: its before-hooks, then its steps.  The tag
       --  filter and an ignore both drop it once the hooks have run.
-      --  Writes: Standing, Last_Passed.
-      Before   + Hook_Due               / Ask_Hook       >= Before,
-      Before   + Hooks_Done (Dropped)   / Drop_Unentered >= Walking,
-      Before   + Hooks_Done (Skips_All) / Enter_Skipped  >= Stepping,
-      Before   + Hooks_Done             / Enter_Scenario >= Stepping,
-      Stepping + Step_Due (Dropped)     / Drop_Entered   >= Walking,
-      Stepping + Step_Due (Unmatched)   / Mark_Undefined >= Stepping,
-      Stepping + Step_Due (Must_Skip)   / Skip_Step      >= Stepping,
-      Stepping + Step_Due (Oversized)   / Refuse_Step    >= Stepping,
-      Stepping + Step_Due                                >= Step_Before,
-      Stepping + Steps_Done (Dropped)   / Drop_Entered   >= Walking,
-      Stepping + Steps_Done (Failing)   / Close_Scenario >= Walking,
-      Stepping + Steps_Done                              >= After,
+      --  Writes: Standing, Ignored, Last_Passed.
+      Before   + Hook_Due               / Ask_Hook            >= Before,
+      Before   + Hook_Posted            / Take_Scenario_Start >= Before,
+      Before   + Hooks_Done (Dropped)   / Drop_Unentered      >= Walking,
+      Before   + Hooks_Done (Skips_All) / Enter_Skipped       >= Stepping,
+      Before   + Hooks_Done             / Enter_Scenario      >= Stepping,
+      Stepping + Step_Due (Dropped)     / Drop_Entered        >= Walking,
+      Stepping + Step_Due (Unmatched)   / Mark_Undefined      >= Stepping,
+      Stepping + Step_Due (Must_Skip)   / Skip_Step           >= Stepping,
+      Stepping + Step_Due (Oversized)   / Refuse_Step         >= Stepping,
+      Stepping + Step_Due                                     >= Step_Before,
+      Stepping + Steps_Done (Dropped)   / Drop_Entered        >= Walking,
+      Stepping + Steps_Done (Failing)   / Close_Scenario      >= Walking,
+      Stepping + Steps_Done                                   >= After,
 
       --  One step: its before-step hooks, its body, its after-step
       --  hooks.  A failed before-step hook closes it at once.
-      --  Writes: Last_Passed.
-      Step_Before + Hook_Due                 / Ask_Hook  >= Step_Before,
-      Step_Before + Hooks_Done (Step_Failed) / Fail_Step >= Stepping,
-      Step_Before + Hooks_Done               / Ask_Step  >= Step_Body,
-      Step_Body   + Posted                               >= Step_After,
-      Step_After  + Hook_Due                 / Ask_Hook  >= Step_After,
-      Step_After  + Hooks_Done (Step_Failed) / Fail_Step >= Stepping,
-      Step_After  + Hooks_Done               / Pass_Step >= Stepping,
+      --  Writes: Step_Failed, Standing, Ignored, Last_Passed.
+      Step_Before + Hook_Due                 / Ask_Hook         >= Step_Before,
+      Step_Before + Hook_Posted              / Take_Step_Start  >= Step_Before,
+      Step_Before + Hooks_Done (Step_Failed) / Fail_Step        >= Stepping,
+      Step_Before + Hooks_Done               / Ask_Step         >= Step_Body,
+      Step_Body   + Step_Posted              / Take_Step_Result >= Step_After,
+      Step_After  + Hook_Due                 / Ask_Hook         >= Step_After,
+      Step_After  + Hook_Posted              / Take_Step_End    >= Step_After,
+      Step_After  + Hooks_Done (Step_Failed) / Fail_Step        >= Stepping,
+      Step_After  + Hooks_Done               / Pass_Step        >= Stepping,
 
       --  The scenario's after-hooks; an ignore there still drops it.
-      --  Writes: no guard flag.
-      After + Hook_Due             / Ask_Hook       >= After,
-      After + Hooks_Done (Dropped) / Drop_Entered   >= Walking,
-      After + Hooks_Done           / Close_Scenario >= Walking,
+      --  Writes: Standing, Ignored.
+      After + Hook_Due             / Ask_Hook          >= After,
+      After + Hook_Posted          / Take_Scenario_End >= After,
+      After + Hooks_Done (Dropped) / Drop_Entered      >= Walking,
+      After + Hooks_Done           / Close_Scenario    >= Walking,
 
       --  The run's After_All hooks.
-      --  Writes: no guard flag.
+      --  Writes: After_All_Failed.
       Closing + Hook_Due                      / Ask_After_All    >= Closing,
+      Closing + Hook_Posted                   / Take_Run_End     >= Closing,
       Closing + Hooks_Done (After_All_Failed) / Count_Hook_Error >= Finished,
       Closing + Hooks_Done                                       >= Finished];
    --!format on
@@ -634,7 +644,8 @@ is
    --  Each request act writes its own command; a step's request also
    --  carries the step's arguments.  No other act writes one: every
    --  event fires with no command pending, since Advance stops at one
-   --  and the shell's answer clears it.
+   --  and the shell's answer clears it before it fires Hook_Posted or
+   --  Step_Posted.
    procedure Ask_Shell (A : Request_Act; Ctx : in out Work) is
    begin
       case A is
@@ -652,6 +663,72 @@ is
             Ctx.Requests.Pending := C_Step;
       end case;
    end Ask_Shell;
+
+   --  The posted outcome fails the scenario.
+   procedure Fail_Scenario (Ctx : in out Work) is
+   begin
+      Ctx.Standing := Failed;
+      Ctx.Scenario_Outcome := Ctx.Answer;
+   end Fail_Scenario;
+
+   --  A skip, an ignore or a scenario failure, from any hook or step.
+   procedure Take_Order (Ctx : in out Work) is
+   begin
+      case Ctx.Answer.Order is
+         when Check.Continue        =>
+            null;
+
+         when Check.Skip_Scenario   =>
+            Skip (Ctx);
+
+         when Check.Ignore_Scenario =>
+            Ctx.Ignored := True;
+
+         when Check.Fail_Scenario   =>
+            Fail_Scenario (Ctx);
+      end case;
+   end Take_Order;
+
+   --  A step's own outcome, or a step hook's: a failure fails the step.
+   procedure Take_Step_Outcome (Ctx : in out Work) is
+   begin
+      if not Ctx.Answer.Passing then
+         Ctx.Step_Failed := True;
+         Ctx.Step_Outcome := Ctx.Answer;
+      end if;
+      Take_Order (Ctx);
+   end Take_Step_Outcome;
+
+   --  A scenario hook's outcome: a failure fails the scenario itself.
+   procedure Take_Scenario_Outcome (Ctx : in out Work) is
+   begin
+      if not Ctx.Answer.Passing then
+         Fail_Scenario (Ctx);
+      end if;
+      Take_Order (Ctx);
+   end Take_Scenario_Outcome;
+
+   --  Each act applies the posted outcome as its phase requires: an
+   --  all-hook phase remembers a failure, a scenario hook's reaches the
+   --  scenario, a step hook's and the step body's the step.
+   procedure Take_Result (A : Result_Act; Ctx : in out Work) is
+   begin
+      case A is
+         when Take_Run_Start                                     =>
+            Ctx.Before_All_Failed :=
+              Ctx.Before_All_Failed or else not Ctx.Answer.Passing;
+
+         when Take_Run_End                                       =>
+            Ctx.After_All_Failed :=
+              Ctx.After_All_Failed or else not Ctx.Answer.Passing;
+
+         when Take_Scenario_Start | Take_Scenario_End            =>
+            Take_Scenario_Outcome (Ctx);
+
+         when Take_Step_Start | Take_Step_End | Take_Step_Result =>
+            Take_Step_Outcome (Ctx);
+      end case;
+   end Take_Result;
 
    procedure Run_Scenario_Act (A : Scenario_Act; Ctx : in out Work) is
    begin
@@ -717,6 +794,9 @@ is
 
          when Request_Act  =>
             Ask_Shell (A, Ctx);
+
+         when Result_Act   =>
+            Take_Result (A, Ctx);
 
          when Scenario_Act =>
             Run_Scenario_Act (A, Ctx);
@@ -841,90 +921,21 @@ is
       Advance (R);
    end Resume;
 
-   procedure Fail_Scenario (Ctx : in out Work; Outcome : Check.Outcome) is
-   begin
-      Ctx.Standing := Failed;
-      Ctx.Scenario_Outcome := Outcome;
-   end Fail_Scenario;
-
-   --  A skip, an ignore or a scenario failure, from any hook or step.
-   procedure Take_Order (Ctx : in out Work; Outcome : Check.Outcome) is
-   begin
-      case Outcome.Order is
-         when Check.Continue        =>
-            null;
-
-         when Check.Skip_Scenario   =>
-            Skip (Ctx);
-
-         when Check.Ignore_Scenario =>
-            Ctx.Ignored := True;
-
-         when Check.Fail_Scenario   =>
-            Fail_Scenario (Ctx, Outcome);
-      end case;
-   end Take_Order;
-
-   --  A step's own outcome, or a step hook's: a failure fails the step.
-   procedure Take_Step_Outcome (Ctx : in out Work; Outcome : Check.Outcome) is
-   begin
-      if not Outcome.Passing then
-         Ctx.Step_Failed := True;
-         Ctx.Step_Outcome := Outcome;
-      end if;
-      Take_Order (Ctx, Outcome);
-   end Take_Step_Outcome;
-
-   --  A scenario hook's outcome: a failure fails the scenario itself.
-   procedure Take_Scenario_Outcome (Ctx : in out Work; Outcome : Check.Outcome)
-   is
-   begin
-      if not Outcome.Passing then
-         Fail_Scenario (Ctx, Outcome);
-      end if;
-      Take_Order (Ctx, Outcome);
-   end Take_Scenario_Outcome;
-
-   --  A hook's outcome goes where its phase says: an all-hook phase
-   --  remembers a failure, a scenario hook's reaches the scenario, a
-   --  step hook's the step.
-   procedure Take_Hook_Outcome
-     (Ctx : in out Work; Phase : Reg.Hook_Phase; Outcome : Check.Outcome) is
-   begin
-      case Phase is
-         when Reg.Run_Start                         =>
-            Ctx.Before_All_Failed :=
-              Ctx.Before_All_Failed or else not Outcome.Passing;
-
-         when Reg.Run_End                           =>
-            Ctx.After_All_Failed :=
-              Ctx.After_All_Failed or else not Outcome.Passing;
-
-         when Reg.Scenario_Start | Reg.Scenario_End =>
-            Take_Scenario_Outcome (Ctx, Outcome);
-
-         when Reg.Step_Start | Reg.Step_End         =>
-            Take_Step_Outcome (Ctx, Outcome);
-      end case;
-   end Take_Hook_Outcome;
-
-   --  A hook request is pending only in a hook state, so the state's
-   --  fact always names the phase.
+   --  The shell's answer: it writes only the outcome and fires the
+   --  event.  A hook request waits only in a hook state, and each hook
+   --  state's Hook_Posted row routes the outcome to its phase's act.
    procedure Post_Hook_Result (R : in out Runner; Outcome : Check.Outcome) is
-      Fact : constant State_Fact := Facts (State_Of (R));
    begin
       R.Run.Ctx.Requests.Pending := C_None;
-      if Fact.Cursor = Hook_Cursor then
-         Take_Hook_Outcome (R.Run.Ctx, Fact.Phase, Outcome);
-      end if;
-      Advance (R);
+      R.Run.Ctx.Answer := Outcome;
+      Trigger (R, E_Hook_Posted);
    end Post_Hook_Result;
 
    procedure Post_Step_Result (R : in out Runner; Outcome : Check.Outcome) is
    begin
       R.Run.Ctx.Requests.Pending := C_None;
-      Take_Step_Outcome (R.Run.Ctx, Outcome);
-      Trigger (R, E_Posted);
+      R.Run.Ctx.Answer := Outcome;
+      Trigger (R, E_Step_Posted);
    end Post_Step_Result;
 
 end Fabula.Run;
