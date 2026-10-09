@@ -71,8 +71,13 @@ is
    is (Source'First = Char_Index'First
        and then Source'Length <= Limits.Max_Pattern_Length);
 
+   --  The literal token over the pattern's First .. Last.  This and
+   --  Add_Param build a full aggregate, not a delta of No_Token: gnatprove's
+   --  flow analysis reports a formal that only feeds such a delta as an
+   --  unused initial value.  The value is the same, since No_Token is
+   --  (others => <>).
    function Literal_Token (First : Char_Index; Last : Char_Count) return Token
-   is ((No_Token with delta First => First, Last => Last));
+   is ((First => First, Last => Last, others => <>));
 
    --  The Keys row whose spelling starts at Source (From), or No_Key.
    --  Keys are case-sensitive and must match exactly.
@@ -181,9 +186,7 @@ is
       end if;
       Flush_Run (B);
       Add_Token
-        (B.Result,
-         B.Ok,
-         (No_Token with delta Kind => Parameter, Param => Kind));
+        (B.Result, B.Ok, (Kind => Parameter, Param => Kind, others => <>));
       B.Params := B.Params + 1;
    end Add_Param;
 
