@@ -246,6 +246,12 @@ is
      (Doc : Ast.Document; P : Scenario_Position) return Boolean
    is (if P.Found then P.Scenario in 1 .. Ast.Scenario_Count (Doc));
 
+   --  The position at S and Ex, found when Ex has a row due.
+   function At_Row
+     (S : Ast.Scenario_Handle; Ex : Expand.Example_Ref)
+      return Scenario_Position
+   is (Found => Ex.Status = Expand.Row_Due, Scenario => S, Example => Ex);
+
    --  From S and Ex, the outline's next data row, when S is an outline
    --  with a current row; else S and Ex as they are, not found.
    function Next_Row
@@ -253,14 +259,7 @@ is
       return Scenario_Position
    is (if Ex.Status = Expand.Row_Due
          and then S in 1 .. Ast.Scenario_Count (Doc)
-       then
-         (declare
-            Next : constant Expand.Example_Ref :=
-              Expand.Next_Example (Doc, S, Ex);
-          begin
-            (Found    => Next.Status = Expand.Row_Due,
-             Scenario => S,
-             Example  => Next))
+       then At_Row (S, Expand.Next_Example (Doc, S, Ex))
        else (Found => False, Scenario => S, Example => Ex))
    with Post => In_Document (Doc, Next_Row'Result);
 
