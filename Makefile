@@ -18,8 +18,22 @@ test:
 	alr --non-interactive test
 
 ## prove       Run the SPARK proof and the proof-closure lint
+#  PROVE_TIMEOUT only stops a wedged run.  phase1_guard.py first drops
+#  gnatprove's phase-1 ALIs when a `gnatprove -u` left two of them
+#  disagreeing on a source's checksum: from there gnatprove's own
+#  gprbuild re-reads an ALI its compiler is rewriting and spins until
+#  killed.  The lock holds the guard and gnatprove together, because two
+#  gnatprove runs on one tree corrupt each other's output.  A manual
+#  `gnatprove -u` takes the same lock:
+#  flock proof/obj/.prove.lock alr exec -- gnatprove -P proof/proof.gpr ...
+PROVE_TIMEOUT ?= 30m
+PROVE_OBJ := proof/obj
 prove:
-	alr exec -- gnatprove -P proof/proof.gpr -j0 --level=2 --checks-as-errors=on --warnings=error
+	@mkdir -p $(PROVE_OBJ)
+	flock $(PROVE_OBJ)/.prove.lock sh -c '\
+	  python3 tools/phase1_guard.py --obj $(PROVE_OBJ) proof/src src && \
+	  timeout $(PROVE_TIMEOUT) alr exec -- gnatprove -P proof/proof.gpr \
+	    -j0 --level=2 --checks-as-errors=on --warnings=error'
 	python3 tools/proof_closure_lint.py
 
 ## format      Check formatting (gnatformat --check, no warnings)
@@ -34,6 +48,7 @@ validation:
 shape:
 	python3 tools/shape_check.py --selftest
 	python3 tools/proof_closure_lint.py --selftest
+	python3 tools/phase1_guard.py --selftest
 	python3 tools/shape_check.py
 
 ## example     Build the box example binary, both modes

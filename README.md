@@ -278,6 +278,14 @@ make demo       # run the whole example/features/ suite (exit 1 by design),
 make ci         # all of the above, cheapest first
 ```
 
+`make prove` first runs `tools/phase1_guard.py`, which drops gnatprove's
+phase-1 ALIs when a `gnatprove -u` left them disagreeing on a source's
+checksum (the state in which gnatprove's gprbuild spins forever), and holds
+`proof/obj/.prove.lock` across the guard and gnatprove, since two gnatprove
+runs on one tree corrupt each other; a manual `gnatprove -u` takes the same
+lock: `flock proof/obj/.prove.lock alr exec -- gnatprove -P proof/proof.gpr
+-u <unit> ...`.  gnatprove is stopped after `PROVE_TIMEOUT` (30m).
+
 `make ci` checks parity in three kinds, each named for what it is:
 
 1. **Upstream reference captures** (12 captures): nine files of the

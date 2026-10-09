@@ -104,6 +104,9 @@ jobs:
       - name: Proof-closure lint selftest
         run: python3 tools/proof_closure_lint.py --selftest
 
+      - name: Phase-1 guard selftest
+        run: python3 tools/phase1_guard.py --selftest
+
   gate:
     name: Byte gate (example vs. the pinned oracle)
     runs-on: ubuntu-latest
